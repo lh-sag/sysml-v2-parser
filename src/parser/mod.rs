@@ -47,7 +47,6 @@ use crate::ast::{
 };
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 use nom::error::Error;
-use nom::Parser;
 use nom_locate::LocatedSpan;
 
 /// Result of parsing with error recovery: a (possibly partial) AST and zero or more diagnostics.
@@ -769,6 +768,58 @@ fn unexpected_keyword_in_scope_diagnostic(
     ))
 }
 
+fn invalid_bare_identifier_in_body_diagnostic(
+    fragment: &[u8],
+    scope_label: &str,
+) -> Option<(&'static str, String, String, String)> {
+    let is_action = scope_label.contains("action body");
+    let is_state = scope_label.contains("state body");
+    if !is_action && !is_state {
+        return None;
+    }
+
+    let fragment = trim_ascii_start(fragment);
+    let ident_end = fragment
+        .iter()
+        .position(|b| !b.is_ascii_alphanumeric() && *b != b'_')
+        .unwrap_or(fragment.len());
+    if ident_end == 0 || !fragment[0].is_ascii_alphabetic() {
+        return None;
+    }
+
+    let ident = &fragment[..ident_end];
+    let rest = trim_ascii_start(&fragment[ident_end..]);
+    if !(rest.starts_with(b";")
+        || rest.starts_with(b"}")
+        || rest.starts_with(b"\n")
+        || rest.starts_with(b"\r"))
+    {
+        return None;
+    }
+
+    let ident_text = String::from_utf8_lossy(ident);
+    if is_action {
+        Some((
+            "invalid_bare_identifier_in_action_body",
+            format!("bare identifier `{ident_text}` is not a valid action body member"),
+            "action body member such as `perform`, `bind`, `in`, or `out`".to_string(),
+            format!(
+                "Use an explicit action-body form, for example `perform {ident_text};`, `bind ... = ...;`, or an `in`/`out` parameter declaration."
+            ),
+        ))
+    } else {
+        Some((
+            "invalid_bare_identifier_in_state_body",
+            format!("bare identifier `{ident_text}` is not a valid state body member"),
+            "state body member such as `entry`, `transition`, `then`, `state`, or `ref`"
+                .to_string(),
+            format!(
+                "Use an explicit state-body form, for example `then {ident_text};`, `transition ...;`, or a nested `state` member."
+            ),
+        ))
+    }
+}
+
 fn unexpected_closing_brace_parse_error(input: Input<'_>) -> ParseError {
     ParseError::new("unexpected closing '}'")
         .with_location(
@@ -886,6 +937,12 @@ enum RecoveryClassification {
         suggestion: String,
     },
     InvalidTypingOperator {
+        code: String,
+        message: String,
+        expected: String,
+        suggestion: String,
+    },
+    InvalidBareIdentifierInBody {
         code: String,
         message: String,
         expected: String,
@@ -1037,6 +1094,17 @@ fn classify_recovery(
     }
 
     if let Some((code, message, expected, suggestion)) =
+        invalid_bare_identifier_in_body_diagnostic(trimmed, scope_label)
+    {
+        return RecoveryClassification::InvalidBareIdentifierInBody {
+            code: code.to_string(),
+            message,
+            expected,
+            suggestion,
+        };
+    }
+
+    if let Some((code, message, expected, suggestion)) =
         unexpected_keyword_in_scope_diagnostic(trimmed, starters, scope_label)
     {
         return RecoveryClassification::UnexpectedKeywordInScope {
@@ -1100,6 +1168,12 @@ pub(crate) fn build_recovery_error_node_from_span(
             expected,
             suggestion,
         }
+        | RecoveryClassification::InvalidBareIdentifierInBody {
+            code,
+            message,
+            expected,
+            suggestion,
+        }
         | RecoveryClassification::UnexpectedKeywordInScope {
             code,
             message,
@@ -1143,28 +1217,6 @@ pub(crate) fn build_recovery_error_node_from_span(
     }
 }
 
-fn is_only_trailing_closing_braces(mut input: Input<'_>) -> bool {
-    loop {
-        let (next, _) = lex::ws_and_comments(input).unwrap_or((input, ()));
-        input = next;
-        if input.fragment().is_empty() {
-            return true;
-        }
-        if input.fragment().starts_with(b"}") {
-            match nom::bytes::complete::tag::<_, _, nom::error::Error<Input>>(&b"}"[..])
-                .parse(input)
-            {
-                Ok((next, _)) => {
-                    input = next;
-                    continue;
-                }
-                Err(_) => return false,
-            }
-        }
-        return false;
-    }
-}
-
 fn parse_error_from_recovery_node(span: &crate::ast::Span, node: &ParseErrorNode) -> ParseError {
     let mut err = ParseError::new(node.message.clone())
         .with_location(span.offset, span.line, span.column)
@@ -1205,6 +1257,9 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
         | Some("unexpected_closing_brace")
         | Some("missing_closing_brace")
         | Some("unsupported_annotation_syntax")
+        | Some("invalid_bare_identifier_in_action_body")
+        | Some("invalid_bare_identifier_in_state_body")
+        | Some("recovery_cascade_suppressed")
         | Some("unexpected_keyword_in_scope") => 5,
         Some("illegal_top_level_definition") => 4,
         Some(code) if code.starts_with("recovered_") => 2,
@@ -1243,6 +1298,94 @@ fn dedup_errors(mut errors: Vec<ParseError>) -> Vec<ParseError> {
 
     deduped.sort_by_key(|e| (e.offset.unwrap_or(usize::MAX), e.line.unwrap_or(u32::MAX)));
     deduped
+}
+
+fn is_cascade_candidate(err: &ParseError) -> bool {
+    matches!(err.code.as_deref(), Some("missing_semicolon"))
+        || err
+            .code
+            .as_deref()
+            .is_some_and(|code| code.starts_with("recovered_"))
+}
+
+fn cascade_family(err: &ParseError) -> Option<&str> {
+    if matches!(err.code.as_deref(), Some("missing_semicolon")) {
+        Some("missing_semicolon")
+    } else if err
+        .code
+        .as_deref()
+        .is_some_and(|code| code.starts_with("recovered_"))
+    {
+        Some("recovered")
+    } else {
+        None
+    }
+}
+
+fn make_cascade_summary(run: &[ParseError]) -> Option<ParseError> {
+    let summary_anchor = run.first()?;
+    let suppressed = run.len().saturating_sub(3);
+    let family = cascade_family(summary_anchor).unwrap_or("recovery");
+    let mut err = ParseError::new(format!(
+        "suppressed {suppressed} cascading {family} diagnostic{} after earlier recovery errors",
+        if suppressed == 1 { "" } else { "s" }
+    ))
+    .with_location(
+        summary_anchor.offset?,
+        summary_anchor.line?,
+        summary_anchor.column?,
+    )
+    .with_length(summary_anchor.length.unwrap_or(1).max(1))
+    .with_code("recovery_cascade_suppressed")
+    .with_expected("fix the first syntax error in this body")
+    .with_suggestion("Fix the earliest diagnostic in this body first; later syntax errors may be cascades.")
+    .with_severity(DiagnosticSeverity::Warning)
+    .with_category(DiagnosticCategory::ParseError);
+    if let Some(found) = &summary_anchor.found {
+        err = err.with_found(found.clone());
+    }
+    Some(err)
+}
+
+fn suppress_diagnostic_cascades(errors: Vec<ParseError>) -> Vec<ParseError> {
+    const MAX_UNSUMMARIZED_CASCADE: usize = 3;
+
+    let mut output = Vec::new();
+    let mut run: Vec<ParseError> = Vec::new();
+
+    let flush_run = |run: &mut Vec<ParseError>, output: &mut Vec<ParseError>| {
+        if run.len() <= MAX_UNSUMMARIZED_CASCADE {
+            output.append(run);
+        } else {
+            output.extend(run.drain(..MAX_UNSUMMARIZED_CASCADE));
+            if let Some(summary) = make_cascade_summary(run) {
+                output.push(summary);
+            }
+            run.clear();
+        }
+    };
+
+    for err in errors {
+        let continues_run = run.last().is_some_and(|previous| {
+            is_cascade_candidate(&err)
+                && cascade_family(previous) == cascade_family(&err)
+                && previous.line.zip(err.line).is_some_and(|(a, b)| b <= a + 1)
+        });
+
+        if is_cascade_candidate(&err) && (run.is_empty() || continues_run) {
+            run.push(err);
+        } else {
+            flush_run(&mut run, &mut output);
+            if is_cascade_candidate(&err) {
+                run.push(err);
+            } else {
+                output.push(err);
+            }
+        }
+    }
+    flush_run(&mut run, &mut output);
+    output.sort_by_key(|e| (e.offset.unwrap_or(usize::MAX), e.line.unwrap_or(u32::MAX)));
+    output
 }
 
 fn collect_requirement_body_errors(body: &RequirementDefBody, errors: &mut Vec<ParseError>) {
@@ -1495,9 +1638,11 @@ pub fn parse_root(input: &str) -> Result<RootNamespace, ParseError> {
             if !rest.fragment().is_empty() && has_unclosed_brace(bytes) {
                 return Err(missing_closing_brace_error_at_eof(bytes));
             }
-            if rest.fragment().is_empty() || is_only_trailing_closing_braces(rest) {
+            if rest.fragment().is_empty() {
                 log::debug!("parse_root: success, {} top-level elements", root.elements.len());
                 Ok(root)
+            } else if trim_ascii_start(rest.fragment()).starts_with(b"}") {
+                Err(unexpected_closing_brace_parse_error(rest))
             } else {
                 let offset = located.location_offset() + located.fragment().len() - rest.fragment().len();
                 let unconsumed = rest.fragment();
@@ -1683,6 +1828,7 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
         elements: elements.clone(),
     }));
     errors = dedup_errors(errors);
+    errors = suppress_diagnostic_cascades(errors);
 
     ParseResult {
         root: RootNamespace { elements },

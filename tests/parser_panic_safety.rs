@@ -36,7 +36,9 @@ fn malformed_inputs() -> Vec<&'static str> {
 #[test]
 fn parse_never_panics_on_known_malformed_inputs() {
     for input in malformed_inputs() {
-        let strict = catch_unwind(AssertUnwindSafe(|| parse(input)));
+        let strict = catch_unwind(AssertUnwindSafe(|| {
+            let _ = parse(input).is_ok();
+        }));
         assert!(
             strict.is_ok(),
             "parse() panicked for malformed input: {:?}",
@@ -55,7 +57,9 @@ fn parse_never_panics_on_known_malformed_inputs() {
 proptest! {
     #[test]
     fn arbitrary_text_never_panics(random in ".*") {
-        let strict = catch_unwind(AssertUnwindSafe(|| parse(&random)));
+        let strict = catch_unwind(AssertUnwindSafe(|| {
+            let _ = parse(&random).is_ok();
+        }));
         prop_assert!(
             strict.is_ok(),
             "parse() panicked for generated input of len {}",

@@ -113,20 +113,7 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
             }
             Err(_) => {
                 let start_unknown = input;
-                if let Ok((next, _)) = skip_statement_or_block(input) {
-                    if next.location_offset() != start_unknown.location_offset() {
-                        let frag = start_unknown.fragment();
-                        let take = frag.len().min(80);
-                        let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-                        elements.push(node_from_to(
-                            start_unknown,
-                            next,
-                            StateDefBodyElement::Other(preview),
-                        ));
-                        input = next;
-                        continue;
-                    }
-                }
+                let (next, _) = recover_body_element(input, STATE_BODY_STARTERS)?;
                 let recovery = build_recovery_error_node_from_span(
                     start_unknown,
                     next,
@@ -134,7 +121,6 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
                     "state body",
                     "recovered_state_body_element",
                 );
-                let (next, _) = recover_body_element(input, STATE_BODY_STARTERS)?;
                 if next.location_offset() == start_unknown.location_offset() {
                     let (input, _) = skip_until_brace_end(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
@@ -142,7 +128,11 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
                 }
                 if matches!(
                     recovery.code.as_str(),
-                    "missing_member_name" | "missing_type_reference"
+                    "missing_member_name"
+                        | "missing_type_reference"
+                        | "invalid_bare_identifier_in_state_body"
+                        | "missing_semicolon"
+                        | "missing_body_or_semicolon"
                 ) {
                     elements.push(node_from_to(
                         start_unknown,

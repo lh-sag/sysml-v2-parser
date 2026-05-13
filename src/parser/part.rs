@@ -107,6 +107,7 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
             }
             Err(_) => {
                 let start_unknown = input;
+                let (next, _) = recover_body_element(input, PART_BODY_STARTERS)?;
                 let recovery = build_recovery_error_node_from_span(
                     start_unknown,
                     next,
@@ -114,7 +115,6 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
                     "part definition body",
                     "recovered_part_def_body_element",
                 );
-                let (next, _) = recover_body_element(input, PART_BODY_STARTERS)?;
                 if next.location_offset() == start_unknown.location_offset() {
                     let (input, _) = skip_until_brace_end(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
@@ -122,7 +122,13 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
                 }
                 if matches!(
                     recovery.code.as_str(),
-                    "missing_member_name" | "missing_type_reference"
+                    "missing_member_name"
+                        | "missing_type_reference"
+                        | "invalid_bare_identifier_in_action_body"
+                        | "invalid_bare_identifier_in_state_body"
+                        | "unexpected_keyword_in_scope"
+                        | "missing_semicolon"
+                        | "missing_body_or_semicolon"
                 ) {
                     elements.push(node_from_to(
                         start_unknown,

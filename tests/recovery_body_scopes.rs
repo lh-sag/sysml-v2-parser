@@ -108,3 +108,43 @@ fn state_recovery_keeps_later_members() {
         "later state members should still parse"
     );
 }
+
+#[test]
+fn state_body_bare_identifier_reports_targeted_diagnostic_and_keeps_transition() {
+    let input = "package P {\nstate def Machine {\nReady;\ntransition t then Ready;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    let err = result
+        .errors
+        .iter()
+        .find(|e| e.code.as_deref() == Some("invalid_bare_identifier_in_state_body"))
+        .expect("expected targeted state bare identifier diagnostic");
+    assert_eq!(err.line, Some(3));
+    assert_eq!(
+        err.expected.as_deref(),
+        Some("state body member such as `entry`, `transition`, `then`, `state`, or `ref`")
+    );
+
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let state_def = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::StateDef(s) => Some(&s.value),
+            _ => None,
+        })
+        .expect("state def should be present");
+    let StateDefBody::Brace { elements } = &state_def.body else {
+        panic!("expected state body");
+    };
+    assert!(elements
+        .iter()
+        .any(|e| matches!(e.value, StateDefBodyElement::Error(_))));
+    assert!(elements
+        .iter()
+        .any(|e| matches!(e.value, StateDefBodyElement::Transition(_))));
+}

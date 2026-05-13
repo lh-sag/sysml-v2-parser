@@ -2048,7 +2048,9 @@ fn test_invalid_input_corpus_is_handled_gracefully() {
     ];
 
     for input in invalid_inputs {
-        let strict = std::panic::catch_unwind(|| parse(input));
+        let strict = std::panic::catch_unwind(|| {
+            let _ = parse(input).is_ok();
+        });
         assert!(strict.is_ok(), "parse should not panic for {:?}", input);
 
         let recovered = std::panic::catch_unwind(|| parse_with_diagnostics(input));

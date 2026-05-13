@@ -42,9 +42,9 @@ fn joined_constraint_expression_text(src: &str, body: &RequireConstraintBody) ->
     }
 }
 
-fn first_require_constraint_body<'a>(
-    root: &'a sysml_v2_parser::ast::RootNamespace,
-) -> &'a RequireConstraintBody {
+fn first_require_constraint_body(
+    root: &sysml_v2_parser::ast::RootNamespace,
+) -> &RequireConstraintBody {
     let pkg = match &root.elements[0].value {
         RootElement::Package(p) => &p.value,
         _ => panic!("expected package"),

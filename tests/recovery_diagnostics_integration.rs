@@ -367,6 +367,59 @@ fn fixture_unexpected_extra_closing_brace_is_localized() {
 }
 
 #[test]
+fn strict_parse_reports_unexpected_trailing_closing_brace() {
+    let input = "package P {\npart def A;\n}\n}";
+    let err = sysml_v2_parser::parse(input).expect_err("extra closing brace should fail");
+    assert_eq!(err.line, Some(4));
+    assert_eq!(err.code.as_deref(), Some("unexpected_closing_brace"));
+    assert_eq!(err.found.as_deref(), Some("}"));
+}
+
+#[test]
+fn repeated_recovery_diagnostics_are_summarized_after_first_few() {
+    let input = r#"package P {
+part def Vehicle {
+  part a : A
+  part b : B
+  part c : C
+  part d : D
+  part e : E
+}
+action def Done { }
+}"#;
+    let result = parse_with_diagnostics(input);
+    let missing_semicolons = result
+        .errors
+        .iter()
+        .filter(|e| e.code.as_deref() == Some("missing_semicolon"))
+        .count();
+    assert_eq!(
+        missing_semicolons, 3,
+        "only the first few cascade diagnostics should remain: {:?}",
+        result.errors
+    );
+    let summary = result
+        .errors
+        .iter()
+        .find(|e| e.code.as_deref() == Some("recovery_cascade_suppressed"))
+        .expect("expected cascade summary diagnostic");
+    assert_eq!(summary.severity, Some(sysml_v2_parser::DiagnosticSeverity::Warning));
+    assert!(
+        summary.message.contains("suppressed"),
+        "summary should explain suppression: {:?}",
+        summary
+    );
+
+    let (_, elements) = package_elements(input);
+    assert!(
+        elements
+            .iter()
+            .any(|e| matches!(e.value, PackageBodyElement::ActionDef(_))),
+        "later valid package siblings should still parse"
+    );
+}
+
+#[test]
 fn fixture_invalid_typing_operator_reports_specific_fix() {
     let input = fixture("invalid-typing-operator.sysml");
     let (result, elements) = package_elements(&input);

@@ -68,3 +68,10 @@ If the release fixtures live somewhere else, set:
 ```bash
 SYSML_V2_RELEASE_DIR=/path/to/SysML-v2-Release
 ```
+
+## Documentation
+
+- [Error recovery](docs/ERROR_RECOVERY.md)
+- [Language server backlog](docs/LANGUAGE_SERVER_BACKLOG.md)
+- [SysML v2 compliance gap](docs/SYSML_V2_COMPLIANCE_GAP.md)
+- [Real-world corpus feedback (Spec42 / parser)](docs/CORPUS_MBSE_VACUUM_PARSER_SPEC42_FEEDBACK.md)
