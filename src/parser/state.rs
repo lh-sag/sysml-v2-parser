@@ -8,8 +8,8 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
-    STATE_BODY_STARTERS,
+    skip_until_brace_end, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
+    ws1, ws_and_comments, STATE_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
@@ -304,10 +304,10 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
     let (input, _) = ws1(input)?;
     let (input, n) = {
         let (peek, _) = ws_and_comments(input)?;
-        if peek.fragment().starts_with(b"first")
-            || peek.fragment().starts_with(b"if")
-            || peek.fragment().starts_with(b"do")
-            || peek.fragment().starts_with(b"then")
+        if starts_with_keyword(peek.fragment(), b"first")
+            || starts_with_keyword(peek.fragment(), b"if")
+            || starts_with_keyword(peek.fragment(), b"do")
+            || starts_with_keyword(peek.fragment(), b"then")
         {
             (input, None)
         } else {

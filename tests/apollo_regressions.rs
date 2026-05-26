@@ -136,6 +136,47 @@ fn exhibit_state_body_supports_unnamed_and_accepting_transitions() {
 }
 
 #[test]
+fn transition_name_with_do_prefix_is_not_confused_with_do_keyword() {
+    let input = "package P {\nstate def M {\nstate docking;\nstate charging;\ntransition docked first docking then charging;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let machine = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::StateDef(def)
+                if def.value.identification.name.as_deref() == Some("M") =>
+            {
+                Some(&def.value)
+            }
+            _ => None,
+        })
+        .expect("expected state def M");
+    let StateDefBody::Brace { elements } = &machine.body else {
+        panic!("expected state body");
+    };
+    let transition = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            StateDefBodyElement::Transition(t) => Some(&t.value),
+            _ => None,
+        })
+        .expect("expected named transition");
+    assert_eq!(transition.name.as_deref(), Some("docked"));
+}
+
+#[test]
 fn timeslice_and_snapshot_parse_inside_part_and_occurrence_bodies() {
     let input = "package P {\nindividual part def MissionIndividual :> Mission;\nindividual part mission : MissionIndividual {\ntimeslice liftoff {\nsnapshot atT0 {\nattribute missionTime = 0;\n}\n}\n}\n}";
     let result = parse_with_diagnostics(input);
