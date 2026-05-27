@@ -1358,6 +1358,7 @@ pub enum UseCaseDefBodyElement {
     Error(Node<ParseErrorNode>),
     /// Unmodeled use-case / analysis-case body element captured as raw text (used for library parsing).
     Other(String),
+    AttributeDef(Node<AttributeDef>),
     Doc(Node<DocComment>),
     SubjectDecl(Node<SubjectDecl>),
     /// `subject;` shorthand.
