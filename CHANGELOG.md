@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-05-28
+
+### Breaking
+
+- **`AttributeUsage`**: added `typing: Option<String>` and `typing_span: Option<Span>` for the type after `:` or `:>` on attribute usages (e.g. `attribute totalMassKg : MassValue`). Any struct literals or manual construction of `AttributeUsage` must set these fields (use `None` when untyped).
+
+### Fixed
+
+- **Typed attribute usages in usage bodies**: `attribute` name followed by `:` or `:>` and a qualified type name now parses as `AttributeUsage` with `typing` populated, including inside `part` usage bodies. Previously the parser rejected this form in usage contexts (recovery / wrong classification). This matches OMG SysML v2 `AttributeUsage = UsagePrefix 'attribute' Usage`, where typing is part of the usage, not only of `attribute def`.
+
+### Migration (Spec42 and similar hosts)
+
+1. Bump the `sysml-v2-parser` dependency to `0.12.0` (or the matching git revision).
+2. Update `AttributeUsage` struct literals to include `typing` and `typing_span`.
+3. When building semantics from attribute usages, read `AttributeUsage::typing` for type edges (typed usages are no longer surfaced only via `AttributeDef` in requirement/part usage bodies).
+
+[0.12.0]: https://github.com/elan8/sysml-v2-parser/compare/v0.11.0...v0.12.0
+
 ## [0.11.0] - 2026-05-28
 
 ### Breaking

@@ -548,10 +548,12 @@ pub struct PerformInOutBinding {
     pub value: Node<Expression>,
 }
 
-/// Attribute usage: `attribute` name `redefines`? value? body.
+/// Attribute usage: `attribute` name (`:>` | `:` type)? `redefines`? value? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttributeUsage {
     pub name: String,
+    /// Type after `:` or `:>`, e.g. Some("MassValue").
+    pub typing: Option<String>,
     /// Redefines target, e.g. Some("Vehicle::mass").
     pub redefines: Option<String>,
     /// Value expression.
@@ -559,6 +561,8 @@ pub struct AttributeUsage {
     pub body: AttributeBody,
     /// Span of the usage name (for semantic tokens).
     pub name_span: Option<Span>,
+    /// Span of the type after `:` / `:>`, if present (for semantic tokens).
+    pub typing_span: Option<Span>,
     /// Span of the redefines target after `redefines`, if present (for semantic tokens).
     pub redefines_span: Option<Span>,
 }
@@ -2005,10 +2009,12 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
 fn normalize_attribute_usage(a: &AttributeUsage) -> AttributeUsage {
     AttributeUsage {
         name: a.name.clone(),
+        typing: a.typing.clone(),
         redefines: a.redefines.clone(),
         value: a.value.clone(),
         body: a.body.clone(),
         name_span: None,
+        typing_span: None,
         redefines_span: None,
     }
 }

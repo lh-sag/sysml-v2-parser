@@ -163,7 +163,7 @@ fn requirement_body_attribute_integer_default_and_quantity() {
         panic!("req brace");
     };
     let mut attrs = elements.iter().filter_map(|e| match &e.value {
-        RequirementDefBodyElement::AttributeDef(a) => Some(&a.value),
+        RequirementDefBodyElement::AttributeUsage(a) => Some(&a.value),
         _ => None,
     });
     let n = attrs.next().expect("attribute n");

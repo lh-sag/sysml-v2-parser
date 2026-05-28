@@ -144,7 +144,7 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
 }
 
 /// Attribute usage:
-/// - `attribute` name ( `redefines` qualified_name )? ( '=' value )? body
+/// - `attribute` name ( (`:>` | `:`) type )? ( `redefines` qualified_name )? ( '=' value )? body
 /// - `attribute :>>` qualified_name ( '=' value )? body
 pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
     enum AttributeUsageHead {
@@ -178,7 +178,15 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         }),
     ))
     .parse(input)?;
-    let (input, name_span, name_str, redefines_span, redefines) = match usage_head {
+    let (
+        input,
+        name_span,
+        name_str,
+        typing_span,
+        typing,
+        redefines_span,
+        redefines,
+    ) = match usage_head {
         AttributeUsageHead::PrefixRedefines {
             redefines_span,
             redefines,
@@ -186,19 +194,26 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             input,
             None,
             local_name_from_qualified_name(&redefines),
+            None,
+            None,
             Some(redefines_span),
             Some(redefines),
         ),
         AttributeUsageHead::Named { name_span, name } => {
-            let (peek, _) = ws_and_comments(input)?;
-            if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>>") {
-                // Typed declarations (`attribute x : T` / `attribute x :> T`) belong to
-                // attribute definitions, not usages.
-                return Err(nom::Err::Error(nom::error::Error::new(
-                    peek,
-                    nom::error::ErrorKind::Tag,
-                )));
-            }
+            let (input, typing_result) = nom::combinator::opt(alt((
+                preceded(
+                    preceded(ws_and_comments, tag(&b":>"[..])),
+                    preceded(ws_and_comments, with_span(qualified_name)),
+                ),
+                preceded(
+                    preceded(ws_and_comments, tag(&b":"[..])),
+                    preceded(ws_and_comments, with_span(qualified_name)),
+                ),
+            )))
+            .parse(input)?;
+            let (typing_span, typing) = typing_result
+                .map(|(span, s)| (Some(span), Some(s)))
+                .unwrap_or((None, None));
             let (input, redefines_result) = nom::combinator::opt(alt((
                 preceded(
                     preceded(ws_and_comments, tag(&b"redefines"[..])),
@@ -213,7 +228,15 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             let (redefines_span, redefines) = redefines_result
                 .map(|(span, s)| (Some(span), Some(s)))
                 .unwrap_or((None, None));
-            (input, Some(name_span), name, redefines_span, redefines)
+            (
+                input,
+                Some(name_span),
+                name,
+                typing_span,
+                typing,
+                redefines_span,
+                redefines,
+            )
         }
     };
     let (input, value) =
@@ -237,10 +260,12 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             input,
             AttributeUsage {
                 name: name_str,
+                typing,
                 redefines,
                 value,
                 body,
                 name_span,
+                typing_span,
                 redefines_span,
             },
         ),
@@ -281,10 +306,12 @@ pub(crate) fn attribute_usage_shorthand(
             input,
             AttributeUsage {
                 name: name_str,
+                typing: None,
                 redefines: None,
                 value,
                 body: AttributeBody::Semicolon,
                 name_span: Some(name_span),
+                typing_span: None,
                 redefines_span: None,
             },
         ),

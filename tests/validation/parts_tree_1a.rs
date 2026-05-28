@@ -203,10 +203,12 @@ fn part_vehicle1() -> PartUsage {
             elements: vec![
                 n(PartUsageBodyElement::AttributeUsage(n(AttributeUsage {
                     name: "mass".to_string(),
+                    typing: None,
                     redefines: Some("Vehicle::mass".to_string()),
                     value: Some(expr_1750_kg()),
                     body: AttributeBody::Brace,
                     name_span: None,
+                    typing_span: None,
                     redefines_span: None,
                 }))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
@@ -314,10 +316,12 @@ fn part_vehicle1_c1() -> PartUsage {
             elements: vec![
                 n(PartUsageBodyElement::AttributeUsage(n(AttributeUsage {
                     name: "mass".to_string(),
+                    typing: None,
                     redefines: Some("Vehicle::mass".to_string()),
                     value: Some(expr_2000_kg()),
                     body: AttributeBody::Brace,
                     name_span: None,
+                    typing_span: None,
                     redefines_span: None,
                 }))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {

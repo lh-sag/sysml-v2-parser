@@ -4,7 +4,8 @@ use std::path::PathBuf;
 
 use sysml_v2_parser::ast::{
     Identification, LibraryPackage, Node, Package, PackageBody, PackageBodyElement,
-    RenderingDefBody, RootElement, RootNamespace, Span, ViewBody, ViewDefBody,
+    PartUsageBody, PartUsageBodyElement, RenderingDefBody, RootElement, RootNamespace, Span,
+    ViewBody, ViewDefBody,
 };
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
@@ -1172,10 +1173,11 @@ fn test_requirement_body_keeps_structured_attributes_and_later_require_constrain
     );
     assert!(
         body_elements.iter().any(|e| matches!(
-            e.value,
-            sysml_v2_parser::ast::RequirementDefBodyElement::AttributeDef(_)
+            &e.value,
+            sysml_v2_parser::ast::RequirementDefBodyElement::AttributeUsage(a)
+                if a.value.typing.is_some()
         )),
-        "typed attribute members should be preserved as structured attribute defs"
+        "typed attribute members should be preserved as structured attribute usages"
     );
     assert!(
         body_elements.iter().any(|e| matches!(
@@ -1225,8 +1227,9 @@ fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
     );
     assert!(
         elements.iter().any(|e| matches!(
-            e.value,
-            sysml_v2_parser::ast::PartDefBodyElement::AttributeDef(_)
+            &e.value,
+            sysml_v2_parser::ast::PartDefBodyElement::AttributeUsage(a)
+                if a.value.typing.is_some()
         )),
         "later modeled members should still parse"
     );
@@ -2308,12 +2311,14 @@ requirement def R {
         panic!("expected requirement body");
     };
     assert!(elements.iter().any(|e| matches!(
-        e.value,
-        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeDef(_)
+        &e.value,
+        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeUsage(a)
+            if a.value.typing.is_some()
     )));
     assert!(elements.iter().any(|e| matches!(
-        e.value,
-        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeUsage(_)
+        &e.value,
+        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeUsage(a)
+            if a.value.redefines.is_some()
     )));
 }
 
@@ -2353,11 +2358,12 @@ requirement def VehicleMassRequirement {
         panic!("expected requirement body");
     };
     assert!(elements.iter().any(|e| matches!(
-        e.value,
-        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeDef(_)
+        &e.value,
+        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeUsage(a)
+            if a.value.typing.is_some()
     )));
     assert!(elements.iter().any(|e| matches!(
-        e.value,
+        &e.value,
         sysml_v2_parser::ast::RequirementDefBodyElement::RequireConstraint(_)
     )));
 }
@@ -2446,4 +2452,54 @@ part def Vehicle {
         usage.value.is_some(),
         "value expression should be preserved"
     );
+}
+
+#[test]
+fn test_parse_typed_attribute_usage_in_part_usage_body() {
+    let input = r#"package P {
+  private import ISQ::*;
+  private import SI::*;
+  attribute def MassValue;
+  part AutonomousFloorCleaningRobot {
+    attribute totalMassKg : MassValue = 4.2 [kg];
+    part mobility : MobilitySubsystem;
+  }
+  part def MobilitySubsystem;
+}"#;
+    let result = sysml_v2_parser::parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "typed attribute usage in part usage body should parse cleanly: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let robot = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartUsage(p) if p.value.name == "AutonomousFloorCleaningRobot" => {
+                Some(&p.value)
+            }
+            _ => None,
+        })
+        .expect("robot part usage");
+    let PartUsageBody::Brace { elements } = &robot.body else {
+        panic!("expected robot part usage body");
+    };
+    let attribute = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PartUsageBodyElement::AttributeUsage(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("typed attribute usage in part usage body");
+    assert_eq!(attribute.name, "totalMassKg");
+    assert_eq!(attribute.typing.as_deref(), Some("MassValue"));
+    assert!(attribute.value.is_some(), "attribute value should parse");
 }
