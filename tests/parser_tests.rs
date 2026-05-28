@@ -1174,10 +1174,10 @@ fn test_requirement_body_keeps_structured_attributes_and_later_require_constrain
     assert!(
         body_elements.iter().any(|e| matches!(
             &e.value,
-            sysml_v2_parser::ast::RequirementDefBodyElement::AttributeUsage(a)
+            sysml_v2_parser::ast::RequirementDefBodyElement::AttributeDef(a)
                 if a.value.typing.is_some()
         )),
-        "typed attribute members should be preserved as structured attribute usages"
+        "typed attribute members in requirement definitions should be attribute definitions"
     );
     assert!(
         body_elements.iter().any(|e| matches!(
@@ -1228,7 +1228,7 @@ fn test_part_def_recovery_preserves_other_member_and_later_sibling() {
     assert!(
         elements.iter().any(|e| matches!(
             &e.value,
-            sysml_v2_parser::ast::PartDefBodyElement::AttributeUsage(a)
+            sysml_v2_parser::ast::PartDefBodyElement::AttributeDef(a)
                 if a.value.typing.is_some()
         )),
         "later modeled members should still parse"
@@ -2312,7 +2312,7 @@ requirement def R {
     };
     assert!(elements.iter().any(|e| matches!(
         &e.value,
-        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeUsage(a)
+        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeDef(a)
             if a.value.typing.is_some()
     )));
     assert!(elements.iter().any(|e| matches!(
@@ -2359,7 +2359,7 @@ requirement def VehicleMassRequirement {
     };
     assert!(elements.iter().any(|e| matches!(
         &e.value,
-        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeUsage(a)
+        sysml_v2_parser::ast::RequirementDefBodyElement::AttributeDef(a)
             if a.value.typing.is_some()
     )));
     assert!(elements.iter().any(|e| matches!(

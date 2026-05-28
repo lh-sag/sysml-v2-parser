@@ -559,7 +559,9 @@ pub(crate) fn package_body_element(
     if let Ok((input, elem)) = map(filter_member, PackageBodyElement::Filter).parse(input) {
         return Ok((input, node_from_to(start, input, elem)));
     }
-    if let Ok((input, elem)) = map(attribute_def, PackageBodyElement::AttributeDef).parse(input) {
+    if let Ok((input, elem)) =
+        map(|i| attribute_def(i, false), PackageBodyElement::AttributeDef).parse(input)
+    {
         return Ok((input, node_from_to(start, input, elem)));
     }
     if let Ok((input, elem)) =

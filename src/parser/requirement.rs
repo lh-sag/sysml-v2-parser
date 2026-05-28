@@ -206,8 +206,8 @@ fn requirement_def_body_element(
             map(annotation, RequirementDefBodyElement::Annotation),
             map(import_, RequirementDefBodyElement::Import),
             map(subject_decl, RequirementDefBodyElement::SubjectDecl),
+            map(|i| attribute_def(i, true), RequirementDefBodyElement::AttributeDef),
             map(attribute_usage, RequirementDefBodyElement::AttributeUsage),
-            map(attribute_def, RequirementDefBodyElement::AttributeDef),
             map(
                 verify_requirement,
                 RequirementDefBodyElement::VerifyRequirement,

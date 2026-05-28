@@ -3,8 +3,8 @@
 use crate::ast::{AttributeBody, AttributeDef, AttributeUsage, Node};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, qualified_name, skip_until_brace_end, take_until_terminator, ws1,
-    ws_and_comments,
+    identification, name, qualified_name, skip_until_brace_end, starts_with_keyword,
+    take_until_terminator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::with_span;
@@ -18,6 +18,40 @@ use nom::Parser;
 
 fn local_name_from_qualified_name(qname: &str) -> String {
     qname.rsplit("::").next().unwrap_or(qname).to_string()
+}
+
+/// Type after `attribute` name: optionally `:>` or `:` plus qualified name. Does not consume `:>>`.
+/// When `allow_colon_gt` is false (after `attribute :>>` redefinition), only `:` is accepted so a
+/// following `:>` can be parsed as subsetting (e.g. `attribute :>> outlet :> electricGrid.outlets`).
+fn attribute_typing(
+    input: Input<'_>,
+    allow_colon_gt: bool,
+) -> IResult<Input<'_>, (crate::ast::Span, String)> {
+    let (input, _) = ws_and_comments(input)?;
+    let peek = input.fragment();
+    if starts_with_keyword(peek, b":>>") {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    if allow_colon_gt && starts_with_keyword(peek, b":>") {
+        let (input, _) = tag(&b":>"[..]).parse(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        return with_span(qualified_name).parse(input);
+    }
+    if peek.first() == Some(&b':')
+        && !starts_with_keyword(peek, b"::")
+        && !starts_with_keyword(peek, b":>")
+    {
+        let (input, _) = tag(&b":"[..]).parse(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        return with_span(qualified_name).parse(input);
+    }
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Tag,
+    )))
 }
 
 fn is_reserved_shorthand_starter(name: &str) -> bool {
@@ -89,7 +123,13 @@ pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBo
 }
 
 /// Attribute definition: 'attribute' name ( ':>' | ':' )? qualified_name? body
-pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeDef>> {
+///
+/// When `disambiguate_from_usage` is true (definition bodies that also accept usages), untyped
+/// `attribute name = value` is left for [`attribute_usage`]. Package-level attributes pass false.
+pub(crate) fn attribute_def(
+    input: Input<'_>,
+    disambiguate_from_usage: bool,
+) -> IResult<Input<'_>, Node<AttributeDef>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = nom::combinator::opt(preceded(
@@ -104,23 +144,40 @@ pub(crate) fn attribute_def(input: Input<'_>) -> IResult<Input<'_>, Node<Attribu
     let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
     let (input, _) = tag(&b"attribute"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
+    let (input, has_def) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
+    let has_def = has_def.is_some();
     let (input, ident) = identification(input)?;
-    let name_str = ident.name.clone().unwrap_or_default();
-    let (input, typing_result) = nom::combinator::opt(alt((
-        preceded(
-            preceded(ws_and_comments, tag(&b":>"[..])),
-            preceded(ws_and_comments, with_span(qualified_name)),
-        ),
-        preceded(
-            preceded(ws_and_comments, tag(&b":"[..])),
-            preceded(ws_and_comments, with_span(qualified_name)),
-        ),
-    )))
-    .parse(input)?;
+    let Some(name_str) = ident.name.clone() else {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    };
+    if disambiguate_from_usage {
+        let (peek_input, _) = ws_and_comments(input)?;
+        let peek = peek_input.fragment();
+        if starts_with_keyword(peek, b"redefines") || starts_with_keyword(peek, b":>>") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                peek_input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
+    let (input, typing_result) =
+        nom::combinator::opt(|i| attribute_typing(i, true)).parse(input)?;
     let (typing_span, typing) = typing_result
         .map(|(span, s)| (Some(span), Some(s)))
         .unwrap_or((None, None));
+    if disambiguate_from_usage && !has_def && typing.is_none() {
+        let (peek_input, _) = ws_and_comments(input)?;
+        let peek = peek_input.fragment();
+        if peek.starts_with(b"=") || peek.starts_with(b":=") {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                peek_input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    }
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
@@ -190,27 +247,25 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         AttributeUsageHead::PrefixRedefines {
             redefines_span,
             redefines,
-        } => (
-            input,
-            None,
-            local_name_from_qualified_name(&redefines),
-            None,
-            None,
-            Some(redefines_span),
-            Some(redefines),
-        ),
+        } => {
+            let (input, typing_result) =
+                nom::combinator::opt(|i| attribute_typing(i, false)).parse(input)?;
+            let (typing_span, typing) = typing_result
+                .map(|(span, s)| (Some(span), Some(s)))
+                .unwrap_or((None, None));
+            (
+                input,
+                None,
+                local_name_from_qualified_name(&redefines),
+                typing_span,
+                typing,
+                Some(redefines_span),
+                Some(redefines),
+            )
+        }
         AttributeUsageHead::Named { name_span, name } => {
-            let (input, typing_result) = nom::combinator::opt(alt((
-                preceded(
-                    preceded(ws_and_comments, tag(&b":>"[..])),
-                    preceded(ws_and_comments, with_span(qualified_name)),
-                ),
-                preceded(
-                    preceded(ws_and_comments, tag(&b":"[..])),
-                    preceded(ws_and_comments, with_span(qualified_name)),
-                ),
-            )))
-            .parse(input)?;
+            let (input, typing_result) =
+                nom::combinator::opt(|i| attribute_typing(i, true)).parse(input)?;
             let (typing_span, typing) = typing_result
                 .map(|(span, s)| (Some(span), Some(s)))
                 .unwrap_or((None, None));

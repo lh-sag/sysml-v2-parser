@@ -228,8 +228,8 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(interface_def, PartDefBodyElement::InterfaceDef),
             map(port_usage, PartDefBodyElement::PortUsage),
             map(part_ref_usage, PartDefBodyElement::Ref),
+            map(|i| attribute_def(i, true), PartDefBodyElement::AttributeDef),
             map(attribute_usage, PartDefBodyElement::AttributeUsage),
-            map(attribute_def, PartDefBodyElement::AttributeDef),
             map(
                 attribute_usage_shorthand,
                 PartDefBodyElement::AttributeUsage,

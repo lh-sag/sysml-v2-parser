@@ -448,7 +448,7 @@ pub(crate) fn use_case_def_body_element(
     let start = input;
     let (input, elem) = alt((
         map(doc_comment, UseCaseDefBodyElement::Doc),
-        map(attribute_def, UseCaseDefBodyElement::AttributeDef),
+        map(|i| attribute_def(i, false), UseCaseDefBodyElement::AttributeDef),
         map(subject_decl, UseCaseDefBodyElement::SubjectDecl),
         map(subject_ref, UseCaseDefBodyElement::SubjectRef),
         map(actor_usage, UseCaseDefBodyElement::ActorUsage),
