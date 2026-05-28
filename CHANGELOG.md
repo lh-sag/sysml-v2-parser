@@ -7,9 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-05-28
+
+### Breaking
+
+- **`UseCaseDefBodyElement`**: added new variant `AttributeDef(Node<AttributeDef>)` so that `attribute` definitions inside a `use case def` body are surfaced in the AST. Any exhaustive `match` on `UseCaseDefBodyElement` must add an arm for `AttributeDef`.
+
 ### Fixed
 
 - **Transition names vs transition keywords**: optional transition names such as `docked` are no longer dropped when the name shares a prefix with `first`, `if`, `do`, or `then`. The parser now uses whole-keyword detection (`starts_with_keyword`) so `transition docked first docking then charging;` parses correctly.
+
+### Migration (Spec42 and similar hosts)
+
+1. Bump the `sysml-v2-parser` dependency to `0.11.0` (or the matching git revision).
+2. If you exhaustively match on `UseCaseDefBodyElement`, add an arm for the new `AttributeDef` variant (carry-through is usually identical to the existing `AttributeDef` arms on `PartDefBodyElement` or `RequirementDefBodyElement`).
+
+[0.11.0]: https://github.com/elan8/sysml-v2-parser/compare/v0.10.0...v0.11.0
 
 ## [0.10.0] - 2026-05-13
 
