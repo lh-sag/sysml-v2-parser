@@ -7,45 +7,99 @@ use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::digit1;
-use nom::combinator::{map, opt};
+use nom::combinator::map;
 use nom::sequence::{delimited, preceded};
 use nom::IResult;
 use nom::Parser;
 
+/// Numeric literal text: optional sign, mantissa, optional exponent (`5E9`, `195.3`, `6.022e23`).
+fn numeric_literal_text(input: Input<'_>) -> IResult<Input<'_>, String> {
+    let (input, _) = ws_and_comments(input)?;
+    let frag = input.fragment();
+    let mut i = 0usize;
+    if matches!(frag.first(), Some(b'+' | b'-')) {
+        i += 1;
+    }
+    let digit_start = i;
+    while i < frag.len() && frag[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i == digit_start {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Digit,
+        )));
+    }
+    if i < frag.len() && frag[i] == b'.' {
+        i += 1;
+        while i < frag.len() && frag[i].is_ascii_digit() {
+            i += 1;
+        }
+    }
+    if i < frag.len() && matches!(frag[i], b'e' | b'E') {
+        i += 1;
+        if i < frag.len() && matches!(frag[i], b'+' | b'-') {
+            i += 1;
+        }
+        let exp_start = i;
+        while i < frag.len() && frag[i].is_ascii_digit() {
+            i += 1;
+        }
+        if i == exp_start {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Digit,
+            )));
+        }
+    }
+    let text = String::from_utf8_lossy(&frag[..i]).to_string();
+    let (input, _) = nom::bytes::complete::take(i).parse(input)?;
+    Ok((input, text))
+}
+
+fn classify_numeric_literal(text: &str) -> Expression {
+    let normalized = text.trim();
+    if normalized.contains('.')
+        || normalized
+            .chars()
+            .skip(1)
+            .any(|c| c == 'e' || c == 'E')
+    {
+        Expression::LiteralReal(normalized.to_string())
+    } else {
+        Expression::LiteralInteger(normalized.parse().unwrap_or(0))
+    }
+}
+
 /// Integer literal.
 fn literal_integer(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, sign) = opt(alt((tag(&b"-"[..]), tag(&b"+"[..])))).parse(input)?;
-    let (input, digits) = digit1.parse(input)?;
-    let s = String::from_utf8_lossy(digits.fragment());
-    let n: i64 = s.parse().unwrap_or(0);
-    let n = if sign.map(|s: Input| s.fragment() == b"-").unwrap_or(false) {
-        -n
-    } else {
-        n
-    };
+    let (input, text) = numeric_literal_text(input)?;
+    if text.contains('.') || text.chars().skip(1).any(|c| c == 'e' || c == 'E') {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Digit,
+        )));
+    }
     Ok((
         input,
-        node_from_to(start, input, Expression::LiteralInteger(n)),
+        node_from_to(start, input, classify_numeric_literal(&text)),
     ))
 }
 
-/// Real literal (simple: digits.digits).
+/// Real literal (decimal or scientific notation).
 fn literal_real(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, whole) = digit1.parse(input)?;
-    let (input, _) = tag(&b"."[..]).parse(input)?;
-    let (input, frac) = digit1.parse(input)?;
-    let s = format!(
-        "{}.{}",
-        String::from_utf8_lossy(whole.fragment()),
-        String::from_utf8_lossy(frac.fragment())
-    );
+    let (input, text) = numeric_literal_text(input)?;
+    if !text.contains('.') && !text.chars().skip(1).any(|c| c == 'e' || c == 'E') {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Digit,
+        )));
+    }
     Ok((
         input,
-        node_from_to(start, input, Expression::LiteralReal(s)),
+        node_from_to(start, input, classify_numeric_literal(&text)),
     ))
 }
 
@@ -127,9 +181,43 @@ fn literal_only(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     .parse(input)
 }
 
-/// Unit text inside `[` … `]` (e.g. `kg`, `m/s`, `N*m`); broader than `qualified_name` for quantity literals.
+fn quoted_unit_string(input: Input<'_>) -> IResult<Input<'_>, String> {
+    let quote = *input.fragment().first().ok_or_else(|| {
+        nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
+    })?;
+    if quote != b'\'' && quote != b'"' {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, _) = nom::bytes::complete::take(1usize).parse(input)?;
+    let frag = input.fragment();
+    let mut i = 0usize;
+    while i < frag.len() {
+        if frag[i] == quote {
+            let s = String::from_utf8_lossy(&frag[..i]).to_string();
+            let (input, _) = nom::bytes::complete::take(i + 1).parse(input)?;
+            return Ok((input, s));
+        }
+        if frag[i] == b'\\' && i + 1 < frag.len() {
+            i += 2;
+            continue;
+        }
+        i += 1;
+    }
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Tag,
+    )))
+}
+
+/// Unit text inside `[` … `]` (e.g. `kg`, `m/s`, `'$'`).
 fn unit_name_in_brackets(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = ws_and_comments(input)?;
+    if matches!(input.fragment().first(), Some(b'"' | b'\'')) {
+        return quoted_unit_string(input);
+    }
     let frag = input.fragment();
     let mut i = 0usize;
     while i < frag.len() {
