@@ -14,7 +14,7 @@ use crate::parser::lex::{
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::Input;
-use crate::parser::{build_recovery_error_node_from_span, node_from_to};
+use crate::parser::{build_recovery_error_node_from_span, node_from_to, parse_optional_definition_specialization};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, success};
@@ -152,8 +152,7 @@ pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
     let start = input;
     let (input, _) = keyword_view_def(input)?;
     let (input, ident) = identification(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
     let (input, body) = view_def_body(input)?;
     Ok((
         input,
@@ -162,6 +161,8 @@ pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
             input,
             ViewDef {
                 identification: ident,
+                specializes,
+                specializes_span,
                 body,
             },
         ),
@@ -181,8 +182,7 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
     let start = input;
     let (input, _) = keyword_viewpoint_def(input)?;
     let (input, ident) = identification(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
     let (input, body) = requirement_def_body(input)?;
     Ok((
         input,
@@ -191,6 +191,8 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
             input,
             ViewpointDef {
                 identification: ident,
+                specializes,
+                specializes_span,
                 body,
             },
         ),
@@ -226,8 +228,7 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
     let start = input;
     let (input, _) = keyword_rendering_def(input)?;
     let (input, ident) = identification(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
     let (input, body) = rendering_def_body(input)?;
     Ok((
         input,
@@ -236,6 +237,8 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
             input,
             RenderingDef {
                 identification: ident,
+                specializes,
+                specializes_span,
                 body,
             },
         ),

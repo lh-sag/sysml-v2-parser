@@ -93,6 +93,8 @@ fn definitions_package() -> Package {
                 }))),
                 n(PackageBodyElement::ActionDef(n(ActionDef {
                     identification: id("Generate Torque"),
+                    specializes: None,
+                    specializes_span: None,
                     body: ActionDefBody::Brace {
                         elements: vec![
                             n(ActionDefBodyElement::InOutDecl(n(InOutDecl {
@@ -110,6 +112,8 @@ fn definitions_package() -> Package {
                 }))),
                 n(PackageBodyElement::ActionDef(n(ActionDef {
                     identification: id("Amplify Torque"),
+                    specializes: None,
+                    specializes_span: None,
                     body: ActionDefBody::Brace {
                         elements: vec![
                             n(ActionDefBodyElement::InOutDecl(n(InOutDecl {
@@ -127,6 +131,8 @@ fn definitions_package() -> Package {
                 }))),
                 n(PackageBodyElement::ActionDef(n(ActionDef {
                     identification: id("Transfer Torque"),
+                    specializes: None,
+                    specializes_span: None,
                     body: ActionDefBody::Brace {
                         elements: vec![
                             n(ActionDefBodyElement::InOutDecl(n(InOutDecl {
@@ -144,6 +150,8 @@ fn definitions_package() -> Package {
                 }))),
                 n(PackageBodyElement::ActionDef(n(ActionDef {
                     identification: id("Distribute Torque"),
+                    specializes: None,
+                    specializes_span: None,
                     body: ActionDefBody::Brace {
                         elements: vec![
                             n(ActionDefBodyElement::InOutDecl(n(InOutDecl {
@@ -166,6 +174,8 @@ fn definitions_package() -> Package {
                 }))),
                 n(PackageBodyElement::ActionDef(n(ActionDef {
                     identification: id("Provide Power"),
+                    specializes: None,
+                    specializes_span: None,
                     body: ActionDefBody::Brace {
                         elements: vec![
                             n(ActionDefBodyElement::InOutDecl(n(InOutDecl {

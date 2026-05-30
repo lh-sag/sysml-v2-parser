@@ -5,6 +5,7 @@ use crate::parser::lex::{
     ws_and_comments,
 };
 use crate::parser::node_from_to;
+use crate::parser::parse_optional_definition_specialization;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -36,6 +37,7 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
     let (input, body) = definition_body(input)?;
     Ok((
         input,
@@ -44,6 +46,8 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
             input,
             AllocationDef {
                 identification,
+                specializes,
+                specializes_span,
                 body,
             },
         ),

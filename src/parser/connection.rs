@@ -12,6 +12,7 @@ use crate::parser::lex::{
     CONNECTION_DEF_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
+use crate::parser::parse_optional_definition_specialization;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -239,8 +240,7 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
     let (input, _) = ws1(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, identification) = identification(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
     let (input, body) = connection_member_body(input)?;
     Ok((
         input,
@@ -250,6 +250,8 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
             ConnectionDef {
                 annotation,
                 identification,
+                specializes,
+                specializes_span,
                 body,
             },
         ),

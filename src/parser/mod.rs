@@ -30,12 +30,14 @@ mod package;
 mod part;
 mod port;
 mod requirement;
+mod specialization;
 mod span;
 mod state;
 mod usecase;
 mod view;
 
 pub(crate) use span::{node_from_to, span_from_to, with_span, Input};
+pub(crate) use specialization::parse_optional_definition_specialization;
 
 use crate::ast::{
     ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, CalcDefBody,
@@ -282,6 +284,9 @@ fn starts_with_missing_name_after_keyword(
         }
     }
     fragment.starts_with(b":")
+        && !lex::starts_with_keyword(fragment, b":>>")
+        && !lex::starts_with_keyword(fragment, b":>")
+        && !lex::starts_with_keyword(fragment, b"::")
 }
 
 fn starts_with_missing_type_after_keyword(

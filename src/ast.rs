@@ -432,6 +432,8 @@ pub enum AttributeBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: AttributeBody,
 }
 
@@ -440,6 +442,7 @@ pub struct ItemDef {
 pub struct IndividualDef {
     pub identification: Identification,
     pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: AttributeBody,
 }
 
@@ -577,6 +580,7 @@ pub struct PortDef {
     pub identification: Identification,
     /// Supertype after `:>`, e.g. Some("ClutchPort") for `port def ManualClutchPort :> ClutchPort`.
     pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: PortDefBody,
 }
 
@@ -634,6 +638,8 @@ pub enum PortBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InterfaceDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: InterfaceDefBody,
 }
 
@@ -697,6 +703,8 @@ pub enum RefBody {
 pub struct ConnectionDef {
     pub annotation: Option<String>,
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: ConnectionDefBody,
 }
 
@@ -725,6 +733,8 @@ pub enum ConnectionDefBodyElement {
 pub struct MetadataDef {
     pub is_abstract: bool,
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: DefinitionBody,
 }
 
@@ -736,6 +746,8 @@ pub struct MetadataDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnumDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: EnumerationBody,
 }
 
@@ -754,6 +766,8 @@ pub enum EnumerationBody {
 pub struct OccurrenceDef {
     pub is_abstract: bool,
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: DefinitionBody,
 }
 
@@ -908,6 +922,8 @@ pub enum AliasBody {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: ActionDefBody,
 }
 
@@ -1044,6 +1060,8 @@ pub struct Flow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: DefinitionBody,
 }
 
@@ -1095,6 +1113,8 @@ pub struct Allocate {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AllocationDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: DefinitionBody,
 }
 
@@ -1227,6 +1247,8 @@ pub struct ConcernUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CaseDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: UseCaseDefBody,
 }
 
@@ -1242,6 +1264,8 @@ pub struct CaseUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnalysisCaseDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: UseCaseDefBody,
 }
 
@@ -1257,6 +1281,8 @@ pub struct AnalysisCaseUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerificationCaseDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: UseCaseDefBody,
 }
 
@@ -1290,6 +1316,8 @@ pub struct ActorDecl {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UseCaseDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: UseCaseDefBody,
 }
 
@@ -1408,6 +1436,8 @@ pub struct Objective {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StateDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: StateDefBody,
 }
 
@@ -1478,6 +1508,8 @@ pub struct Transition {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConstraintDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: ConstraintDefBody,
 }
 
@@ -1574,6 +1606,8 @@ pub struct ReturnDecl {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ViewDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: ViewDefBody,
 }
 
@@ -1607,6 +1641,8 @@ pub struct ViewRenderingUsage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ViewpointDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: RequirementDefBody,
 }
 
@@ -1614,6 +1650,8 @@ pub struct ViewpointDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderingDef {
     pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
     pub body: RenderingDefBody,
 }
 
@@ -2210,6 +2248,7 @@ fn normalize_port_def(p: &PortDef) -> PortDef {
     PortDef {
         identification: p.identification.clone(),
         specializes: p.specializes.clone(),
+        specializes_span: None,
         body: normalize_port_def_body(&p.body),
     }
 }
@@ -2248,6 +2287,8 @@ fn normalize_port_def_body_element_node(el: &Node<PortDefBodyElement>) -> Node<P
 fn normalize_interface_def(i: &InterfaceDef) -> InterfaceDef {
     InterfaceDef {
         identification: i.identification.clone(),
+        specializes: i.specializes.clone(),
+        specializes_span: None,
         body: normalize_interface_def_body(&i.body),
     }
 }
@@ -2256,6 +2297,8 @@ fn normalize_connection_def(c: &ConnectionDef) -> ConnectionDef {
     ConnectionDef {
         annotation: c.annotation.clone(),
         identification: c.identification.clone(),
+        specializes: c.specializes.clone(),
+        specializes_span: None,
         body: normalize_connection_def_body(&c.body),
     }
 }
@@ -2293,6 +2336,8 @@ fn normalize_metadata_def(m: &MetadataDef) -> MetadataDef {
     MetadataDef {
         is_abstract: m.is_abstract,
         identification: m.identification.clone(),
+        specializes: m.specializes.clone(),
+        specializes_span: None,
         body: m.body.clone(),
     }
 }
@@ -2300,6 +2345,8 @@ fn normalize_metadata_def(m: &MetadataDef) -> MetadataDef {
 fn normalize_enum_def(e: &EnumDef) -> EnumDef {
     EnumDef {
         identification: e.identification.clone(),
+        specializes: e.specializes.clone(),
+        specializes_span: None,
         body: e.body.clone(),
     }
 }
@@ -2308,6 +2355,8 @@ fn normalize_occurrence_def(o: &OccurrenceDef) -> OccurrenceDef {
     OccurrenceDef {
         is_abstract: o.is_abstract,
         identification: o.identification.clone(),
+        specializes: o.specializes.clone(),
+        specializes_span: None,
         body: o.body.clone(),
     }
 }
@@ -2368,6 +2417,8 @@ fn normalize_ref_decl(r: &RefDecl) -> RefDecl {
 fn normalize_action_def(a: &ActionDef) -> ActionDef {
     ActionDef {
         identification: a.identification.clone(),
+        specializes: a.specializes.clone(),
+        specializes_span: None,
         body: normalize_action_def_body(&a.body),
     }
 }

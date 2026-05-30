@@ -12,7 +12,7 @@ use crate::parser::lex::{
     ws_and_comments, CALC_DEF_BODY_STARTERS, CONSTRAINT_DEF_BODY_STARTERS,
 };
 use crate::parser::Input;
-use crate::parser::{build_recovery_error_node_from_span, node_from_to};
+use crate::parser::{build_recovery_error_node_from_span, node_from_to, parse_optional_definition_specialization};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
@@ -30,8 +30,7 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
     let (input, _) = ws1(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, ident) = identification(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
     let (input, body) = constraint_def_body(input)?;
     Ok((
         input,
@@ -40,6 +39,8 @@ pub(crate) fn constraint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Constr
             input,
             ConstraintDef {
                 identification: ident,
+                specializes,
+                specializes_span,
                 body,
             },
         ),

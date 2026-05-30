@@ -11,6 +11,7 @@ use crate::parser::lex::{
     ws_and_comments,
 };
 use crate::parser::node_from_to;
+use crate::parser::parse_optional_definition_specialization;
 use crate::parser::requirement::doc_comment;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -193,8 +194,7 @@ pub(crate) fn interface_def(input: Input<'_>) -> IResult<Input<'_>, Node<Interfa
     let (input, _) = ws1(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, identification) = identification(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
     let (input, body) = interface_def_body(input)?;
     Ok((
         input,
@@ -203,6 +203,8 @@ pub(crate) fn interface_def(input: Input<'_>) -> IResult<Input<'_>, Node<Interfa
             input,
             InterfaceDef {
                 identification,
+                specializes,
+                specializes_span,
                 body,
             },
         ),

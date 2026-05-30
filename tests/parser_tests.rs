@@ -960,10 +960,18 @@ fn test_stdlib_requirement_usecase_enum_map_to_dedicated_nodes() {
         elements[0].value,
         PackageBodyElement::RequirementDef(_)
     ));
+    let PackageBodyElement::RequirementDef(req) = &elements[0].value else {
+        panic!("expected requirement def");
+    };
+    assert_eq!(req.value.specializes.as_deref(), Some("BaseType"));
     assert!(matches!(
         elements[1].value,
         PackageBodyElement::UseCaseDef(_)
     ));
+    let PackageBodyElement::UseCaseDef(uc) = &elements[1].value else {
+        panic!("expected use case def");
+    };
+    assert_eq!(uc.value.specializes.as_deref(), Some("Case"));
     assert!(matches!(elements[2].value, PackageBodyElement::EnumDef(_)));
 }
 
@@ -984,11 +992,23 @@ fn test_stdlib_part_port_viewpoint_map_to_dedicated_nodes() {
         _ => panic!("expected brace body"),
     };
     assert!(matches!(elements[0].value, PackageBodyElement::PartDef(_)));
+    let PackageBodyElement::PartDef(part) = &elements[0].value else {
+        panic!("expected part def");
+    };
+    assert_eq!(part.value.specializes.as_deref(), Some("Item"));
     assert!(matches!(elements[1].value, PackageBodyElement::PortDef(_)));
+    let PackageBodyElement::PortDef(port) = &elements[1].value else {
+        panic!("expected port def");
+    };
+    assert_eq!(port.value.specializes.as_deref(), Some("Object"));
     assert!(matches!(
         elements[2].value,
         PackageBodyElement::ViewpointDef(_)
     ));
+    let PackageBodyElement::ViewpointDef(vp) = &elements[2].value else {
+        panic!("expected viewpoint def");
+    };
+    assert_eq!(vp.value.specializes.as_deref(), Some("RequirementCheck"));
     assert!(
         !elements
             .iter()
@@ -1066,6 +1086,10 @@ fn test_enum_def_with_specialization_and_assigned_literals_maps_dedicated() {
         _ => panic!("expected brace body"),
     };
     assert!(matches!(elements[0].value, PackageBodyElement::EnumDef(_)));
+    let PackageBodyElement::EnumDef(enum_def) = &elements[0].value else {
+        panic!("expected enum def");
+    };
+    assert_eq!(enum_def.value.specializes.as_deref(), Some("Level"));
     assert!(
         !elements
             .iter()
@@ -1439,6 +1463,59 @@ fn test_parse_part_attribute_prefix_redefines_shorthand() {
         attribute.value.is_some(),
         "attribute value should be parsed"
     );
+}
+
+#[test]
+fn test_parse_part_attribute_prefix_redefines_scientific_notation_with_quoted_unit() {
+    let input = r#"package P {
+  part def Mission {
+    attribute :>> researchAndDevelopmentCost = 5E9 ['$'];
+    attribute :>> manufacturingCost = 3E9 ['$'];
+  }
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+    let root = parse(input).expect("parse should succeed");
+    let pkg = match &root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    let mission = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(p)
+                if p.value.identification.name.as_deref() == Some("Mission") =>
+            {
+                Some(&p.value)
+            }
+            _ => None,
+        })
+        .expect("Mission part def should be present");
+    let mission_body = match &mission.body {
+        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        _ => panic!("expected Mission part def body"),
+    };
+    let attr = mission_body
+        .iter()
+        .find_map(|e| match &e.value {
+            sysml_v2_parser::ast::PartDefBodyElement::AttributeUsage(a)
+                if a.value.name == "researchAndDevelopmentCost" =>
+            {
+                Some(&a.value)
+            }
+            _ => None,
+        })
+        .expect("researchAndDevelopmentCost attribute usage should be present");
+    assert_eq!(attr.redefines.as_deref(), Some("researchAndDevelopmentCost"));
+    assert!(attr.value.is_some(), "attribute value should be parsed");
 }
 
 #[test]
@@ -2199,6 +2276,30 @@ individual def Rover specializes MobileRobot;
     assert_eq!(
         individual_def.value.specializes.as_deref(),
         Some("MobileRobot")
+    );
+}
+
+#[test]
+fn test_action_def_accepts_specializes_keyword_as_specialization() {
+    let input = r#"package P {
+action def Run specializes BaseAction;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let action_def = match &elements[0].value {
+        PackageBodyElement::ActionDef(p) => p,
+        other => panic!("expected action def, got {:?}", other),
+    };
+    assert_eq!(
+        action_def.value.specializes.as_deref(),
+        Some("BaseAction")
     );
 }
 
