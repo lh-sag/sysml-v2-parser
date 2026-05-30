@@ -1112,10 +1112,14 @@ pub struct AllocationUsage {
 // Requirements
 // ---------------------------------------------------------------------------
 
-/// Requirement definition: `requirement def` Identification body.
+/// Requirement definition: `requirement def` Identification (`:>` specializes)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RequirementDef {
     pub identification: Identification,
+    /// Supertype after `:>`, e.g. Some("UserRequirement") for `requirement def Need :> UserRequirement`.
+    pub specializes: Option<String>,
+    /// Span of the `:> <type>` fragment (for semantic tokens), when present.
+    pub specializes_span: Option<Span>,
     pub body: RequirementDefBody,
 }
 

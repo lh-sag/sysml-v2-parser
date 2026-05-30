@@ -12,13 +12,13 @@ use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    skip_until_brace_end, starts_with_any_keyword, subset_operator, take_until_terminator, ws, ws1,
-    ws_and_comments, REQUIREMENT_BODY_STARTERS,
+    skip_until_brace_end, specialization_operator, starts_with_any_keyword, subset_operator,
+    take_until_terminator, ws, ws1, ws_and_comments, REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::Input;
-use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span};
+use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
@@ -83,8 +83,19 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
     let start = input;
     let (input, _) = keyword_requirement_def(input)?;
     let (input, ident) = identification(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    let before_specializes = input;
+    let (input, opt_specializes) = opt((
+        preceded(ws_and_comments, specialization_operator),
+        preceded(ws_and_comments, qualified_name),
+    ))
+    .parse(input)?;
+    let (specializes, specializes_span) = match opt_specializes {
+        Some((_, type_name)) => (
+            Some(type_name),
+            Some(span_from_to(before_specializes, input)),
+        ),
+        None => (None, None),
+    };
     let (input, body) = requirement_def_body(input)?;
     Ok((
         input,
@@ -93,6 +104,8 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
             input,
             RequirementDef {
                 identification: ident,
+                specializes,
+                specializes_span,
                 body,
             },
         ),
