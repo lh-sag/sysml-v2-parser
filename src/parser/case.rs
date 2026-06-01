@@ -3,10 +3,10 @@ use crate::ast::{
     VerificationCaseUsage,
 };
 use crate::parser::lex::{
-    identification, name, qualified_name, take_until_terminator, ws1, ws_and_comments,
+    name, qualified_name, take_until_terminator, ws1, ws_and_comments,
 };
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
@@ -16,14 +16,10 @@ use nom::Parser;
 
 pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"case"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"case").def_required(),
+    )?;
     let (input, body) = loose_use_case_body(input)?;
     Ok((
         input,
@@ -31,9 +27,9 @@ pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
             start,
             input,
             CaseDef {
-                identification,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),
@@ -52,14 +48,10 @@ pub(crate) fn case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CaseUsage>
 
 pub(crate) fn analysis_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<AnalysisCaseDef>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"analysis"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"analysis").def_required(),
+    )?;
     let (input, body) = loose_use_case_body(input)?;
     Ok((
         input,
@@ -67,9 +59,9 @@ pub(crate) fn analysis_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<Ana
             start,
             input,
             AnalysisCaseDef {
-                identification,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),
@@ -101,14 +93,10 @@ pub(crate) fn verification_case_def(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<VerificationCaseDef>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"verification"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"verification").def_required(),
+    )?;
     let (input, body) = loose_use_case_body(input)?;
     Ok((
         input,
@@ -116,9 +104,9 @@ pub(crate) fn verification_case_def(
             start,
             input,
             VerificationCaseDef {
-                identification,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

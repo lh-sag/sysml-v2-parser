@@ -13,7 +13,9 @@ mod allocation;
 mod attribute;
 mod case;
 mod connection;
+mod body;
 mod constraint;
+mod definition_prefix;
 mod dependency;
 mod enumeration;
 mod expr;
@@ -37,8 +39,6 @@ mod usecase;
 mod view;
 
 pub(crate) use span::{node_from_to, span_from_to, with_span, Input};
-pub(crate) use specialization::parse_optional_definition_header_after_identification;
-
 use crate::ast::{
     ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, CalcDefBody,
     CalcDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, PackageBody,

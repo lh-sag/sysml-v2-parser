@@ -11,8 +11,8 @@ use crate::parser::lex::{
     skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
     USE_CASE_BODY_STARTERS,
 };
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::attribute::attribute_def;
 use crate::parser::requirement::{doc_comment, parse_requirement_usage_payload, subject_decl};
 use crate::parser::Input;
@@ -334,9 +334,12 @@ pub(crate) fn use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<UseCas
 
 pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseDef>> {
     let start = input;
-    let (input, _) = keyword_use_case_def(input)?;
-    let (input, ident) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"use")
+            .with_second_keyword(b"case")
+            .def_required(),
+    )?;
     let (input, body) = use_case_def_body(input)?;
     Ok((
         input,
@@ -344,9 +347,9 @@ pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseD
             start,
             input,
             UseCaseDef {
-                identification: ident,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

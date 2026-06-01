@@ -9,12 +9,12 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::expr::path_expression;
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
-    identification, name, qualified_name, skip_statement_or_block, skip_until_brace_end,
+    name, qualified_name, skip_statement_or_block, skip_until_brace_end,
     take_until_terminator, ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::annotation;
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::part::bind_;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -463,14 +463,10 @@ fn action_def_body_element(
 /// Action definition: `action` `def` Identification body
 pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"action"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"action").def_required(),
+    )?;
     let (input, body) = action_def_body(input)?;
     Ok((
         input,
@@ -478,9 +474,9 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
             start,
             input,
             ActionDef {
-                identification,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

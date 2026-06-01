@@ -14,22 +14,14 @@ use crate::parser::lex::{
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::Input;
-use crate::parser::{build_recovery_error_node_from_span, node_from_to, parse_optional_definition_header_after_identification};
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
+use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, success};
 use nom::multi::many0;
 use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
-
-fn keyword_view_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"view"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    Ok((input, ()))
-}
 
 fn view_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDefBodyElement>> {
     let start = input;
@@ -150,9 +142,10 @@ fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
 
 pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
     let start = input;
-    let (input, _) = keyword_view_def(input)?;
-    let (input, ident) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"view").def_required(),
+    )?;
     let (input, body) = view_def_body(input)?;
     Ok((
         input,
@@ -160,29 +153,21 @@ pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
             start,
             input,
             ViewDef {
-                identification: ident,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),
     ))
 }
 
-fn keyword_viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"viewpoint"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    Ok((input, ()))
-}
-
 pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewpointDef>> {
     let start = input;
-    let (input, _) = keyword_viewpoint_def(input)?;
-    let (input, ident) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"viewpoint").def_required(),
+    )?;
     let (input, body) = requirement_def_body(input)?;
     Ok((
         input,
@@ -190,22 +175,13 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
             start,
             input,
             ViewpointDef {
-                identification: ident,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),
     ))
-}
-
-fn keyword_rendering_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"rendering"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    Ok((input, ()))
 }
 
 fn rendering_def_body(input: Input<'_>) -> IResult<Input<'_>, RenderingDefBody> {
@@ -226,9 +202,10 @@ fn rendering_def_body(input: Input<'_>) -> IResult<Input<'_>, RenderingDefBody> 
 
 pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<RenderingDef>> {
     let start = input;
-    let (input, _) = keyword_rendering_def(input)?;
-    let (input, ident) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"rendering").def_required(),
+    )?;
     let (input, body) = rendering_def_body(input)?;
     Ok((
         input,
@@ -236,9 +213,9 @@ pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<Renderi
             start,
             input,
             RenderingDef {
-                identification: ident,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

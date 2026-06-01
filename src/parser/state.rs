@@ -12,8 +12,8 @@ use crate::parser::lex::{
     ws1, ws_and_comments, STATE_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::annotation;
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::requirement::{doc_comment, requirement_usage};
 use crate::parser::Input;
 use nom::branch::alt;
@@ -22,20 +22,12 @@ use nom::combinator::{map, opt};
 use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
 
-fn keyword_state_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"state"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    Ok((input, ()))
-}
-
 pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> {
     let start = input;
-    let (input, _) = keyword_state_def(input)?;
-    let (input, ident) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"state").def_required(),
+    )?;
     let (input, body) = state_def_body(input)?;
     Ok((
         input,
@@ -43,9 +35,9 @@ pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> 
             start,
             input,
             StateDef {
-                identification: ident,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

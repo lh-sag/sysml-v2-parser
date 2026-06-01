@@ -10,8 +10,8 @@ use crate::parser::lex::{
     identification, name, qualified_name, skip_until_brace_end, take_until_terminator, ws1,
     ws_and_comments,
 };
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::requirement::doc_comment;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -188,13 +188,8 @@ fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> 
 /// Interface definition: `interface` `def` Identification body
 pub(crate) fn interface_def(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceDef>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"interface"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-    let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) =
+        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"interface"))?;
     let (input, body) = interface_def_body(input)?;
     Ok((
         input,
@@ -202,9 +197,9 @@ pub(crate) fn interface_def(input: Input<'_>) -> IResult<Input<'_>, Node<Interfa
             start,
             input,
             InterfaceDef {
-                identification,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

@@ -1,53 +1,34 @@
-use crate::ast::{AllocationDef, AllocationUsage, DefinitionBody, Node};
+use crate::ast::{AllocationDef, AllocationUsage, Node};
+use crate::parser::body::semicolon_or_opaque_brace_body;
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
-use crate::parser::lex::{
-    identification, name, qualified_name, skip_until_brace_end, take_until_terminator, ws1,
-    ws_and_comments,
-};
+use crate::parser::lex::{name, qualified_name, take_until_terminator, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::Input;
-use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{map, opt};
+use nom::combinator::opt;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-fn definition_body(input: Input<'_>) -> IResult<Input<'_>, DefinitionBody> {
-    let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| DefinitionBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                skip_until_brace_end,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| DefinitionBody::Brace,
-        ),
-    ))
-    .parse(input)
-}
-
 pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<AllocationDef>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"allocation"[..])).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
-    let (input, body) = definition_body(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"allocation")
+            .def_required()
+            .no_abstract(),
+    )?;
+    let (input, body) = semicolon_or_opaque_brace_body(input)?;
     Ok((
         input,
         node_from_to(
             start,
             input,
             AllocationDef {
-                identification,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),
@@ -81,7 +62,7 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
     };
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
-    let (input, body) = definition_body(input)?;
+    let (input, body) = semicolon_or_opaque_brace_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -105,7 +86,7 @@ pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
     let (input, source) = expression(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
     let (input, target) = preceded(ws1, expression).parse(input)?;
-    let (input, body) = definition_body(input)?;
+    let (input, body) = semicolon_or_opaque_brace_body(input)?;
     Ok((
         input,
         node_from_to(

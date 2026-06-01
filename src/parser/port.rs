@@ -9,8 +9,8 @@ use crate::parser::lex::{
     identification, name, qualified_name, redefine_operator, skip_until_brace_end,
     specialization_operator, subset_operator, take_until_terminator, ws1, ws_and_comments,
 };
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::requirement::doc_comment;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -184,13 +184,8 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
 /// Port definition: 'port' 'def' Identification ( (':>' | 'specializes') qualified_name )? body
 pub(crate) fn port_def(input: Input<'_>) -> IResult<Input<'_>, Node<PortDef>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"port"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-    let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) =
+        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"port"))?;
     let (input, body) = port_def_body(input)?;
     Ok((
         input,
@@ -198,9 +193,9 @@ pub(crate) fn port_def(input: Input<'_>) -> IResult<Input<'_>, Node<PortDef>> {
             start,
             input,
             PortDef {
-                identification,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

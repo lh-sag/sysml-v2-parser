@@ -11,8 +11,8 @@ use crate::parser::lex::{
     starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
     CONNECTION_DEF_BODY_STARTERS,
 };
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -227,21 +227,10 @@ pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, Con
 /// Connection definition: `connection def` Identification body.
 pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionDef>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, annotation) = opt(preceded(
-        tag(&b"#"[..]),
-        take_while1(|c: u8| c.is_ascii_alphanumeric() || c == b'_'),
-    ))
-    .parse(input)?;
-    let annotation = annotation.map(|raw| String::from_utf8_lossy(raw.fragment()).to_string());
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"connection"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-    let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) =
-        parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"connection").with_hash_annotation(),
+    )?;
     let (input, body) = connection_member_body(input)?;
     Ok((
         input,
@@ -249,10 +238,10 @@ pub(crate) fn connection_def(input: Input<'_>) -> IResult<Input<'_>, Node<Connec
             start,
             input,
             ConnectionDef {
-                annotation,
-                identification,
-                specializes,
-                specializes_span,
+                annotation: prefix.annotation,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

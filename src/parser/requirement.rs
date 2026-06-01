@@ -18,7 +18,8 @@ use crate::parser::lex::{
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::Input;
-use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span, parse_optional_definition_header_after_identification, span_from_to};
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
+use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
@@ -70,20 +71,12 @@ fn other_requirement_body_element(
     Ok((input, RequirementDefBodyElement::Other(preview)))
 }
 
-fn keyword_requirement_def(input: Input<'_>) -> IResult<Input<'_>, ()> {
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"requirement"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    Ok((input, ()))
-}
-
 pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementDef>> {
     let start = input;
-    let (input, _) = keyword_requirement_def(input)?;
-    let (input, ident) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"requirement").def_required(),
+    )?;
     let (input, body) = requirement_def_body(input)?;
     Ok((
         input,
@@ -91,9 +84,9 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
             start,
             input,
             RequirementDef {
-                identification: ident,
-                specializes,
-                specializes_span,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),

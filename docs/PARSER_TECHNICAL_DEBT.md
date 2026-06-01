@@ -24,51 +24,21 @@ A recent example: library declarations such as `abstract connection name : Type[
 
 ## Where duplication appears
 
-### 1. Definition prefix boilerplate (high duplication, low risk to unify)
+### 1. Definition prefix boilerplate — **P1 done (June 2026)**
 
-Many definition parsers share the same skeleton:
+[`src/parser/definition_prefix.rs`](../src/parser/definition_prefix.rs) provides `parse_definition_prefix` with `DefinitionPrefixOptions` (`DefKeywordMode`, `VisibilityPrefix`, `AnnotationMode`, optional `second_keyword` for `use case`). Migrated `*_def` parsers: item, individual, interface, metadata, connection, constraint, port, requirement, state, occurrence, flow, allocation, case / analysis / verification, view / viewpoint / rendering, use case, enum, action.
 
-1. `ws_and_comments`
-2. Optional `abstract`
-3. Family keyword (`item`, `connection`, `interface`, …)
-4. Optional or required `def`
-5. `identification(input)`
-6. `parse_optional_definition_header_after_identification(input)`
-7. Family-specific body parser
-8. `node_from_to` into a typed `*Def` AST node
+**Still on local preludes (intentional):** `part_def` (usage disambiguation), `*_usage`, `alias_def`, `dependency`, `calc_def`, `attribute_def`.
 
-Example ([`src/parser/item.rs`](../src/parser/item.rs)):
+### 2. Body terminators — **opaque helper done (P1)**
 
-```rust
-pub(crate) fn item_def(input: Input<'_>) -> IResult<Input<'_>, Node<ItemDef>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag("abstract"), ws1)).parse(input)?;
-    let (input, _) = tag("item").parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = opt(preceded(tag("def"), ws1)).parse(input)?;
-    let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) =
-        parse_optional_definition_header_after_identification(input)?;
-    let (input, body) = attribute_body(input)?;
-    // ...
-}
-```
+[`src/parser/body.rs`](../src/parser/body.rs) exports `semicolon_or_opaque_brace_body`. Used by **flow**, **allocation**, and **metadata** definitions (and allocation/flow usages that share the same terminator).
 
-Families differ mainly by keyword, whether `def` is optional, and which body parser runs next.
+**Opaque-body families (June 2026):** flow, allocation, metadata.
 
-**Recommended improvement:** extract `parse_definition_prefix(keyword, DefOptions { abstract_ok, def_required })` and reuse across simple defs. The header-after-ident step is already centralized; the prelude is the next low-risk consolidation.
+**Still local:** occurrence and other modules with their own `definition_body` helpers; structured bodies unchanged.
 
-### 2. Body terminators (medium duplication)
-
-The pattern “`;` or `{ ... }`” is repeated across modules (`flow`, `allocation`, `metadata`, `occurrence`, …), often as local `definition_body` helpers. Some use structured member parsing; others use `skip_until_brace_end` and accept opaque brace content.
-
-**Recommended improvement:** shared helpers in `lex.rs` or a small `body.rs`:
-
-- `semicolon_or_structured_brace_body(parse_member)` — real `*_body_element` loops
-- `semicolon_or_opaque_brace()` — intentional shell bodies; document which families still use this
-
-This does not remove per-family modules; it stops copy-pasting the same `alt(semicolon, delimited("{", skip, "}"))` blocks.
+**P2 (not done):** `semicolon_or_structured_brace_body` with member parsing and recovery.
 
 ### 3. Package dispatch (large surface, mostly intentional)
 
@@ -108,12 +78,16 @@ From [`SYSML_V2_COMPLIANCE_GAP.md`](./SYSML_V2_COMPLIANCE_GAP.md):
 
 Duplication in code and “partial grammar” in the spec sense overlap: the same missing shared header/body grammar shows up as copy-pasted parsers *and* as `ExtendedLibraryDecl` or opaque bodies when a shortcut fails.
 
+## Implementation plan (P1)
+
+**Status: complete (June 2026).** Spec and checklist: [`PARSER_DEBT_P1_PLAN.md`](./PARSER_DEBT_P1_PLAN.md). Code: [`definition_prefix.rs`](../src/parser/definition_prefix.rs), [`body.rs`](../src/parser/body.rs).
+
 ## Prioritized improvements
 
 | Priority | Change | Effort | Benefit |
 |----------|--------|--------|---------|
-| **P1** | `parse_definition_prefix` + `DefOptions` per keyword | Small | Fewer header bugs; one place for `abstract` / `def` / keyword prelude |
-| **P1** | Shared `semicolon_or_*_body` helpers | Small | Less body boilerplate; explicit list of opaque-body families |
+| ~~**P1**~~ | ~~`parse_definition_prefix` + options per keyword~~ | Done | Central prelude for migrated defs |
+| ~~**P1**~~ | ~~`semicolon_or_opaque_brace_body`~~ | Done | flow / allocation / metadata |
 | **P2** | Generic structured body loop with recovery | Medium | Less recovery duplication; better editor behavior |
 | **P2** | Split `package_body_element` into keyword-group sub-dispatchers | Medium | Easier extension without reordering dozens of branches |
 | **P3** | Unified definition/usage header (typing, multiplicity, subsets, redefines) | Large | Spec-aligned; fixes whole classes of library edge cases |
@@ -138,7 +112,7 @@ Duplication in code and “partial grammar” in the spec sense overlap: the sam
 |----------|--------|
 | Is there a lot of duplication? | **Yes** — especially definition prefixes, body terminators, and recovery loops. |
 | Is the codebase unmaintainable? | **No** — modules and tests are coherent; debt is known and gated. |
-| Best next step? | **P1** shared definition prefix and body terminators, without AST redesign. |
+| Best next step? | **P2** structured body recovery loop; optional package sub-dispatch. |
 | Largest long-term gap? | **Unified definition/usage/specialization grammar** plus deeper body parsing, not more top-level `*_def` files. |
 
 The validation CI regression fixed in 2026 (typed library headers after `identification`) illustrates the preferred direction: **extract shared grammar fragments** as they are discovered, keep construct modules, and let library node-shape gates enforce that dedicated parsers stay on the happy path.

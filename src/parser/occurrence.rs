@@ -8,12 +8,12 @@ use crate::parser::attribute::attribute_usage;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, redefine_operator,
+    name, qualified_name, recover_body_element, redefine_operator,
     skip_until_brace_end, subset_operator, ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::annotation;
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::part::part_usage;
 use crate::parser::requirement::doc_comment;
 use crate::parser::Input;
@@ -55,16 +55,10 @@ fn definition_body(input: Input<'_>) -> IResult<Input<'_>, DefinitionBody> {
 
 pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceDef>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, is_abstract) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
-    let (input, _) = tag(&b"occurrence"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"occurrence").def_required(),
+    )?;
     let (input, body) = definition_body(input)?;
     Ok((
         input,
@@ -72,10 +66,10 @@ pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<Occurr
             start,
             input,
             OccurrenceDef {
-                is_abstract,
-                identification,
-                specializes,
-                specializes_span,
+                is_abstract: prefix.is_abstract,
+                identification: prefix.identification,
+                specializes: prefix.specializes,
+                specializes_span: prefix.specializes_span,
                 body,
             },
         ),
