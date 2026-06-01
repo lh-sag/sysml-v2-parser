@@ -6,7 +6,6 @@ use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::digit1;
 use nom::combinator::map;
 use nom::sequence::{delimited, preceded};
 use nom::IResult;

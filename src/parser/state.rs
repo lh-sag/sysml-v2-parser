@@ -13,7 +13,7 @@ use crate::parser::lex::{
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_specialization;
+use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::requirement::{doc_comment, requirement_usage};
 use crate::parser::Input;
 use nom::branch::alt;
@@ -35,7 +35,7 @@ pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> 
     let start = input;
     let (input, _) = keyword_state_def(input)?;
     let (input, ident) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
     let (input, body) = state_def_body(input)?;
     Ok((
         input,

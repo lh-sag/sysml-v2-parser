@@ -18,7 +18,7 @@ use crate::parser::lex::{
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::Input;
-use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span, parse_optional_definition_specialization, span_from_to};
+use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span, parse_optional_definition_header_after_identification, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
@@ -83,7 +83,7 @@ pub(crate) fn requirement_def(input: Input<'_>) -> IResult<Input<'_>, Node<Requi
     let start = input;
     let (input, _) = keyword_requirement_def(input)?;
     let (input, ident) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
     let (input, body) = requirement_def_body(input)?;
     Ok((
         input,

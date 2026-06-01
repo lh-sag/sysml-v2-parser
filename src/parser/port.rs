@@ -10,7 +10,7 @@ use crate::parser::lex::{
     specialization_operator, subset_operator, take_until_terminator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_specialization;
+use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::requirement::doc_comment;
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -190,7 +190,7 @@ pub(crate) fn port_def(input: Input<'_>) -> IResult<Input<'_>, Node<PortDef>> {
     let (input, _) = ws1(input)?;
     let (input, _) = opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
     let (input, body) = port_def_body(input)?;
     Ok((
         input,

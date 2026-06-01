@@ -6,7 +6,7 @@ use crate::parser::lex::{
     identification, name, qualified_name, take_until_terminator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_specialization;
+use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
@@ -23,7 +23,7 @@ pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
     let (input, body) = loose_use_case_body(input)?;
     Ok((
         input,
@@ -59,7 +59,7 @@ pub(crate) fn analysis_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<Ana
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
     let (input, body) = loose_use_case_body(input)?;
     Ok((
         input,
@@ -108,7 +108,7 @@ pub(crate) fn verification_case_def(
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
     let (input, body) = loose_use_case_body(input)?;
     Ok((
         input,

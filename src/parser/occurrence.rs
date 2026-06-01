@@ -13,7 +13,7 @@ use crate::parser::lex::{
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_specialization;
+use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::part::part_usage;
 use crate::parser::requirement::doc_comment;
 use crate::parser::Input;
@@ -64,7 +64,7 @@ pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<Occurr
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
     let (input, body) = definition_body(input)?;
     Ok((
         input,

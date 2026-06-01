@@ -12,7 +12,7 @@ use crate::parser::lex::{
     USE_CASE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
-use crate::parser::parse_optional_definition_specialization;
+use crate::parser::parse_optional_definition_header_after_identification;
 use crate::parser::attribute::attribute_def;
 use crate::parser::requirement::{doc_comment, parse_requirement_usage_payload, subject_decl};
 use crate::parser::Input;
@@ -336,7 +336,7 @@ pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseD
     let start = input;
     let (input, _) = keyword_use_case_def(input)?;
     let (input, ident) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
+    let (input, (specializes, specializes_span)) = parse_optional_definition_header_after_identification(input)?;
     let (input, body) = use_case_def_body(input)?;
     Ok((
         input,

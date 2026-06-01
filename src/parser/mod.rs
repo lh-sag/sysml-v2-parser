@@ -37,7 +37,7 @@ mod usecase;
 mod view;
 
 pub(crate) use span::{node_from_to, span_from_to, with_span, Input};
-pub(crate) use specialization::parse_optional_definition_specialization;
+pub(crate) use specialization::parse_optional_definition_header_after_identification;
 
 use crate::ast::{
     ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, CalcDefBody,
