@@ -142,6 +142,8 @@ The parser is not blocked on missing top-level support for major SysML families 
 4. language-server recovery quality still needs hardening beyond the current solid baseline
 5. semantic conformance remains largely out of scope
 
+For a maintainability-focused view (duplication, refactors, priorities), see [`PARSER_TECHNICAL_DEBT.md`](./PARSER_TECHNICAL_DEBT.md).
+
 ## Recommended next work
 
 If the goal is deeper parser fidelity rather than just keeping the current suites green, the highest-value work is:
