@@ -2,7 +2,7 @@
 
 use crate::ast::{
     CalcDef, CalcDefBody, CalcDefBodyElement, ConstraintDef, ConstraintDefBody,
-    ConstraintDefBodyElement, Node, ParseErrorNode, ReturnDecl,
+    ConstraintDefBodyElement, Expression, Node, ParseErrorNode, ReturnDecl,
 };
 use crate::parser::action::in_out_decl;
 use crate::parser::expr::expression;
@@ -315,6 +315,8 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
         }
         if let Ok((input, decl)) = return_decl(input) {
             (input, CalcDefBodyElement::ReturnDecl(decl))
+        } else if let Ok((input, expr)) = calc_return_expression(input) {
+            (input, CalcDefBodyElement::Expression(expr))
         } else {
             other_calc_return(input)?
         }
@@ -429,6 +431,15 @@ fn named_return_missing_type(input: Input<'_>) -> bool {
             || rest.starts_with(b"}");
     }
     false
+}
+
+/// `return sum(parts.massKg);` — expression return (SysML calc body), not `return name : Type;`.
+fn calc_return_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let (input, _) = preceded(ws_and_comments, tag(&b"return"[..])).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, expr) = expression(input)?;
+    let (input, _) = opt(preceded(ws_and_comments, tag(&b";"[..]))).parse(input)?;
+    Ok((input, expr))
 }
 
 fn other_calc_return(input: Input<'_>) -> IResult<Input<'_>, CalcDefBodyElement> {
