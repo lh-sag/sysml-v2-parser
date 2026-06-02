@@ -223,7 +223,7 @@ SysML Viewpoint* partial
 SysML Rendering* partial
 SysML FramedConcern* partial
 SysML Concern* partial
-SysML Metadata* opaque
+SysML Metadata* partial
 SysML Message* partial
 
 # KerML expression and argument families.

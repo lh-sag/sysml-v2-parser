@@ -901,6 +901,30 @@ fn test_flow_and_allocation_brace_bodies_parse() {
 }
 
 #[test]
+fn test_metadata_def_brace_body_parse() {
+    let input = "package P { metadata def SecurityTag { doc /* classification */ level = high; nested { key = value; } } }";
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+
+    match &elements[0].value {
+        PackageBodyElement::MetadataDef(metadata) => {
+            assert!(matches!(
+                metadata.body,
+                sysml_v2_parser::ast::DefinitionBody::Brace
+            ));
+        }
+        _ => panic!("expected MetadataDef"),
+    }
+}
+
+#[test]
 fn test_case_family_parse() {
     let input = "package P { case def GenericCase { } analysis def TradeStudy { } verification def VerifyThing { } }";
     let result = parse(input).expect("parse should succeed");
