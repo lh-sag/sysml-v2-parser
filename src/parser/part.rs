@@ -15,8 +15,8 @@ use crate::parser::expr::{expression, path_expression};
 use crate::parser::interface::{connect_body, interface_def};
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_until_brace_end,
-    specialization_operator, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
-    ws1, ws_and_comments, PART_BODY_STARTERS,
+    starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1, ws_and_comments,
+    PART_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 use crate::parser::occurrence::{
@@ -24,12 +24,13 @@ use crate::parser::occurrence::{
 };
 use crate::parser::port::port_usage;
 use crate::parser::requirement::{comment_annotation, doc_comment, requirement_usage, satisfy};
+use crate::parser::specialization::parse_optional_definition_specialization;
 use crate::parser::usage::{
     multiplicity, optional_typings, redefinition, specialization_clauses, subsetting, typings,
 };
 use crate::parser::with_span;
 use crate::parser::Input;
-use crate::parser::{node_from_to, span_from_to};
+use crate::parser::node_from_to;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt, value};
@@ -420,28 +421,7 @@ pub(crate) fn part_def(input: Input<'_>) -> IResult<Input<'_>, Node<PartDef>> {
     let (input, _) = tag(&b"def"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, identification) = identification(input)?;
-    let before_specializes = input;
-    let (input, opt_specializes) = opt((
-        preceded(ws_and_comments, specialization_operator),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, _) = if opt_specializes.is_some() {
-        many0(preceded(
-            preceded(ws_and_comments, tag(&b","[..])),
-            preceded(ws_and_comments, qualified_name),
-        ))
-        .parse(input)?
-    } else {
-        (input, Vec::new())
-    };
-    let (specializes, specializes_span) = match opt_specializes {
-        Some((_, type_name)) => (
-            Some(type_name),
-            Some(span_from_to(before_specializes, input)),
-        ),
-        None => (None, None),
-    };
+    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
     let (input, body) = part_def_body(input)?;
     Ok((
         input,
@@ -481,28 +461,8 @@ pub(crate) fn part_def_or_usage(input: Input<'_>) -> IResult<Input<'_>, PartDefO
     if let Ok((input, _)) = tag::<_, _, nom::error::Error<Input>>(&b"def"[..]).parse(input) {
         let (input, _) = ws1(input)?;
         let (input, identification) = identification(input)?;
-        let before_specializes = input;
-        let (input, opt_specializes) = opt((
-            preceded(ws_and_comments, specialization_operator),
-            preceded(ws_and_comments, qualified_name),
-        ))
-        .parse(input)?;
-        let (input, _) = if opt_specializes.is_some() {
-            many0(preceded(
-                preceded(ws_and_comments, tag(&b","[..])),
-                preceded(ws_and_comments, qualified_name),
-            ))
-            .parse(input)?
-        } else {
-            (input, Vec::new())
-        };
-        let (specializes, specializes_span) = match opt_specializes {
-            Some((_, type_name)) => (
-                Some(type_name),
-                Some(span_from_to(before_specializes, input)),
-            ),
-            None => (None, None),
-        };
+        let (input, (specializes, specializes_span)) =
+            parse_optional_definition_specialization(input)?;
         let (input, body) = part_def_body(input)?;
         return Ok((
             input,

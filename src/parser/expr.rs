@@ -147,11 +147,11 @@ fn literal_boolean(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     ))
 }
 
-/// Feature reference: single name.
+/// Feature reference: name or qualified name.
 fn feature_ref_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, n) = name(input)?;
+    let (input, n) = qualified_name(input)?;
     Ok((input, node_from_to(start, input, Expression::FeatureRef(n))))
 }
 

@@ -1224,6 +1224,37 @@ fn test_expression_precedence_parse() {
 }
 
 #[test]
+fn test_expression_allows_qualified_names_and_invocation_arguments() {
+    let input = "package P { attribute x = Vehicles::Engine.power + normalize(System::Sensors::rpm); }";
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    let attr = match &elements[0].value {
+        PackageBodyElement::AttributeDef(attr) => attr,
+        other => panic!("expected AttributeDef, got {other:?}"),
+    };
+    let value = attr.value.value.as_ref().expect("expected value expression");
+    match &value.value {
+        sysml_v2_parser::ast::Expression::BinaryOp { op, right, .. } => {
+            assert_eq!(op, "+");
+            match &right.value {
+                sysml_v2_parser::ast::Expression::Invocation { args, .. } => {
+                    assert_eq!(args.len(), 1, "expected one invocation argument");
+                }
+                other => panic!("expected invocation on rhs, got {other:?}"),
+            }
+        }
+        other => panic!("expected binary expression, got {other:?}"),
+    }
+}
+
+#[test]
 fn test_package_body_recovery_skips_annotated_member_and_keeps_later_sibling() {
     let input = "package P {\n#fmeaspec requirement req1 { }\npart def Good;\n}";
     let result = parse(input).expect("parse should succeed with recovery");
@@ -2342,6 +2373,31 @@ part def A specializes B;
 }
 
 #[test]
+fn test_part_def_preserves_multiple_specializes_targets() {
+    let input = r#"package P {
+part def A :> B, C, D;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = match &elements[0].value {
+        PackageBodyElement::PartDef(part) => part,
+        other => panic!("expected part definition, got {:?}", other),
+    };
+    assert_eq!(part_def.value.specializes.as_deref(), Some("B, C, D"));
+    assert!(
+        part_def.value.specializes_span.is_some(),
+        "specializes span should be present for multi-target form"
+    );
+}
+
+#[test]
 fn test_port_def_accepts_specializes_keyword_as_specialization() {
     let input = r#"package P {
 port def ControlPort specializes BasePort;
@@ -2360,6 +2416,31 @@ port def ControlPort specializes BasePort;
         other => panic!("expected port def, got {:?}", other),
     };
     assert_eq!(port_def.value.specializes.as_deref(), Some("BasePort"));
+}
+
+#[test]
+fn test_port_def_preserves_multiple_specializes_targets() {
+    let input = r#"package P {
+port def ControlPort :> BasePort, DiagnosticPort;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let port_def = match &elements[0].value {
+        PackageBodyElement::PortDef(port) => port,
+        other => panic!("expected port definition, got {:?}", other),
+    };
+    assert_eq!(
+        port_def.value.specializes.as_deref(),
+        Some("BasePort, DiagnosticPort")
+    );
+    assert!(port_def.value.specializes_span.is_some());
 }
 
 #[test]
@@ -2405,6 +2486,31 @@ action def Run specializes BaseAction;
         other => panic!("expected action def, got {:?}", other),
     };
     assert_eq!(action_def.value.specializes.as_deref(), Some("BaseAction"));
+}
+
+#[test]
+fn test_action_def_preserves_multiple_specializes_targets() {
+    let input = r#"package P {
+action def Run :> BaseAction, LoggedAction;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let action_def = match &elements[0].value {
+        PackageBodyElement::ActionDef(action) => action,
+        other => panic!("expected action definition, got {:?}", other),
+    };
+    assert_eq!(
+        action_def.value.specializes.as_deref(),
+        Some("BaseAction, LoggedAction")
+    );
+    assert!(action_def.value.specializes_span.is_some());
 }
 
 #[test]
