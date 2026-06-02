@@ -300,6 +300,7 @@ fn implemented_productions_do_not_use_skip_or_statement_only_bodies() {
         ("PartUsage", "src/parser/part.rs"),
         ("PortDefinition", "src/parser/port.rs"),
         ("PortUsage", "src/parser/port.rs"),
+        ("RenderingDefinition", "src/parser/view.rs"),
         ("FlowDefinition", "src/parser/flow.rs"),
         ("FlowUsage", "src/parser/flow.rs"),
         ("AllocationDefinition", "src/parser/allocation.rs"),

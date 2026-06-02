@@ -183,15 +183,10 @@ fn safe_constraint_def_body_element(
 
 pub(crate) fn calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
     let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"private"[..]), ws1)).parse(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    let (input, _) = tag(&b"calc"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
-    let (input, ident) = identification(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    let (input, prefix) = parse_definition_prefix(
+        input,
+        DefinitionPrefixOptions::new(b"calc").with_private(),
+    )?;
     let (input, body) = calc_def_body(input)?;
     Ok((
         input,
@@ -199,7 +194,7 @@ pub(crate) fn calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
             start,
             input,
             CalcDef {
-                identification: ident,
+                identification: prefix.identification,
                 body,
             },
         ),

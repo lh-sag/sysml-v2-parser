@@ -421,11 +421,22 @@ pub struct AttributeDef {
     pub typing_span: Option<Span>,
 }
 
-/// Body of an attribute (def or usage): `;` or `{` ... `}`.
+/// Body of an attribute (def or usage): `;` or `{` AttributeBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttributeBody {
     Semicolon,
-    Brace,
+    Brace {
+        elements: Vec<Node<AttributeBodyElement>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttributeBodyElement {
+    Error(Node<ParseErrorNode>),
+    Doc(Node<DocComment>),
+    AttributeDef(Node<AttributeDef>),
+    AttributeUsage(Node<AttributeUsage>),
+    Other(String),
 }
 
 /// Item definition: `item def` Identification body (for events, etc.).
@@ -822,11 +833,21 @@ pub struct LibraryPackage {
     pub body: PackageBody,
 }
 
-/// Generic definition body: `;` or `{` ... `}` (skip content for metadata/occurrence).
+/// Generic definition body: `;` or `{` DefinitionBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DefinitionBody {
     Semicolon,
-    Brace,
+    Brace {
+        elements: Vec<Node<DefinitionBodyElement>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DefinitionBodyElement {
+    Error(Node<ParseErrorNode>),
+    Doc(Node<DocComment>),
+    OccurrenceMember(Node<OccurrenceBodyElement>),
+    Other(String),
 }
 
 /// Connect statement in interface def or usage: `connect` from `to` to body.
@@ -1658,7 +1679,18 @@ pub struct RenderingDef {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RenderingDefBody {
     Semicolon,
-    Brace,
+    Brace {
+        elements: Vec<Node<RenderingDefBodyElement>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RenderingDefBodyElement {
+    Error(Node<ParseErrorNode>),
+    Doc(Node<DocComment>),
+    Filter(Node<FilterMember>),
+    ViewRendering(Node<ViewRenderingUsage>),
+    Other(String),
 }
 
 /// View usage: `view` name `:` type? ViewBody.

@@ -78,22 +78,28 @@ Related docs in this repo:
 
 ### 3.5 Regression suite from the corpus
 
-**Suggestion:** Add an **optional** integration test (ignored by default, like validation against the release tree) that parses the MBSE repo path when `MBSE_VACUUM_EXAMPLE_DIR` is set, and asserts:
-
-- no parser panic
-- bounded diagnostic count or snapshot of **primary** codes only
-
-This avoids licensing/size issues if the corpus is not vendored.
+Optional corpus-wide integration testing is **not** checked in here (no vendored MBSE repo, no `MBSE_VACUUM_EXAMPLE_DIR` gate). Use local/manual runs against the public corpus when validating Spec42 or parser changes.
 
 ### 3.6 Shared usage-header parsing (Spec42 sync point)
 
-`sysml-v2-parser` now routes additional usage families through shared usage-header parsing (`:` / `defined by` / `typed by` + specialization clauses) for requirement/case/action/state/view/rendering usages.
+`sysml-v2-parser` routes usage families through shared usage-header parsing (`:` / `defined by` / `typed by` + specialization clauses) for requirement/case/action/state/view/rendering/use-case/viewpoint usages.
 
 **Spec42 alignment notes:**
 
 - Keep consuming normalized usage typing from existing `type_name` fields (same public field names, broader accepted syntax).
 - For requirement usage, `subsets` continues to be exposed as a single normalized target (`last-wins` when multiple clauses are present).
 - Treat broader acceptance of typed/specialized headers as parser coverage growth, not as a semantic model change by itself.
+
+### 3.7 Structured definition bodies (Spec42 sync point)
+
+Attribute, occurrence definition, rendering definition, and generic flow/allocation/metadata bodies now expose brace contents as structured element vectors instead of opaque spans.
+
+**Spec42 alignment notes:**
+
+- `AttributeBody::Brace { elements }` — inspect `AttributeBodyElement` (doc, nested attribute def/usage, recovery errors).
+- `DefinitionBody::Brace { elements }` — occurrence defs and flow/allocation/metadata use `DefinitionBodyElement` (doc, occurrence members, recovery errors).
+- `RenderingDefBody::Brace { elements }` — rendering defs use `RenderingDefBodyElement`.
+- Downstream tools should prefer typed member nodes over re-parsing raw body text where these shapes are present.
 
 ---
 

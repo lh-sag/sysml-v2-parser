@@ -613,6 +613,9 @@ pub(crate) fn skip_statement_or_block(input: Input<'_>) -> IResult<Input<'_>, ()
     if frag.is_empty() {
         return Ok((input, ()));
     }
+    if frag[0] == b'}' {
+        return Ok((input, ()));
+    }
     if frag[0] == b'{' {
         let (input, _) = tag(&b"{"[..]).parse(input)?;
         let (input, _) = skip_until_brace_end(input)?;

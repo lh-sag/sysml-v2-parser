@@ -1,7 +1,7 @@
 //! Metadata definition parsing (BNF MetadataDefinition).
 
 use crate::ast::{MetadataDef, Node};
-use crate::parser::body::semicolon_or_statement_brace_body;
+use crate::parser::body::semicolon_or_structured_definition_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
 use crate::parser::Input;
@@ -14,7 +14,7 @@ pub(crate) fn metadata_def(input: Input<'_>) -> IResult<Input<'_>, Node<Metadata
         input,
         DefinitionPrefixOptions::new(b"metadata").def_required(),
     )?;
-    let (input, body) = semicolon_or_statement_brace_body(input)?;
+    let (input, body) = semicolon_or_structured_definition_body(input)?;
     Ok((
         input,
         node_from_to(

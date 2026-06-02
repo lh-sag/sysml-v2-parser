@@ -21,16 +21,19 @@ Important distinction:
 - **Accepted grammar fragment** means strict parsing recognizes the BNF surface form and preserves the existing public AST shape where fields exist.
 - **Fully structured AST body** means brace body contents are parsed into construct-specific member nodes, not consumed by `skip_until_brace_end` or generic statement-only body parsing.
 
-The coverage gate treats `implemented` as the stronger claim. Attribute, occurrence, part, port, flow, allocation, and metadata productions remain `partial` while any associated body path still relies on opaque or statement-only parsing, even when their headers now accept more BNF forms.
+The coverage gate treats `implemented` as the stronger claim. Productions marked `implemented` must not rely on `skip_until_brace_end`, `semicolon_or_statement_brace_body`, or `take_until_terminator(input, b";{")` in their parser module (see `tests/bnf_compliance.rs`).
 
 ## Package-level declaration families
 
 - `package`, `library package`, `namespace`, `import`: `implemented`
 - `part`, `port`: `partial`; shared usage typing/specialization fragments are accepted, but body coverage is still not a full BNF-modeled AST for every member
-- `attribute`: `partial`; `:` / `defined by` / `typed by` and specialization clauses are accepted for definitions/usages, but extra usage specializations are not all public AST fields yet and brace bodies are still opaque
-- `occurrence`: `partial`; `:` / `defined by` / `typed by`, `subsets`, and `redefines` are accepted on usages with current last-wins normalization
-- `requirement usage`, `case usage`, `analysis case usage`, `verification case usage`, `action usage`, `state usage`, `view usage`, `rendering usage`: `implemented` (shared `usage_header` flow accepts `:` / `defined by` / `typed by` plus specialization clauses)
-- `action`, `state`, `requirement`, `case`, `analysis`, `verification`, `flow`, `allocation`, `interface`, `view`, `viewpoint`, `rendering`, `metadata`, `enum`: `partial` for the broader families due to remaining body/member-depth gaps outside the promoted usage productions
+- `attribute definition`, `attribute usage`: `implemented`; brace bodies use structured member parsing (`AttributeBody::Brace { elements }`) with doc/nested attribute recovery
+- `occurrence definition`: `implemented`; definition brace bodies use structured `DefinitionBody::Brace { elements }` with occurrence member parsing
+- `flow definition`, `allocation definition`, `metadata definition`: `implemented`; brace bodies use shared structured parsing (doc members plus statement recovery)
+- `occurrence usage`: `partial`; `:` / `defined by` / `typed by`, `subsets`, and `redefines` are accepted on usages with current last-wins normalization
+- `requirement usage`, `case usage`, `analysis case usage`, `verification case usage`, `action usage`, `state usage`, `view usage`, `rendering usage`, `use case usage`, `viewpoint usage`: `implemented` (shared `usage_header` flow accepts `:` / `defined by` / `typed by` plus specialization clauses)
+- `rendering definition`: `implemented`; structured `RenderingDefBody::Brace { elements }`
+- `action`, `state`, `requirement`, `case`, `analysis`, `verification`, `flow usage`, `allocation usage`, `interface`, `view`, `viewpoint`, `metadata usage`, `enum`: `partial` for the broader families due to remaining body/member-depth gaps outside the promoted productions
 - KerML semantic families (`behavior`, `function`, `datatype`, `assoc`, `struct`, `metaclass`, `class`, `classifier`, `feature`, `step`): `modeled`
 - KerML feature logic families (`occurrence`, `expr`, `predicate`, `succession`): `modeled`
 - Extended declaration starters (`message`, `concern` and remaining library declarations): `modeled`
@@ -47,7 +50,7 @@ The coverage gate treats `implemented` as the stronger claim. Attribute, occurre
 
 ## Current quality baseline (2026-06-02)
 
-- `cargo test` is green.
+- `cargo test` is green (124 parser tests + bnf_compliance gate).
 - `cargo test --test validation -- --include-ignored` is green, including the full validation suite and full SysML library gates.
 - Systems Library node-shape validation passes with `ExtendedLibraryDecl = 0`.
 - Full std-library node-shape validation also passes with `ExtendedLibraryDecl = 0`.

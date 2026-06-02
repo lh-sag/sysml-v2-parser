@@ -30,15 +30,15 @@ A recent example: library declarations such as `abstract connection name : Type[
 
 **Still on local preludes (intentional):** `part_def` (usage disambiguation), `*_usage`, `alias_def`, `dependency`, `calc_def`, `attribute_def`.
 
-### 2. Body terminators — **statement body helper done (P1), structured body still open**
+### 2. Body terminators — **structured body loop started (P2, June 2026)**
 
-[`src/parser/body.rs`](../src/parser/body.rs) exports shared semicolon/body helpers. **Flow**, **allocation**, and **metadata** definitions and usages now use `semicolon_or_statement_brace_body`: brace bodies are no longer consumed as one opaque blob, but they are still parsed as generic statement nodes rather than family-specific structured AST members.
+[`src/parser/body.rs`](../src/parser/body.rs) exports `parse_structured_brace_members` and `semicolon_or_structured_definition_body`. **Attribute**, **occurrence definition**, and **rendering definition** brace bodies now parse structured member nodes with recovery instead of opaque `skip_until_brace_end`.
 
-**Statement-only body families (June 2026):** flow, allocation, metadata.
+**Structured generic bodies (June 2026):** flow, allocation, and metadata definitions/usages — doc members plus statement-skip recovery into `DefinitionBody::Brace { elements }`.
 
-**Still local or opaque:** occurrence definitions and other modules with their own `definition_body` helpers; attribute brace bodies still use `skip_until_brace_end`; structured bodies remain construct-specific.
+**Still local or opaque:** part/port/action/state/requirement deep body members; alias/import paths; connect bodies in interface parsing.
 
-**P2 (not done):** `semicolon_or_structured_brace_body` with member parsing and recovery.
+**P2 (in progress):** extend structured member grammars per family beyond doc + recovery stubs.
 
 ### 3. Package dispatch (large surface, mostly intentional)
 
@@ -50,7 +50,7 @@ A recent example: library declarations such as `abstract connection name : Type[
 
 `recover_body_element` plus `build_recovery_error_node_from_span` loops appear in `part`, `action`, `state`, `requirement`, `constraint`, `view`, and others. The shape is always: try parse member → on failure recover and skip → push `Error` node → continue.
 
-**Recommended improvement:** a generic `parse_body_members(input, starters, parse_one)` for structured bodies. Improves language-server resilience and reduces bug surface when touching recovery.
+**Recommended improvement:** `parse_structured_brace_members` in [`body.rs`](../src/parser/body.rs) is the shared entry point; migrate remaining families to family-specific `parse_one` callbacks.
 
 ### 5. AST shape duplication (structural, larger refactor)
 
@@ -64,9 +64,9 @@ Many `*Def` structs repeat `identification`, `specializes`, `specializes_span`, 
 
 **Current AST caveat:** `attribute_usage` accepts extra specialization clauses for grammar coverage, but the existing public `AttributeUsage` AST only stores `typing` and `redefines`. `occurrence_usage` stores `type_name`, `subsets`, and `redefines`, using the current last-wins behavior for multiple clauses. Structured AST fidelity for `references` / `crosses` and richer body members remains a later tranche.
 
-**Recently migrated (June 2026):** requirement/case/analysis/verification usages, action/state usages, and view/rendering usages now route through shared `usage_header` parsing.
+**Recently migrated (June 2026):** requirement/case/analysis/verification usages, action/state usages, view/rendering/viewpoint/use-case usages, and `concern_usage` route through shared `usage_header` parsing. `calc_def` uses `parse_definition_prefix`.
 
-**Next candidates:** use-case usage and viewpoint usage, then remaining families that still parse typing or specialization fragments locally.
+**Next candidates:** remaining families with local typing fragments; deep action/state/requirement body member grammar.
 
 ## What is not wasteful duplication
 
@@ -82,7 +82,7 @@ Many `*Def` structs repeat `identification`, `specializes`, `specializes_span`, 
 From [`SYSML_V2_COMPLIANCE_GAP.md`](./SYSML_V2_COMPLIANCE_GAP.md):
 
 1. **Generic definition/usage/specialization** — still distributed across construct-specific parsers instead of one unified layer (largest architectural gap).
-2. **Permissive bodies** — `skip_until_brace_end` and statement-only body helpers still appear in attribute, occurrence definition, alias, import, flow/allocation/metadata, and parts of other modules.
+2. **Permissive bodies** — `skip_until_brace_end` still appears in alias, import, connect-body fallbacks, and deep behavioral body parsers; attribute/occurrence/rendering definition bodies and flow/allocation/metadata generic bodies are now structured with recovery.
 3. **Expression subset** — `expr.rs` is precedence-aware but not full `OwnedExpression`.
 4. **Recovery / LSP** — solid baseline; more specific diagnostics and coverage still wanted.
 
@@ -98,7 +98,8 @@ Duplication in code and “partial grammar” in the spec sense overlap: the sam
 |----------|--------|--------|---------|
 | ~~**P1**~~ | ~~`parse_definition_prefix` + options per keyword~~ | Done | Central prelude for migrated defs |
 | ~~**P1**~~ | ~~`semicolon_or_opaque_brace_body`~~ | Done | flow / allocation / metadata |
-| **P2** | Generic structured body loop with recovery | Medium | Less recovery duplication; better editor behavior |
+| ~~**P2**~~ | Generic structured body loop with recovery | Done (attribute/occurrence/rendering + generic flow/allocation/metadata) | Less recovery duplication; better editor behavior |
+| **P2** | Family-specific structured body members (action/state/requirement depth) | Medium | Full BNF member fidelity |
 | **P2** | Split `package_body_element` into keyword-group sub-dispatchers | Medium | Easier extension without reordering dozens of branches |
 | **P3** | Unified definition/usage header (typing, multiplicity, subsets, redefines) | In progress; part/port/attribute/occurrence + requirement/case/action/state/view usages migrated | Spec-aligned; fixes whole classes of library edge cases |
 | **P3** | Replace `skip_until_brace_end` in high-traffic bodies | Large | Deeper AST; significant work per module |
@@ -122,7 +123,7 @@ Duplication in code and “partial grammar” in the spec sense overlap: the sam
 |----------|--------|
 | Is there a lot of duplication? | **Yes** — especially definition prefixes, body terminators, and recovery loops. |
 | Is the codebase unmaintainable? | **No** — modules and tests are coherent; debt is known and gated. |
-| Best next step? | **P2** structured body recovery loop; optional package sub-dispatch. |
+| Best next step? | **Deep behavioral body members** (action/state/requirement); optional package sub-dispatch. |
 | Largest long-term gap? | **Unified definition/usage/specialization grammar** plus deeper body parsing, not more top-level `*_def` files. |
 
 The validation CI regression fixed in 2026 (typed library headers after `identification`) illustrates the preferred direction: **extract shared grammar fragments** as they are discovered, keep construct modules, and let library node-shape gates enforce that dedicated parsers stay on the happy path.

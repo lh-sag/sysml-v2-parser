@@ -3,15 +3,15 @@
 
 use crate::ast::{
     ExposeMember, FilterMember, Node, ParseErrorNode, RenderingDef, RenderingDefBody,
-    RenderingUsage, SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef, ViewDefBody,
-    ViewDefBodyElement, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
+    RenderingDefBodyElement, RenderingUsage, SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef,
+    ViewDefBody, ViewDefBodyElement, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
-    VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
+    starts_with_any_keyword, ws1, ws_and_comments, VIEW_BODY_STARTERS,
+    VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::usage::usage_header;
@@ -116,7 +116,7 @@ fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
                 let start_unknown = input;
                 let (next, _) = skip_statement_or_block(input)?;
                 if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = crate::parser::body::advance_to_closing_brace(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                     return Ok((input, ViewDefBody::Brace { elements }));
                 }
@@ -179,20 +179,53 @@ pub(crate) fn viewpoint_def(input: Input<'_>) -> IResult<Input<'_>, Node<Viewpoi
     ))
 }
 
+fn rendering_def_body_element(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<RenderingDefBodyElement>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, elem) = alt((
+        map(doc_comment, RenderingDefBodyElement::Doc),
+        map(view_filter_member, RenderingDefBodyElement::Filter),
+        map(view_rendering_usage, RenderingDefBodyElement::ViewRendering),
+    ))
+    .parse(input)?;
+    Ok((input, node_from_to(start, input, elem)))
+}
+
+fn rendering_def_body_recovery(
+    start: Input<'_>,
+    end: Input<'_>,
+) -> Node<RenderingDefBodyElement> {
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        VIEW_DEF_BODY_STARTERS,
+        "rendering definition body",
+        "recovered_rendering_def_body_element",
+    );
+    node_from_to(
+        start,
+        end,
+        RenderingDefBodyElement::Error(node_from_to(start, end, recovery)),
+    )
+}
+
 fn rendering_def_body(input: Input<'_>) -> IResult<Input<'_>, RenderingDefBody> {
     let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| RenderingDefBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                crate::parser::lex::skip_until_brace_end,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| RenderingDefBody::Brace,
-        ),
-    ))
-    .parse(input)
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, RenderingDefBody::Semicolon));
+    }
+    let (input, elements) = crate::parser::body::parse_structured_brace_members(
+        input,
+        VIEW_DEF_BODY_STARTERS,
+        "rendering definition body",
+        "recovered_rendering_def_body_element",
+        rendering_def_body_element,
+        rendering_def_body_recovery,
+    )?;
+    Ok((input, RenderingDefBody::Brace { elements }))
 }
 
 pub(crate) fn rendering_def(input: Input<'_>) -> IResult<Input<'_>, Node<RenderingDef>> {
@@ -359,7 +392,7 @@ fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
                 let start_unknown = input;
                 let (next, _) = skip_statement_or_block(input)?;
                 if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = crate::parser::body::advance_to_closing_brace(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                     return Ok((input, ViewBody::Brace { elements }));
                 }
@@ -388,7 +421,6 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, header) = usage_header(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = view_body(input)?;
     Ok((
         input,
@@ -411,10 +443,7 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
     let (input, _) = tag(&b"viewpoint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    let (input, header) = usage_header(input)?;
     let (input, body) = requirement_def_body(input)?;
     Ok((
         input,
@@ -423,7 +452,7 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
             input,
             ViewpointUsage {
                 name: name_str,
-                type_name,
+                type_name: header.type_name.unwrap_or_default(),
                 body,
             },
         ),
@@ -438,7 +467,6 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
     let (input, header) = usage_header(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,

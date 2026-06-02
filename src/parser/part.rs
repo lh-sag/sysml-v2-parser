@@ -357,18 +357,7 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMe
         .unwrap_or("member")
         .to_string();
     let (input, _) = ws_and_comments(input)?;
-    let (input, body) = alt((
-        map(tag(&b";"[..]), |_| AttributeBody::Semicolon),
-        map(
-            delimited(
-                tag(&b"{"[..]),
-                skip_until_brace_end,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| AttributeBody::Brace,
-        ),
-    ))
-    .parse(input)?;
+    let (input, body) = crate::parser::attribute::attribute_body(input)?;
     let (input, trailing_subsets) = opt(preceded(
         preceded(ws_and_comments, tag(&b":>"[..])),
         preceded(ws_and_comments, qualified_name),

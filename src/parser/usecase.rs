@@ -15,6 +15,7 @@ use crate::parser::lex::{
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::{doc_comment, parse_requirement_usage_payload, subject_decl};
+use crate::parser::usage::usage_header;
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span};
 use nom::branch::alt;
@@ -118,6 +119,23 @@ fn then_include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<ThenInclud
     ))
 }
 
+fn use_case_usage_tail(
+    input: Input<'_>,
+    ident: String,
+) -> IResult<Input<'_>, UseCaseUsage> {
+    let (input, header) = usage_header(input)?;
+    let (input, _) = take_until_terminator(input, b";{")?;
+    let (input, body) = use_case_def_body(input)?;
+    Ok((
+        input,
+        UseCaseUsage {
+            name: ident,
+            type_name: header.type_name,
+            body,
+        },
+    ))
+}
+
 fn use_case_usage_in_body(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUsage>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"use"[..])).parse(input)?;
@@ -125,31 +143,8 @@ fn use_case_usage_in_body(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseUs
     let (input, _) = tag(&b"case"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, ident) = name(input)?;
-    let (input, type_name) = {
-        let (peek, _) = ws_and_comments(input)?;
-        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
-            (input, Some(type_name))
-        } else {
-            (input, None)
-        }
-    };
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
-    let (input, body) = use_case_def_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            UseCaseUsage {
-                name: ident,
-                type_name,
-                body,
-            },
-        ),
-    ))
+    let (input, usage) = use_case_usage_tail(input, ident)?;
+    Ok((input, node_from_to(start, input, usage)))
 }
 
 fn then_use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ThenUseCaseUsage>> {
@@ -305,31 +300,8 @@ pub(crate) fn use_case_usage(input: Input<'_>) -> IResult<Input<'_>, Node<UseCas
     let (input, _) = tag(&b"case"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, ident) = name(input)?;
-    let (input, type_name) = {
-        let (peek, _) = ws_and_comments(input)?;
-        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
-            (input, Some(type_name))
-        } else {
-            (input, None)
-        }
-    };
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
-    let (input, body) = use_case_def_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            UseCaseUsage {
-                name: ident,
-                type_name,
-                body,
-            },
-        ),
-    ))
+    let (input, usage) = use_case_usage_tail(input, ident)?;
+    Ok((input, node_from_to(start, input, usage)))
 }
 
 pub(crate) fn use_case_def(input: Input<'_>) -> IResult<Input<'_>, Node<UseCaseDef>> {

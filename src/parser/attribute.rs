@@ -1,12 +1,14 @@
 //! Attribute definition and usage parsing.
 
-use crate::ast::{AttributeBody, AttributeDef, AttributeUsage, Node};
-use crate::parser::expr::expression;
-use crate::parser::lex::{
-    identification, name, qualified_name, skip_until_brace_end, starts_with_keyword, ws1,
-    ws_and_comments,
+use crate::ast::{
+    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Node,
 };
+use crate::parser::body::parse_structured_brace_members;
+use crate::parser::build_recovery_error_node_from_span;
+use crate::parser::expr::expression;
+use crate::parser::lex::{identification, name, qualified_name, starts_with_keyword, ws1, ws_and_comments};
 use crate::parser::node_from_to;
+use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{multiplicity, optional_typings, specialization_clauses, typings};
 use crate::parser::with_span;
 use crate::parser::Input;
@@ -14,9 +16,17 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, value};
 use nom::multi::many0;
-use nom::sequence::{delimited, preceded};
+use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
+
+const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
+    b"doc",
+    b"attribute",
+    b"comment",
+    b"@",
+    b"#",
+];
 
 fn local_name_from_qualified_name(qname: &str) -> String {
     qname.rsplit("::").next().unwrap_or(qname).to_string()
@@ -91,21 +101,52 @@ fn value_part(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Expressio
     expression(input)
 }
 
-/// Attribute body: ';' or '{' ... '}' (skip content inside braces)
+fn attribute_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, elem) = alt((
+        map(doc_comment, AttributeBodyElement::Doc),
+        map(
+            |i| attribute_def(i, true),
+            AttributeBodyElement::AttributeDef,
+        ),
+        map(attribute_usage, AttributeBodyElement::AttributeUsage),
+    ))
+    .parse(input)?;
+    Ok((input, node_from_to(start, input, elem)))
+}
+
+fn attribute_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<AttributeBodyElement> {
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        ATTRIBUTE_BODY_STARTERS,
+        "attribute body",
+        "recovered_attribute_body_element",
+    );
+    node_from_to(
+        start,
+        end,
+        AttributeBodyElement::Error(node_from_to(start, end, recovery)),
+    )
+}
+
+/// Attribute body: `;` or `{` AttributeBodyElement* `}`.
 pub(crate) fn attribute_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBody> {
     let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| AttributeBody::Semicolon),
-        map(
-            delimited(
-                tag(&b"{"[..]),
-                skip_until_brace_end,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| AttributeBody::Brace,
-        ),
-    ))
-    .parse(input)
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, AttributeBody::Semicolon));
+    }
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        ATTRIBUTE_BODY_STARTERS,
+        "attribute body",
+        "recovered_attribute_body_element",
+        attribute_body_element,
+        attribute_body_recovery,
+    )?;
+    Ok((input, AttributeBody::Brace { elements }))
 }
 
 /// Attribute definition: 'attribute' name ( ':>' | ':' )? qualified_name? body

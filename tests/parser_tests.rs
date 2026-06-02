@@ -883,7 +883,7 @@ fn test_flow_and_allocation_brace_bodies_parse() {
         PackageBodyElement::FlowUsage(flow) => {
             assert!(matches!(
                 flow.body,
-                sysml_v2_parser::ast::DefinitionBody::Brace
+                sysml_v2_parser::ast::DefinitionBody::Brace { .. }
             ));
         }
         _ => panic!("expected FlowUsage"),
@@ -893,7 +893,7 @@ fn test_flow_and_allocation_brace_bodies_parse() {
         PackageBodyElement::AllocationUsage(alloc) => {
             assert!(matches!(
                 alloc.body,
-                sysml_v2_parser::ast::DefinitionBody::Brace
+                sysml_v2_parser::ast::DefinitionBody::Brace { .. }
             ));
         }
         _ => panic!("expected AllocationUsage"),
@@ -917,7 +917,7 @@ fn test_metadata_def_brace_body_parse() {
         PackageBodyElement::MetadataDef(metadata) => {
             assert!(matches!(
                 metadata.body,
-                sysml_v2_parser::ast::DefinitionBody::Brace
+                sysml_v2_parser::ast::DefinitionBody::Brace { .. }
             ));
         }
         _ => panic!("expected MetadataDef"),
@@ -2712,6 +2712,149 @@ case analyze typed by Mission::CaseType subsets BaseCase;
         other => panic!("expected case usage, got {:?}", other),
     };
     assert_eq!(case_usage.value.type_name.as_deref(), Some("Mission::CaseType"));
+}
+
+#[test]
+fn test_use_case_usage_accepts_typed_by_and_specialization_clauses() {
+    let input = r#"package P {
+use case mission typed by Mission::CaseType subsets BaseCase;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let use_case = match &elements[0].value {
+        PackageBodyElement::UseCaseUsage(u) => u,
+        other => panic!("expected use case usage, got {:?}", other),
+    };
+    assert_eq!(use_case.value.type_name.as_deref(), Some("Mission::CaseType"));
+}
+
+#[test]
+fn test_then_use_case_usage_accepts_typed_by_alias() {
+    let input = r#"package P {
+use case def U {
+then use case step typed by Mission::StepCase;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let use_case_def = match &pkg.value.body {
+        PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBodyElement::UseCaseDef(d) => d,
+            other => panic!("expected use case def, got {:?}", other),
+        },
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let body_elements = match &use_case_def.value.body {
+        sysml_v2_parser::ast::UseCaseDefBody::Brace { elements } => elements,
+        other => panic!("expected use case brace body, got {:?}", other),
+    };
+    let then_use_case = body_elements
+        .iter()
+        .find_map(|el| match &el.value {
+            sysml_v2_parser::ast::UseCaseDefBodyElement::ThenUseCaseUsage(t) => Some(t),
+            _ => None,
+        })
+        .expect("then use case usage should be present");
+    assert_eq!(
+        then_use_case
+            .value
+            .use_case
+            .value
+            .type_name
+            .as_deref(),
+        Some("Mission::StepCase")
+    );
+}
+
+#[test]
+fn test_viewpoint_usage_accepts_defined_by_typing() {
+    let input = r#"package P {
+viewpoint safety defined by Mission::SafetyViewpoint { }
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let viewpoint = match &elements[0].value {
+        PackageBodyElement::ViewpointUsage(v) => v,
+        other => panic!("expected viewpoint usage, got {:?}", other),
+    };
+    assert_eq!(viewpoint.value.type_name, "Mission::SafetyViewpoint");
+}
+
+#[test]
+fn test_attribute_def_brace_body_preserves_structured_members() {
+    let input = r#"package P {
+attribute def Tensor {
+doc /* tensor doc */
+attribute def rank: Integer;
+attribute usage : Real;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let attr_def = match &pkg.value.body {
+        PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBodyElement::AttributeDef(a) => a,
+            other => panic!("expected attribute def, got {:?}", other),
+        },
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let members = match &attr_def.value.body {
+        sysml_v2_parser::ast::AttributeBody::Brace { elements } => elements,
+        other => panic!("expected structured attribute body, got {:?}", other),
+    };
+    assert!(
+        members.len() >= 2,
+        "attribute definition body should retain nested members"
+    );
+}
+
+#[test]
+fn test_metadata_def_brace_body_preserves_doc_member() {
+    let input = r#"package P {
+metadata def Tag {
+doc /* tag doc */
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let metadata_def = match &pkg.value.body {
+        PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBodyElement::MetadataDef(m) => m,
+            other => panic!("expected metadata def, got {:?}", other),
+        },
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let members = match &metadata_def.value.body {
+        sysml_v2_parser::ast::DefinitionBody::Brace { elements } => elements,
+        other => panic!("expected structured metadata body, got {:?}", other),
+    };
+    assert!(
+        !members.is_empty(),
+        "metadata definition body should retain doc member"
+    );
 }
 
 #[test]

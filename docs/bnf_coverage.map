@@ -148,12 +148,15 @@
 * Invariant partial
 
 # SysML structural families.
-SysML AttributeDefinition partial
-SysML AttributeUsage partial
+SysML AttributeDefinition implemented
+SysML AttributeUsage implemented
+SysML OccurrenceDefinition implemented
+SysML FlowDefinition implemented
+SysML AllocationDefinition implemented
+SysML MetadataDefinition implemented
 SysML Attribute* partial
 SysML Enumeration* partial
 SysML EnumeratedValue partial
-SysML OccurrenceDefinition partial
 SysML OccurrenceUsage partial
 SysML Occurrence* partial
 SysML EventOccurrenceUsage partial
@@ -193,6 +196,9 @@ SysML ActionUsage implemented
 SysML StateUsage implemented
 SysML ViewUsage implemented
 SysML RenderingUsage implemented
+SysML UseCaseUsage implemented
+SysML ViewpointUsage implemented
+SysML RenderingDefinition implemented
 SysML Action* partial
 SysML Accept* partial
 SysML AssertConstraintUsage partial

@@ -1,14 +1,14 @@
 //! Occurrence definition and usage parsing.
 
 use crate::ast::{
-    AssertConstraintMember, ConstraintDefBody, DefinitionBody, Node, OccurrenceBodyElement,
-    OccurrenceDef, OccurrenceUsage, OccurrenceUsageBody, ParseErrorNode,
+    AssertConstraintMember, ConstraintDefBody, DefinitionBody, DefinitionBodyElement, Node,
+    OccurrenceBodyElement, OccurrenceDef, OccurrenceUsage, OccurrenceUsageBody, ParseErrorNode,
 };
 use crate::parser::attribute::attribute_usage;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, recover_body_element, skip_until_brace_end, ws1, ws_and_comments};
+use crate::parser::lex::{name, recover_body_element, ws1, ws_and_comments};
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::part::part_usage;
@@ -37,18 +37,43 @@ const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
 
 fn definition_body(input: Input<'_>) -> IResult<Input<'_>, DefinitionBody> {
     let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| DefinitionBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                skip_until_brace_end,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| DefinitionBody::Brace,
-        ),
-    ))
-    .parse(input)
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, DefinitionBody::Semicolon));
+    }
+    let (input, elements) = crate::parser::body::parse_structured_brace_members(
+        input,
+        OCCURRENCE_BODY_STARTERS,
+        "occurrence definition body",
+        "recovered_occurrence_def_body_element",
+        |input| {
+            let start = input;
+            let (input, node) = occurrence_body_element(input)?;
+            Ok((
+                input,
+                node_from_to(
+                    start,
+                    input,
+                    DefinitionBodyElement::OccurrenceMember(node),
+                ),
+            ))
+        },
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                OCCURRENCE_BODY_STARTERS,
+                "occurrence definition body",
+                "recovered_occurrence_def_body_element",
+            );
+            node_from_to(
+                start,
+                end,
+                DefinitionBodyElement::Error(node_from_to(start, end, recovery)),
+            )
+        },
+    )?;
+    Ok((input, DefinitionBody::Brace { elements }))
 }
 
 pub(crate) fn occurrence_def(input: Input<'_>) -> IResult<Input<'_>, Node<OccurrenceDef>> {
@@ -203,7 +228,7 @@ fn occurrence_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, Occurrenc
                 let start_unknown = input;
                 let (next, _) = recover_body_element(input, OCCURRENCE_BODY_STARTERS)?;
                 if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = crate::parser::body::advance_to_closing_brace(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                     return Ok((input, OccurrenceUsageBody::Brace { elements }));
                 }

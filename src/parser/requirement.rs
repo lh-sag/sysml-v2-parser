@@ -587,17 +587,12 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let (input, _) = ws1(input)?;
     let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, ident) = name(input)?;
-    let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, header) = usage_header(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = requirement_def_body(input)?;
     let val = ConcernUsage {
         name: ident,
-        type_name,
+        type_name: header.type_name,
         body,
     };
     Ok((input, node_from_to(start, input, val)))
