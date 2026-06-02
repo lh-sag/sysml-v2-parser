@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-06-02
+
+### Added
+
+- **Qualified package identifiers**: package and namespace declarations now accept qualified names in the identification position (e.g. `package AstronomyReference::Domain { ... }`) and keep the full qualified path in the AST.
+- **`ref part` assignment forms**: part usage bodies now parse `ref part` declarations with optional typing and optional value binding (e.g. `ref part centralBody = sun;`, `ref part orbitingBody : Body = earth;`) without recovery diagnostics.
+
+### Fixed
+
+- **Reference usage grammar coverage**: `ref part` declarations that omit explicit typing are no longer forced into a `:` parse path, aligning parser behavior with SysML v2 reference-usage notation.
+
+### Migration (Spec42 and similar hosts)
+
+1. Bump the `sysml-v2-parser` dependency to `0.14.0` (or the matching git revision / path).
+2. If downstream code assumes `package`/`namespace` names are unqualified, update it to handle `::`-qualified identifiers in `Identification.name`.
+3. Re-run parser and semantic smoke tests that cover `ref part` declarations with and without type annotations.
+
+[0.14.0]: https://github.com/elan8/sysml-v2-parser/compare/v0.13.0...v0.14.0
+
 ## [0.13.0] - 2026-06-01
 
 ### Breaking
