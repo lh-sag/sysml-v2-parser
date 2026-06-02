@@ -3,7 +3,8 @@
 use crate::ast::{Expression, Node, Span};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    qualified_name, redefine_operator, subset_operator, typed_by_operator, ws_and_comments,
+    qualified_name, redefine_operator, starts_with_keyword, subset_operator, typed_by_operator,
+    ws_and_comments,
 };
 use crate::parser::{span_from_to, Input};
 use nom::bytes::complete::{tag, take_until};
@@ -38,6 +39,19 @@ pub(crate) fn typings(input: Input<'_>) -> IResult<Input<'_>, (Span, String)> {
     let mut names = vec![first];
     names.extend(rest);
     Ok((input, (span_from_to(before, input), names.join(", "))))
+}
+
+/// Optional typings that remain strict once a typing starter is present.
+pub(crate) fn optional_typings(input: Input<'_>) -> IResult<Input<'_>, Option<(Span, String)>> {
+    let (peek, _) = ws_and_comments(input)?;
+    let fragment = peek.fragment();
+    if (fragment.starts_with(b":") && !fragment.starts_with(b":>") && !fragment.starts_with(b":>>"))
+        || starts_with_keyword(fragment, b"defined")
+    {
+        let (input, typing) = typings(input)?;
+        return Ok((input, Some(typing)));
+    }
+    Ok((input, None))
 }
 
 fn conjugated_qualified_name(input: Input<'_>) -> IResult<Input<'_>, String> {

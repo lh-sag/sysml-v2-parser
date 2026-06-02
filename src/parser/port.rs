@@ -12,7 +12,7 @@ use crate::parser::lex::{
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
-use crate::parser::usage::{multiplicity, redefinition, subsetting, typings};
+use crate::parser::usage::{multiplicity, optional_typings, redefinition, subsetting};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -65,7 +65,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
         .map(|(i, o)| (i, o.is_some()))?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    let (input, type_result) = opt(typings).parse(input)?;
+    let (input, type_result) = optional_typings(input)?;
     let (type_ref_span, type_name) = type_result
         .map(|(span, name)| (Some(span), Some(name)))
         .unwrap_or((None, None));

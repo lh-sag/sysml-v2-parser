@@ -15,8 +15,8 @@ use crate::parser::expr::{expression, path_expression};
 use crate::parser::interface::{connect_body, interface_def};
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_until_brace_end,
-    specialization_operator, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
-    PART_BODY_STARTERS,
+    specialization_operator, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
+    ws1, ws_and_comments, PART_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 use crate::parser::occurrence::{
@@ -24,11 +24,12 @@ use crate::parser::occurrence::{
 };
 use crate::parser::port::port_usage;
 use crate::parser::requirement::{comment_annotation, doc_comment, requirement_usage, satisfy};
+use crate::parser::usage::{multiplicity, optional_typings, redefinition, subsetting, typings};
 use crate::parser::with_span;
 use crate::parser::Input;
 use crate::parser::{node_from_to, span_from_to};
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until};
+use nom::bytes::complete::tag;
 use nom::combinator::{map, opt, value};
 use nom::multi::many0;
 use nom::sequence::delimited;
@@ -527,16 +528,6 @@ pub(crate) fn part_def_or_usage(input: Input<'_>) -> IResult<Input<'_>, PartDefO
     Ok((input, PartDefOrUsage::Usage(usage)))
 }
 
-/// Multiplicity: '[' ... ']' as string
-fn multiplicity(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"["[..]).parse(input)?;
-    let (input, content) = take_until(&b"]"[..]).parse(input)?;
-    let (input, _) = tag(&b"]"[..]).parse(input)?;
-    let s = format!("[{}]", String::from_utf8_lossy(content.fragment()).trim());
-    Ok((input, s))
-}
-
 /// Value part for usages: `= expr` | `:= expr` | `default = expr` | `default := expr`.
 fn usage_value_part(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Expression>> {
     let (input, _) = ws_and_comments(input)?;
@@ -594,83 +585,21 @@ fn part_usage_named<'a>(start: Input<'a>, input: Input<'a>) -> IResult<Input<'a>
     let (input, _) = ws_and_comments(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
     let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
-    let (input, type_result) = {
-        let (peek, _) = ws_and_comments(input)?;
-        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, result) =
-                preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
-            (input, Some(result))
-        } else {
-            (input, None)
-        }
-    };
+    let (input, type_result) = optional_typings(input)?;
     let (type_ref_span, type_name) = type_result
         .map(|(s, t)| (Some(s), t))
         .unwrap_or((None, String::new()));
     let (input, trailing_multiplicity_opt) = opt(multiplicity).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(trailing_multiplicity_opt);
     let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
-    let (input, subsets) = opt(preceded(
-        alt((
-            preceded(ws_and_comments, tag(&b":>"[..])),
-            preceded(ws_and_comments, tag(&b"subsets"[..])),
-        )),
-        preceded(
-            ws_and_comments,
-            (
-                name,
-                opt(preceded(
-                    preceded(ws_and_comments, tag(&b"="[..])),
-                    preceded(ws_and_comments, expression),
-                )),
-            ),
-        ),
-    ))
-    .parse(input)?;
-    let (input, redefines) = opt(alt((
-        preceded(
-            preceded(ws_and_comments, tag(&b"redefines"[..])),
-            preceded(ws1, qualified_name),
-        ),
-        preceded(
-            preceded(ws_and_comments, tag(&b":>>"[..])),
-            preceded(ws_and_comments, qualified_name),
-        ),
-    )))
-    .parse(input)?;
+    let (input, subsets) = opt(subsetting).parse(input)?;
+    let (input, redefines) = opt(redefinition).parse(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = part_usage_body(input)?;
-    let (input, trailing_subsets) = opt(preceded(
-        alt((
-            preceded(ws_and_comments, tag(&b":>"[..])),
-            preceded(ws_and_comments, tag(&b"subsets"[..])),
-        )),
-        preceded(
-            ws_and_comments,
-            (
-                name,
-                opt(preceded(
-                    preceded(ws_and_comments, tag(&b"="[..])),
-                    preceded(ws_and_comments, expression),
-                )),
-            ),
-        ),
-    ))
-    .parse(input)?;
-    let (input, trailing_redefines) = opt(alt((
-        preceded(
-            preceded(ws_and_comments, tag(&b"redefines"[..])),
-            preceded(ws1, qualified_name),
-        ),
-        preceded(
-            preceded(ws_and_comments, tag(&b":>>"[..])),
-            preceded(ws_and_comments, qualified_name),
-        ),
-    )))
-    .parse(input)?;
+    let (input, trailing_subsets) = opt(subsetting).parse(input)?;
+    let (input, trailing_redefines) = opt(redefinition).parse(input)?;
     let subsets = subsets.or(trailing_subsets.clone());
     let redefines = redefines.or(trailing_redefines.clone());
     let input = if trailing_subsets.is_some() || trailing_redefines.is_some() {
@@ -711,9 +640,10 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
     let (input, _) = tag(&b"part"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (peek, _) = ws_and_comments(input)?;
-    if peek.fragment().starts_with(b":")
+    if (peek.fragment().starts_with(b":")
         && !peek.fragment().starts_with(b":>")
-        && !peek.fragment().starts_with(b":>>")
+        && !peek.fragment().starts_with(b":>>"))
+        || starts_with_keyword(peek.fragment(), b"defined")
     {
         let (input, mut usage) = anonymous_part_usage(start, input)?;
         usage.value.is_individual = is_individual;
@@ -733,38 +663,11 @@ fn anonymous_part_usage<'a>(
     start: Input<'a>,
     input: Input<'a>,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, (type_ref_span, type_name)) = typings(input)?;
     let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
     let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
-    let (input, subsets) = opt(preceded(
-        alt((
-            preceded(ws_and_comments, tag(&b":>"[..])),
-            preceded(ws_and_comments, tag(&b"subsets"[..])),
-        )),
-        preceded(
-            ws_and_comments,
-            (
-                name,
-                opt(preceded(
-                    preceded(ws_and_comments, tag(&b"="[..])),
-                    preceded(ws_and_comments, expression),
-                )),
-            ),
-        ),
-    ))
-    .parse(input)?;
-    let (input, redefines) = opt(alt((
-        preceded(
-            preceded(ws_and_comments, tag(&b"redefines"[..])),
-            preceded(ws1, qualified_name),
-        ),
-        preceded(
-            preceded(ws_and_comments, tag(&b":>>"[..])),
-            preceded(ws_and_comments, qualified_name),
-        ),
-    )))
-    .parse(input)?;
+    let (input, subsets) = opt(subsetting).parse(input)?;
+    let (input, redefines) = opt(redefinition).parse(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
@@ -785,7 +688,7 @@ fn anonymous_part_usage<'a>(
                 value,
                 body,
                 name_span: None,
-                type_ref_span: None,
+                type_ref_span: Some(type_ref_span),
             },
         ),
     ))

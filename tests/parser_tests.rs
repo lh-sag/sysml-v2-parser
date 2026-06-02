@@ -2735,3 +2735,80 @@ fn test_part_usage_body_ref_part_assignments_parse() {
     assert_eq!(refs[1].type_name, "Body");
     assert!(refs[1].value.is_some());
 }
+
+#[test]
+fn test_part_usage_accepts_defined_by_typings() {
+    let input = r#"package P {
+part def Carrier {
+  part engine defined by Vehicle::Engine, Vehicle::PoweredComponent[1] subsets components;
+}
+}"#;
+    let result = parse(input).expect("defined-by part usage should parse");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = match &elements[0].value {
+        PackageBodyElement::PartDef(p) => p,
+        other => panic!("expected part def, got {:?}", other),
+    };
+    let body = match &part_def.value.body {
+        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    let part_usage = match &body[0].value {
+        sysml_v2_parser::ast::PartDefBodyElement::PartUsage(p) => p,
+        other => panic!("expected part usage, got {:?}", other),
+    };
+    assert_eq!(part_usage.value.name, "engine");
+    assert_eq!(
+        part_usage.value.type_name,
+        "Vehicle::Engine, Vehicle::PoweredComponent"
+    );
+    assert_eq!(part_usage.value.multiplicity.as_deref(), Some("[1]"));
+    assert_eq!(
+        part_usage
+            .value
+            .subsets
+            .as_ref()
+            .map(|(name, _)| name.as_str()),
+        Some("components")
+    );
+}
+
+#[test]
+fn test_anonymous_part_usage_accepts_defined_by_typing() {
+    let input = r#"package P {
+part def Carrier {
+  part defined by Vehicle::Engine[2];
+}
+}"#;
+    let result = parse(input).expect("anonymous defined-by part usage should parse");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = match &elements[0].value {
+        PackageBodyElement::PartDef(p) => p,
+        other => panic!("expected part def, got {:?}", other),
+    };
+    let body = match &part_def.value.body {
+        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    let part_usage = match &body[0].value {
+        sysml_v2_parser::ast::PartDefBodyElement::PartUsage(p) => p,
+        other => panic!("expected part usage, got {:?}", other),
+    };
+    assert!(part_usage.value.name.is_empty());
+    assert_eq!(part_usage.value.type_name, "Vehicle::Engine");
+    assert_eq!(part_usage.value.multiplicity.as_deref(), Some("[2]"));
+}

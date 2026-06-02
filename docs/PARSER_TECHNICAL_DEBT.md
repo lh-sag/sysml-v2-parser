@@ -60,7 +60,7 @@ Many `*Def` structs repeat `identification`, `specializes`, `specializes_span`, 
 
 ### 6. Shared usage grammar fragments — **started**
 
-[`src/parser/usage.rs`](../src/parser/usage.rs) now centralizes small `UsageDeclaration` / `FeatureSpecializationPart` fragments: multiplicity, `TypedBy` (`:` / `defined by`), subsetting, and redefinition. `port_usage` has been migrated first, including `defined by` and multiple typing targets. Next candidates are `part_usage`, `attribute_usage`, occurrence usages, and requirement/case usages that still parse these fragments locally.
+[`src/parser/usage.rs`](../src/parser/usage.rs) now centralizes small `UsageDeclaration` / `FeatureSpecializationPart` fragments: multiplicity, `TypedBy` (`:` / `defined by`), subsetting, and redefinition. `port_usage` and `part_usage` have been migrated first, including `defined by` and multiple typing targets. Next candidates are `attribute_usage`, occurrence usages, and requirement/case usages that still parse these fragments locally.
 
 ## What is not wasteful duplication
 
