@@ -1,5 +1,5 @@
 use crate::ast::{AllocationDef, AllocationUsage, Node};
-use crate::parser::body::semicolon_or_opaque_brace_body;
+use crate::parser::body::semicolon_or_statement_brace_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{name, qualified_name, take_until_terminator, ws1, ws_and_comments};
@@ -19,7 +19,7 @@ pub(crate) fn allocation_def(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
             .def_required()
             .no_abstract(),
     )?;
-    let (input, body) = semicolon_or_opaque_brace_body(input)?;
+    let (input, body) = semicolon_or_statement_brace_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -62,7 +62,7 @@ pub(crate) fn allocation_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Allo
     };
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
-    let (input, body) = semicolon_or_opaque_brace_body(input)?;
+    let (input, body) = semicolon_or_statement_brace_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -86,7 +86,7 @@ pub(crate) fn allocate_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Alloca
     let (input, source) = expression(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
     let (input, target) = preceded(ws1, expression).parse(input)?;
-    let (input, body) = semicolon_or_opaque_brace_body(input)?;
+    let (input, body) = semicolon_or_statement_brace_body(input)?;
     Ok((
         input,
         node_from_to(

@@ -867,6 +867,40 @@ fn test_flow_and_allocation_parse() {
 }
 
 #[test]
+fn test_flow_and_allocation_brace_bodies_parse() {
+    let input = "package P { flow transfer : Fuel from src to dst { x = y; nested { z = q; } } allocation map allocate source to target { one = two; } }";
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+
+    match &elements[0].value {
+        PackageBodyElement::FlowUsage(flow) => {
+            assert!(matches!(
+                flow.body,
+                sysml_v2_parser::ast::DefinitionBody::Brace
+            ));
+        }
+        _ => panic!("expected FlowUsage"),
+    }
+
+    match &elements[1].value {
+        PackageBodyElement::AllocationUsage(alloc) => {
+            assert!(matches!(
+                alloc.body,
+                sysml_v2_parser::ast::DefinitionBody::Brace
+            ));
+        }
+        _ => panic!("expected AllocationUsage"),
+    }
+}
+
+#[test]
 fn test_case_family_parse() {
     let input = "package P { case def GenericCase { } analysis def TradeStudy { } verification def VerifyThing { } }";
     let result = parse(input).expect("parse should succeed");

@@ -1,5 +1,5 @@
 use crate::ast::{FlowDef, FlowUsage, Node};
-use crate::parser::body::semicolon_or_opaque_brace_body;
+use crate::parser::body::semicolon_or_statement_brace_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{name, qualified_name, take_until_terminator, ws1, ws_and_comments};
@@ -18,7 +18,7 @@ pub(crate) fn flow_def(input: Input<'_>) -> IResult<Input<'_>, Node<FlowDef>> {
         input,
         DefinitionPrefixOptions::new(b"flow").def_required(),
     )?;
-    let (input, body) = semicolon_or_opaque_brace_body(input)?;
+    let (input, body) = semicolon_or_statement_brace_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -61,7 +61,7 @@ pub(crate) fn flow_usage(input: Input<'_>) -> IResult<Input<'_>, Node<FlowUsage>
     };
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
-    let (input, body) = semicolon_or_opaque_brace_body(input)?;
+    let (input, body) = semicolon_or_statement_brace_body(input)?;
     Ok((
         input,
         node_from_to(

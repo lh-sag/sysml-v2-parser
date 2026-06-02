@@ -168,12 +168,12 @@ SysML Interface* partial
 SysML BinaryInterface* partial
 SysML NaryInterface* partial
 SysML DefaultInterfaceEnd partial
-SysML Flow* opaque
+SysML Flow* partial
 KerML Flow partial
 KerML FlowFeatureRedefinition partial
 KerML SuccessionFlow partial
 SysML Payload* partial
-SysML Allocation* opaque
+SysML Allocation* partial
 
 # SysML behavior, state, requirement, case, view, and metadata families.
 SysML Action* partial
