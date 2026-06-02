@@ -9,14 +9,14 @@ use crate::ast::{
     RefDecl,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage, attribute_usage_shorthand};
+use crate::parser::body::advance_to_closing_brace;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connection::connection_member_body;
 use crate::parser::expr::{expression, path_expression};
 use crate::parser::interface::{connect_body, interface_def};
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_until_brace_end,
-    starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1, ws_and_comments,
-    PART_BODY_STARTERS,
+    identification, name, qualified_name, recover_body_element,
+    starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 use crate::parser::node_from_to;
@@ -39,6 +39,8 @@ use nom::sequence::delimited;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
+
+const MEMBER_HEADER_UNTIL_BODY: &[u8] = b";{";
 
 /// Result of parsing either a part definition or part usage (used for package body to avoid part_def consuming "part" before part_usage can run).
 #[derive(Debug)]
@@ -120,7 +122,7 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
                     "recovered_part_def_body_element",
                 );
                 if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = advance_to_closing_brace(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                     return Ok((input, PartDefBody::Brace { elements }));
                 }
@@ -322,7 +324,10 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMe
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, header_text) = take_until_terminator(input, b";{")?;
+    let (input, header_text) = crate::parser::lex::take_until_terminator(
+        input,
+        MEMBER_HEADER_UNTIL_BODY,
+    )?;
     let keyword = if starts_with_any_keyword(input.fragment(), &[b"ref"]) {
         "ref"
     } else if starts_with_any_keyword(input.fragment(), &[b"action"]) {
@@ -505,8 +510,6 @@ fn part_usage_redefines_only<'a>(
     let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
     let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = part_usage_body(input)?;
     Ok((
         input,
@@ -545,8 +548,6 @@ fn part_usage_named<'a>(start: Input<'a>, input: Input<'a>) -> IResult<Input<'a>
     let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
     let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = part_usage_body(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
     let subsets = trailing_clauses
@@ -623,8 +624,6 @@ fn anonymous_part_usage<'a>(
     let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
     let (input, clauses) = specialization_clauses(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = part_usage_body(input)?;
     Ok((
         input,
@@ -900,7 +899,7 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
         map(
             nom::sequence::delimited(
                 preceded(ws_and_comments, tag(&b"{"[..])),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| Some(ConnectBody::Brace),
@@ -986,7 +985,7 @@ fn ref_body_parse(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
         map(
             nom::sequence::delimited(
                 tag(&b"{"[..]),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| RefBody::Brace,
@@ -1132,7 +1131,7 @@ fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             map(
                 delimited(
                     tag(&b"{"[..]),
-                    skip_until_brace_end,
+                    advance_to_closing_brace,
                     preceded(ws_and_comments, tag(&b"}"[..])),
                 ),
                 |_| RefBody::Brace,

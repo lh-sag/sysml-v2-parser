@@ -162,13 +162,13 @@ SysML Occurrence* partial
 SysML EventOccurrenceUsage partial
 SysML Individual* partial
 SysML Item* partial
-SysML PartDefinition partial
-SysML PartUsage partial
+SysML PartDefinition implemented
+SysML PartUsage implemented
+SysML PortDefinition implemented
+SysML PortUsage implemented
 SysML Part* partial
 SysML PortionUsage partial
 SysML Portion* partial
-SysML PortDefinition partial
-SysML PortUsage partial
 SysML Port* partial
 SysML Connection* partial
 SysML Connector* partial

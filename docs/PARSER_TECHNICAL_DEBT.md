@@ -36,6 +36,8 @@ A recent example: library declarations such as `abstract connection name : Type[
 
 **Structured generic bodies (June 2026):** flow, allocation, and metadata definitions/usages — doc members plus statement-skip recovery into `DefinitionBody::Brace { elements }`.
 
+**Part/port bodies (June 2026):** part def/usage bodies retain structured member AST; port def/usage use `parse_structured_brace_members` with `PortBody::Brace { elements }` (nested ports, in/out, doc, recovery).
+
 **Still local or opaque:** part/port/action/state/requirement deep body members; alias/import paths; connect bodies in interface parsing.
 
 **P2 (in progress):** extend structured member grammars per family beyond doc + recovery stubs.

@@ -609,6 +609,7 @@ pub enum PortDefBody {
 pub enum PortDefBodyElement {
     InOutDecl(Node<InOutDecl>),
     Doc(Node<DocComment>),
+    Error(Node<ParseErrorNode>),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
     PortUsage(Node<PortUsage>),
@@ -630,15 +631,22 @@ pub struct PortUsage {
     pub type_ref_span: Option<Span>,
 }
 
-/// Body of a port usage: `;` or `{` PortUsage* `}` (nested ports).
+/// Body of a port usage: `;` or `{` PortBodyElement* `}`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PortBody {
     Semicolon,
-    Brace,
-    /// Brace with nested port usages (e.g. port vehicleToRoadPort redefines ... { port left...; port right...; }).
-    BraceWithPorts {
-        elements: Vec<Node<PortUsage>>,
+    Brace {
+        elements: Vec<Node<PortBodyElement>>,
     },
+}
+
+/// Element inside a port usage body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PortBodyElement {
+    Error(Node<ParseErrorNode>),
+    InOutDecl(Node<InOutDecl>),
+    PortUsage(Node<PortUsage>),
+    Other(String),
 }
 
 // ---------------------------------------------------------------------------
@@ -2266,14 +2274,27 @@ fn normalize_port_usage(p: &PortUsage) -> PortUsage {
 fn normalize_port_body(b: &PortBody) -> PortBody {
     match b {
         PortBody::Semicolon => PortBody::Semicolon,
-        PortBody::Brace => PortBody::Brace,
-        PortBody::BraceWithPorts { elements } => PortBody::BraceWithPorts {
+        PortBody::Brace { elements } => PortBody::Brace {
             elements: elements
                 .iter()
-                .map(|n| dummy_node(n, normalize_port_usage(&n.value)))
+                .map(normalize_port_body_element_node)
                 .collect(),
         },
     }
+}
+
+fn normalize_port_body_element_node(el: &Node<PortBodyElement>) -> Node<PortBodyElement> {
+    let value = match &el.value {
+        PortBodyElement::Error(n) => PortBodyElement::Error(dummy_node(n, n.value.clone())),
+        PortBodyElement::InOutDecl(n) => {
+            PortBodyElement::InOutDecl(dummy_node(n, n.value.clone()))
+        }
+        PortBodyElement::PortUsage(n) => {
+            PortBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
+        }
+        PortBodyElement::Other(text) => PortBodyElement::Other(text.clone()),
+    };
+    dummy_node(el, value)
 }
 
 fn normalize_port_def(p: &PortDef) -> PortDef {
@@ -2303,6 +2324,7 @@ fn normalize_port_def_body_element_node(el: &Node<PortDefBodyElement>) -> Node<P
             PortDefBodyElement::InOutDecl(dummy_node(n, n.value.clone()))
         }
         PortDefBodyElement::Doc(n) => PortDefBodyElement::Doc(dummy_node(n, n.value.clone())),
+        PortDefBodyElement::Error(n) => PortDefBodyElement::Error(dummy_node(n, n.value.clone())),
         PortDefBodyElement::AttributeDef(n) => {
             PortDefBodyElement::AttributeDef(dummy_node(n, normalize_attribute_def(&n.value)))
         }

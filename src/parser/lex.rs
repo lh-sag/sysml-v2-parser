@@ -93,6 +93,23 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"timeslice",
 ];
 
+pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[
+    b"doc",
+    b"attribute",
+    b"port",
+    b"in",
+    b"out",
+    b"inout",
+];
+
+pub(crate) const PORT_BODY_STARTERS: &[&[u8]] = &[
+    b"doc",
+    b"port",
+    b"in",
+    b"out",
+    b"inout",
+];
+
 pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
     b"#",
     b"@",

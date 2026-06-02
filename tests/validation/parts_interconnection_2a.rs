@@ -5,7 +5,7 @@ use sysml_v2_parser::ast::{
     InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage,
     InterfaceUsageBodyElement, Node, Package, PackageBody, PackageBodyElement, PartDef,
     PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, PortBody,
-    PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, RootElement,
+    PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, RootElement,
     RootNamespace, Span, Visibility,
 };
 use sysml_v2_parser::parse;
@@ -538,9 +538,9 @@ fn part_vehicle1_c1() -> PartUsage {
                     multiplicity: None,
                     subsets: None,
                     redefines: Some("VehicleA::vehicleToRoadPort".to_string()),
-                    body: PortBody::BraceWithPorts {
+                    body: PortBody::Brace {
                         elements: vec![
-                            n(PortUsage {
+                            n(PortBodyElement::PortUsage(n(PortUsage {
                                 name: "leftWheelToRoadPort".to_string(),
                                 type_name: None,
                                 multiplicity: None,
@@ -552,8 +552,8 @@ fn part_vehicle1_c1() -> PartUsage {
                                 body: PortBody::Semicolon,
                                 name_span: None,
                                 type_ref_span: None,
-                            }),
-                            n(PortUsage {
+                            }))),
+                            n(PortBodyElement::PortUsage(n(PortUsage {
                                 name: "rightWheelToRoadPort".to_string(),
                                 type_name: None,
                                 multiplicity: None,
@@ -565,7 +565,7 @@ fn part_vehicle1_c1() -> PartUsage {
                                 body: PortBody::Semicolon,
                                 name_span: None,
                                 type_ref_span: None,
-                            }),
+                            }))),
                         ],
                     },
                     name_span: None,
@@ -735,7 +735,7 @@ fn part_differential() -> PartUsage {
                     multiplicity: None,
                     subsets: None,
                     redefines: None,
-                    body: PortBody::Brace,
+                    body: PortBody::Brace { elements: vec![] },
                     name_span: None,
                     type_ref_span: None,
                 }))),

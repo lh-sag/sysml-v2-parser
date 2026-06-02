@@ -26,7 +26,9 @@ The coverage gate treats `implemented` as the stronger claim. Productions marked
 ## Package-level declaration families
 
 - `package`, `library package`, `namespace`, `import`: `implemented`
-- `part`, `port`: `partial`; shared usage typing/specialization fragments are accepted, but body coverage is still not a full BNF-modeled AST for every member
+- `part definition`, `part usage`: `implemented`; definition and usage bodies already parse structured member nodes (attributes, nested parts/ports, doc, recovery errors)
+- `port definition`, `port usage`: `implemented`; `PortBody::Brace { elements }` with nested ports and in/out members
+- `part*`, `port*` wildcards: `partial` (member-depth gaps remain in broader families)
 - `attribute definition`, `attribute usage`: `implemented`; brace bodies use structured member parsing (`AttributeBody::Brace { elements }`) with doc/nested attribute recovery
 - `occurrence definition`: `implemented`; definition brace bodies use structured `DefinitionBody::Brace { elements }` with occurrence member parsing
 - `flow definition`, `allocation definition`, `metadata definition`: `implemented`; brace bodies use shared structured parsing (doc members plus statement recovery)

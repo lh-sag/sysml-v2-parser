@@ -2858,6 +2858,110 @@ doc /* tag doc */
 }
 
 #[test]
+fn test_part_def_brace_body_preserves_structured_members() {
+    let input = r#"package P {
+part def Vehicle {
+doc /* vehicle doc */
+attribute mass: Real;
+part wheel : Wheel;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let part_def = match &pkg.value.body {
+        PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBodyElement::PartDef(d) => d,
+            other => panic!("expected part def, got {:?}", other),
+        },
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let members = match &part_def.value.body {
+        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        other => panic!("expected structured part def body, got {:?}", other),
+    };
+    assert!(
+        members.len() >= 2,
+        "part definition body should retain nested members"
+    );
+}
+
+#[test]
+fn test_port_def_brace_body_preserves_structured_members() {
+    let input = r#"package P {
+port def FuelPort {
+doc /* port doc */
+in fuel : Fuel;
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let port_def = match &pkg.value.body {
+        PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBodyElement::PortDef(d) => d,
+            other => panic!("expected port def, got {:?}", other),
+        },
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let members = match &port_def.value.body {
+        sysml_v2_parser::ast::PortDefBody::Brace { elements } => elements,
+        other => panic!("expected structured port def body, got {:?}", other),
+    };
+    assert!(
+        members.len() >= 2,
+        "port definition body should retain doc and in/out members"
+    );
+}
+
+#[test]
+fn test_port_usage_brace_body_preserves_nested_port_members() {
+    let input = r#"package P {
+part vehicle {
+port vehicleToRoadPort {
+port leftWheelToRoadPort;
+port rightWheelToRoadPort;
+}
+}
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let part_usage = match &pkg.value.body {
+        PackageBody::Brace { elements } => match &elements[0].value {
+            PackageBodyElement::PartUsage(p) => p,
+            other => panic!("expected part usage, got {:?}", other),
+        },
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let port_usage = match &part_usage.value.body {
+        sysml_v2_parser::ast::PartUsageBody::Brace { elements } => elements
+            .iter()
+            .find_map(|el| match &el.value {
+                PartUsageBodyElement::PortUsage(p) => Some(p),
+                _ => None,
+            })
+            .expect("part usage should contain nested port usage"),
+        other => panic!("expected part usage brace body, got {:?}", other),
+    };
+    let members = match &port_usage.value.body {
+        sysml_v2_parser::ast::PortBody::Brace { elements } => elements,
+        other => panic!("expected structured port body, got {:?}", other),
+    };
+    assert_eq!(
+        members.len(),
+        2,
+        "port usage body should retain nested port members"
+    );
+}
+
+#[test]
 fn test_action_state_and_view_usage_accept_typed_by_alias() {
     let input = r#"package P {
 action send typed by Mission::SendAction;
