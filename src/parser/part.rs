@@ -1251,6 +1251,11 @@ fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, _) = opt(preceded(tag(&b"part"[..]), ws1)).parse(input)?;
+    let (input, _) = opt(preceded(
+        ws_and_comments,
+        preceded(tag(&b":>>"[..]), ws_and_comments),
+    ))
+    .parse(input)?;
     let (input, name_str) = name(input)?;
     let (input, type_name) = opt(preceded(
         preceded(ws_and_comments, tag(&b":"[..])),
