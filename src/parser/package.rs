@@ -25,7 +25,7 @@ use crate::parser::individual::individual_def;
 use crate::parser::interface::interface_def;
 use crate::parser::item::item_def;
 use crate::parser::lex::{
-    identification, recover_body_element, skip_statement_or_block, starts_with_any_keyword,
+    name, qualified_name, recover_body_element, skip_statement_or_block, starts_with_any_keyword,
     starts_with_keyword, ws1, ws_and_comments, PACKAGE_BODY_STARTERS,
 };
 use crate::parser::metadata::metadata_def;
@@ -50,7 +50,7 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
 use nom::multi::many0;
-use nom::sequence::preceded;
+use nom::sequence::{delimited, preceded};
 use nom::IResult;
 use nom::Parser;
 
@@ -61,10 +61,24 @@ fn keyword_package(input: Input<'_>) -> IResult<Input<'_>, ()> {
     Ok((input, ()))
 }
 
-fn required_identification(input: Input<'_>) -> IResult<Input<'_>, crate::ast::Identification> {
-    let (input, identification) = identification(input)?;
-    if identification.short_name.is_some() || identification.name.is_some() {
-        Ok((input, identification))
+fn required_package_identification(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::Identification> {
+    let (input, short_name) = opt(delimited(
+        preceded(ws_and_comments, tag(&b"<"[..])),
+        preceded(ws_and_comments, name),
+        preceded(ws_and_comments, tag(&b">"[..])),
+    ))
+    .parse(input)?;
+    let (input, decl_name) = opt(preceded(ws_and_comments, qualified_name)).parse(input)?;
+    if short_name.is_some() || decl_name.is_some() {
+        Ok((
+            input,
+            crate::ast::Identification {
+                short_name,
+                name: decl_name,
+            },
+        ))
     } else {
         Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -94,7 +108,7 @@ fn library_package_(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPackage>
         (input, is_standard)
     };
     let (input, _) = keyword_package(input)?;
-    let (input, identification) = required_identification(input)?;
+    let (input, identification) = required_package_identification(input)?;
     let (input, body) = package_body(input)?;
     Ok((
         input,
@@ -114,7 +128,7 @@ fn library_package_(input: Input<'_>) -> IResult<Input<'_>, Node<LibraryPackage>
 fn package_(input: Input<'_>) -> IResult<Input<'_>, Node<Package>> {
     let start = input;
     let (input, _) = keyword_package(input)?;
-    let (input, identification) = required_identification(input)?;
+    let (input, identification) = required_package_identification(input)?;
     let (input, body) = package_body(input)?;
     Ok((
         input,
@@ -134,7 +148,7 @@ fn namespace_decl(input: Input<'_>) -> IResult<Input<'_>, Node<NamespaceDecl>> {
     let start = input;
     let (input, _) = preceded(ws_and_comments, tag(&b"namespace"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, identification) = required_identification(input)?;
+    let (input, identification) = required_package_identification(input)?;
     let (input, body) = package_body(input)?;
     Ok((
         input,
@@ -559,8 +573,11 @@ pub(crate) fn package_body_element(
     if let Ok((input, elem)) = map(filter_member, PackageBodyElement::Filter).parse(input) {
         return Ok((input, node_from_to(start, input, elem)));
     }
-    if let Ok((input, elem)) =
-        map(|i| attribute_def(i, false), PackageBodyElement::AttributeDef).parse(input)
+    if let Ok((input, elem)) = map(
+        |i| attribute_def(i, false),
+        PackageBodyElement::AttributeDef,
+    )
+    .parse(input)
     {
         return Ok((input, node_from_to(start, input, elem)));
     }

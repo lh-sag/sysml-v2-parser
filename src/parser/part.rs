@@ -1245,19 +1245,24 @@ fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsage>>
     }
 }
 
-/// Ref in part usage body: `ref` name `:` type body.
+/// Ref in part usage body: `ref` (`part`)? name (`:` type)? (`=` value)? body.
 fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
+    let (input, _) = opt(preceded(tag(&b"part"[..]), ws1)).parse(input)?;
     let (input, name_str) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, type_name) = opt(preceded(
+        preceded(ws_and_comments, tag(&b":"[..])),
+        preceded(ws_and_comments, qualified_name),
+    ))
+    .parse(input)?;
     let (input, value) = opt(preceded(
         preceded(ws_and_comments, tag(&b"="[..])),
         preceded(ws_and_comments, expression),
     ))
     .parse(input)?;
+    let type_name = type_name.unwrap_or_default();
     let (input, body) = preceded(
         ws_and_comments,
         alt((

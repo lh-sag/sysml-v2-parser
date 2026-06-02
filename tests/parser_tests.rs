@@ -3,9 +3,9 @@
 use std::path::PathBuf;
 
 use sysml_v2_parser::ast::{
-    Identification, LibraryPackage, Node, Package, PackageBody, PackageBodyElement,
-    PartUsageBody, PartUsageBodyElement, RenderingDefBody, RootElement, RootNamespace, Span,
-    ViewBody, ViewDefBody,
+    Identification, LibraryPackage, Node, Package, PackageBody, PackageBodyElement, PartUsageBody,
+    PartUsageBodyElement, RenderingDefBody, RootElement, RootNamespace, Span, ViewBody,
+    ViewDefBody,
 };
 use sysml_v2_parser::{parse, parse_with_diagnostics};
 
@@ -1514,7 +1514,10 @@ fn test_parse_part_attribute_prefix_redefines_scientific_notation_with_quoted_un
             _ => None,
         })
         .expect("researchAndDevelopmentCost attribute usage should be present");
-    assert_eq!(attr.redefines.as_deref(), Some("researchAndDevelopmentCost"));
+    assert_eq!(
+        attr.redefines.as_deref(),
+        Some("researchAndDevelopmentCost")
+    );
     assert!(attr.value.is_some(), "attribute value should be parsed");
 }
 
@@ -2297,10 +2300,7 @@ action def Run specializes BaseAction;
         PackageBodyElement::ActionDef(p) => p,
         other => panic!("expected action def, got {:?}", other),
     };
-    assert_eq!(
-        action_def.value.specializes.as_deref(),
-        Some("BaseAction")
-    );
+    assert_eq!(action_def.value.specializes.as_deref(), Some("BaseAction"));
 }
 
 #[test]
@@ -2603,4 +2603,92 @@ fn test_parse_typed_attribute_usage_in_part_usage_body() {
     assert_eq!(attribute.name, "totalMassKg");
     assert_eq!(attribute.typing.as_deref(), Some("MassValue"));
     assert!(attribute.value.is_some(), "attribute value should parse");
+}
+
+#[test]
+fn test_qualified_package_declaration_parses() {
+    let input = "package AstronomyReference::Domain { part def Thing; }";
+    let result = sysml_v2_parser::parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "qualified package declaration should parse cleanly: {:?}",
+        result.errors
+    );
+    let package = match &result.root.elements[0].value {
+        RootElement::Package(package) => &package.value,
+        other => panic!("expected package root element, got {other:?}"),
+    };
+    assert_eq!(
+        package.identification.name.as_deref(),
+        Some("AstronomyReference::Domain")
+    );
+}
+
+#[test]
+fn test_part_usage_body_ref_part_assignments_parse() {
+    let input = r#"package RefPartAssignmentProbe {
+  part def Body;
+  part def Orbit {
+    ref part centralBody : Body;
+    ref part orbitingBody : Body;
+  }
+  part system {
+    part sun : Body;
+    part earth : Body;
+    part earthOrbit : Orbit {
+      ref part centralBody = sun;
+      ref part orbitingBody : Body = earth;
+    }
+  }
+}"#;
+    let result = sysml_v2_parser::parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "ref part assignment forms should parse cleanly: {:?}",
+        result.errors
+    );
+
+    let package = match &result.root.elements[0].value {
+        RootElement::Package(package) => &package.value,
+        other => panic!("expected package root element, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &package.body else {
+        panic!("expected package body");
+    };
+    let system = elements
+        .iter()
+        .find_map(|element| match &element.value {
+            PackageBodyElement::PartUsage(part) if part.value.name == "system" => Some(&part.value),
+            _ => None,
+        })
+        .expect("system part usage");
+    let PartUsageBody::Brace { elements } = &system.body else {
+        panic!("expected system part usage body");
+    };
+    let earth_orbit = elements
+        .iter()
+        .find_map(|element| match &element.value {
+            PartUsageBodyElement::PartUsage(part) if part.value.name == "earthOrbit" => {
+                Some(&part.value)
+            }
+            _ => None,
+        })
+        .expect("earthOrbit part usage");
+    let PartUsageBody::Brace { elements } = &earth_orbit.body else {
+        panic!("expected earthOrbit body");
+    };
+    let refs: Vec<_> = elements
+        .iter()
+        .filter_map(|element| match &element.value {
+            PartUsageBodyElement::Ref(reference) => Some(&reference.value),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(refs.len(), 2, "expected two ref part assignments");
+    assert_eq!(refs[0].name, "centralBody");
+    assert_eq!(refs[0].type_name, "");
+    assert!(refs[0].value.is_some());
+    assert_eq!(refs[1].name, "orbitingBody");
+    assert_eq!(refs[1].type_name, "Body");
+    assert!(refs[1].value.is_some());
 }
