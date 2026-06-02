@@ -47,6 +47,7 @@ pub(crate) fn optional_typings(input: Input<'_>) -> IResult<Input<'_>, Option<(S
     let fragment = peek.fragment();
     if (fragment.starts_with(b":") && !fragment.starts_with(b":>") && !fragment.starts_with(b":>>"))
         || starts_with_keyword(fragment, b"defined")
+        || starts_with_keyword(fragment, b"typed")
     {
         let (input, typing) = typings(input)?;
         return Ok((input, Some(typing)));
@@ -106,6 +107,14 @@ mod tests {
     #[test]
     fn typings_accepts_defined_by_and_multiple_targets() {
         let input = span_input("defined by ~Ports::Fuel, Ports::Command ;");
+        let (rest, (_, typing)) = typings(input).expect("typings");
+        assert_eq!(typing, "~Ports::Fuel, Ports::Command");
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
+
+    #[test]
+    fn typings_accepts_typed_by_keyword_alias() {
+        let input = span_input("typed by ~Ports::Fuel, Ports::Command ;");
         let (rest, (_, typing)) = typings(input).expect("typings");
         assert_eq!(typing, "~Ports::Fuel, Ports::Command");
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
