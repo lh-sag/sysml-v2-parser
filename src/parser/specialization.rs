@@ -81,8 +81,7 @@ pub(crate) fn parse_optional_definition_header_after_identification(
     input: Input<'_>,
 ) -> IResult<Input<'_>, (Option<String>, Option<Span>)> {
     let (input, _) = ws_and_comments(input)?;
-    if input.fragment().starts_with(b":>")
-        || starts_with_keyword(input.fragment(), b"specializes")
+    if input.fragment().starts_with(b":>") || starts_with_keyword(input.fragment(), b"specializes")
     {
         return parse_optional_definition_specialization(input);
     }
@@ -113,10 +112,7 @@ mod tests {
         let (rest, (specializes, _)) =
             parse_optional_definition_header_after_identification(input).expect("header");
         assert!(rest.fragment().is_empty());
-        assert_eq!(
-            specializes.as_deref(),
-            Some("linkObjects, parts")
-        );
+        assert_eq!(specializes.as_deref(), Some("linkObjects, parts"));
     }
 
     #[test]

@@ -19,6 +19,7 @@ use crate::parser::lex::{
     PART_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
+use crate::parser::node_from_to;
 use crate::parser::occurrence::{
     individual_usage, occurrence_usage, snapshot_usage, then_timeslice_usage, timeslice_usage,
 };
@@ -30,7 +31,6 @@ use crate::parser::usage::{
 };
 use crate::parser::with_span;
 use crate::parser::Input;
-use crate::parser::node_from_to;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt, value};

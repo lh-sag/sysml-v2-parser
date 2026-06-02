@@ -3,55 +3,23 @@
 use crate::ast::{AttributeBody, AttributeDef, AttributeUsage, Node};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, qualified_name, skip_until_brace_end, starts_with_keyword,
-    take_until_terminator, ws1, ws_and_comments,
+    identification, name, qualified_name, skip_until_brace_end, starts_with_keyword, ws1,
+    ws_and_comments,
 };
 use crate::parser::node_from_to;
+use crate::parser::usage::{multiplicity, optional_typings, specialization_clauses, typings};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::map;
+use nom::combinator::{map, value};
+use nom::multi::many0;
 use nom::sequence::{delimited, preceded};
 use nom::IResult;
 use nom::Parser;
 
 fn local_name_from_qualified_name(qname: &str) -> String {
     qname.rsplit("::").next().unwrap_or(qname).to_string()
-}
-
-/// Type after `attribute` name: optionally `:>` or `:` plus qualified name. Does not consume `:>>`.
-/// When `allow_colon_gt` is false (after `attribute :>>` redefinition), only `:` is accepted so a
-/// following `:>` can be parsed as subsetting (e.g. `attribute :>> outlet :> electricGrid.outlets`).
-fn attribute_typing(
-    input: Input<'_>,
-    allow_colon_gt: bool,
-) -> IResult<Input<'_>, (crate::ast::Span, String)> {
-    let (input, _) = ws_and_comments(input)?;
-    let peek = input.fragment();
-    if starts_with_keyword(peek, b":>>") {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    if allow_colon_gt && starts_with_keyword(peek, b":>") {
-        let (input, _) = tag(&b":>"[..]).parse(input)?;
-        let (input, _) = ws_and_comments(input)?;
-        return with_span(qualified_name).parse(input);
-    }
-    if peek.first() == Some(&b':')
-        && !starts_with_keyword(peek, b"::")
-        && !starts_with_keyword(peek, b":>")
-    {
-        let (input, _) = tag(&b":"[..]).parse(input)?;
-        let (input, _) = ws_and_comments(input)?;
-        return with_span(qualified_name).parse(input);
-    }
-    Err(nom::Err::Error(nom::error::Error::new(
-        input,
-        nom::error::ErrorKind::Tag,
-    )))
 }
 
 fn is_reserved_shorthand_starter(name: &str) -> bool {
@@ -90,6 +58,21 @@ fn is_reserved_shorthand_starter(name: &str) -> bool {
     )
 }
 
+fn ignored_feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = many0(preceded(
+        ws_and_comments,
+        alt((
+            value((), multiplicity),
+            value((), tag(&b"nonunique"[..])),
+            value((), tag(&b"unique"[..])),
+            value((), tag(&b"ordered"[..])),
+            value((), tag(&b"nonordered"[..])),
+        )),
+    ))
+    .parse(input)?;
+    Ok((input, ()))
+}
+
 /// Value part: `= expr` | `:= expr` | `default = expr` | `default := expr` (BNF FeatureValue).
 fn value_part(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Expression>> {
     let (input, _) = ws_and_comments(input)?;
@@ -98,7 +81,10 @@ fn value_part(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Expressio
         preceded(tag(&b":="[..]), ws_and_comments),
         preceded(
             preceded(tag(&b"default"[..]), ws1),
-            preceded(alt((tag(&b"="[..]), tag(&b":="[..]))), ws_and_comments),
+            alt((
+                preceded(alt((tag(&b"="[..]), tag(&b":="[..]))), ws_and_comments),
+                ws_and_comments,
+            )),
         ),
     ))
     .parse(input)?;
@@ -163,11 +149,11 @@ pub(crate) fn attribute_def(
             )));
         }
     }
-    let (input, typing_result) =
-        nom::combinator::opt(|i| attribute_typing(i, true)).parse(input)?;
+    let (input, typing_result) = optional_typings(input)?;
     let (typing_span, typing) = typing_result
         .map(|(span, s)| (Some(span), Some(s)))
         .unwrap_or((None, None));
+    let (input, _) = ignored_feature_modifiers(input)?;
     if disambiguate_from_usage && !has_def && typing.is_none() {
         let (peek_input, _) = ws_and_comments(input)?;
         let peek = peek_input.fragment();
@@ -178,10 +164,20 @@ pub(crate) fn attribute_def(
             )));
         }
     }
+    let (input, leading_clauses) = specialization_clauses(input)?;
+    let leading_subset = leading_clauses.subsets;
+    let (typing_span, typing, leading_value) = if typing.is_none() {
+        leading_subset
+            .map(|(name, value)| (None, Some(name), value))
+            .unwrap_or((typing_span, typing, None))
+    } else {
+        (typing_span, typing, None)
+    };
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    let value = value.or(leading_value);
+    let (input, _) = specialization_clauses(input)?;
+    let (input, _) = ignored_feature_modifiers(input)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -235,78 +231,54 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         }),
     ))
     .parse(input)?;
-    let (
-        input,
-        name_span,
-        name_str,
-        typing_span,
-        typing,
-        redefines_span,
-        redefines,
-    ) = match usage_head {
-        AttributeUsageHead::PrefixRedefines {
-            redefines_span,
-            redefines,
-        } => {
-            let (input, typing_result) =
-                nom::combinator::opt(|i| attribute_typing(i, false)).parse(input)?;
-            let (typing_span, typing) = typing_result
-                .map(|(span, s)| (Some(span), Some(s)))
-                .unwrap_or((None, None));
-            (
-                input,
-                None,
-                local_name_from_qualified_name(&redefines),
-                typing_span,
-                typing,
-                Some(redefines_span),
-                Some(redefines),
-            )
-        }
-        AttributeUsageHead::Named { name_span, name } => {
-            let (input, typing_result) =
-                nom::combinator::opt(|i| attribute_typing(i, true)).parse(input)?;
-            let (typing_span, typing) = typing_result
-                .map(|(span, s)| (Some(span), Some(s)))
-                .unwrap_or((None, None));
-            let (input, redefines_result) = nom::combinator::opt(alt((
-                preceded(
-                    preceded(ws_and_comments, tag(&b"redefines"[..])),
-                    preceded(ws1, with_span(qualified_name)),
-                ),
-                preceded(
-                    preceded(ws_and_comments, tag(&b":>>"[..])),
-                    preceded(ws_and_comments, with_span(qualified_name)),
-                ),
-            )))
-            .parse(input)?;
-            let (redefines_span, redefines) = redefines_result
-                .map(|(span, s)| (Some(span), Some(s)))
-                .unwrap_or((None, None));
-            (
-                input,
-                Some(name_span),
-                name,
-                typing_span,
-                typing,
+    let (input, name_span, name_str, typing_span, typing, redefines_span, redefines) =
+        match usage_head {
+            AttributeUsageHead::PrefixRedefines {
                 redefines_span,
                 redefines,
-            )
-        }
-    };
+            } => {
+                let (input, typing_result) = optional_typings(input)?;
+                let (typing_span, typing) = typing_result
+                    .map(|(span, s)| (Some(span), Some(s)))
+                    .unwrap_or((None, None));
+                let (input, _) = ignored_feature_modifiers(input)?;
+                (
+                    input,
+                    None,
+                    local_name_from_qualified_name(&redefines),
+                    typing_span,
+                    typing,
+                    Some(redefines_span),
+                    Some(redefines),
+                )
+            }
+            AttributeUsageHead::Named { name_span, name } => {
+                let (input, typing_result) = optional_typings(input)?;
+                let (typing_span, typing) = typing_result
+                    .map(|(span, s)| (Some(span), Some(s)))
+                    .unwrap_or((None, None));
+                let (input, _) = ignored_feature_modifiers(input)?;
+                (
+                    input,
+                    Some(name_span),
+                    name,
+                    typing_span,
+                    typing,
+                    None,
+                    None,
+                )
+            }
+        };
+    let (input, leading_clauses) = specialization_clauses(input)?;
+    let (input, _) = ignored_feature_modifiers(input)?;
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
-    // Accept trailing subsetting forms used in libraries and examples, e.g.
-    // `attribute :>> outlet :> electricGrid.outlets;`
-    // while preserving existing AST shape (AttributeUsage currently has no subsets field).
-    let (input, _) = nom::combinator::opt(preceded(
-        alt((
-            preceded(ws_and_comments, tag(&b":>"[..])),
-            preceded(ws_and_comments, tag(&b"subsets"[..])),
-        )),
-        preceded(ws_and_comments, |i| take_until_terminator(i, b";{")),
-    ))
-    .parse(input)?;
+    let (input, trailing_clauses) = specialization_clauses(input)?;
+    let (input, _) = ignored_feature_modifiers(input)?;
+    let redefines = trailing_clauses
+        .redefines
+        .or(leading_clauses.redefines)
+        .or(redefines);
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -347,9 +319,7 @@ pub(crate) fn attribute_usage_shorthand(
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    // Parse (and ignore) the declared type.
-    let (input, _) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, _) = typings(input)?;
     // Keep shorthand values on the shared expression path so precedence/parentheses are preserved.
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;

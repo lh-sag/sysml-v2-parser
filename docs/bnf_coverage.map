@@ -148,15 +148,24 @@
 * Invariant partial
 
 # SysML structural families.
+SysML AttributeDefinition partial
+SysML AttributeUsage partial
 SysML Attribute* partial
 SysML Enumeration* partial
 SysML EnumeratedValue partial
+SysML OccurrenceDefinition partial
+SysML OccurrenceUsage partial
 SysML Occurrence* partial
 SysML EventOccurrenceUsage partial
 SysML Individual* partial
 SysML Item* partial
+SysML PartDefinition partial
+SysML PartUsage partial
 SysML Part* partial
+SysML PortionUsage partial
 SysML Portion* partial
+SysML PortDefinition partial
+SysML PortUsage partial
 SysML Port* partial
 SysML Connection* partial
 SysML Connector* partial

@@ -8,6 +8,7 @@ use crate::ast::{
 };
 use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::lex::{
@@ -18,7 +19,6 @@ use crate::parser::lex::{
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::Input;
-use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span, span_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -200,7 +200,10 @@ fn requirement_def_body_element(
             map(annotation, RequirementDefBodyElement::Annotation),
             map(import_, RequirementDefBodyElement::Import),
             map(subject_decl, RequirementDefBodyElement::SubjectDecl),
-            map(|i| attribute_def(i, true), RequirementDefBodyElement::AttributeDef),
+            map(
+                |i| attribute_def(i, true),
+                RequirementDefBodyElement::AttributeDef,
+            ),
             map(attribute_usage, RequirementDefBodyElement::AttributeUsage),
             map(
                 verify_requirement,

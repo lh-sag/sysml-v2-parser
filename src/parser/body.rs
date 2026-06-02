@@ -13,7 +13,9 @@ use nom::Parser;
 /// Families using opaque brace bodies (inner content skipped, not structured):
 /// none currently; keep this helper for families that still need broad compatibility.
 #[allow(dead_code)]
-pub(crate) fn semicolon_or_opaque_brace_body(input: Input<'_>) -> IResult<Input<'_>, DefinitionBody> {
+pub(crate) fn semicolon_or_opaque_brace_body(
+    input: Input<'_>,
+) -> IResult<Input<'_>, DefinitionBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(tag(&b";"[..]), |_| DefinitionBody::Semicolon),

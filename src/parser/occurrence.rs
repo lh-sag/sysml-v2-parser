@@ -7,19 +7,17 @@ use crate::ast::{
 use crate::parser::attribute::attribute_usage;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
-use crate::parser::lex::{
-    name, qualified_name, recover_body_element, redefine_operator,
-    skip_until_brace_end, subset_operator, ws1, ws_and_comments,
-};
-use crate::parser::metadata_annotation::annotation;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
+use crate::parser::lex::{name, recover_body_element, skip_until_brace_end, ws1, ws_and_comments};
+use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::part::part_usage;
 use crate::parser::requirement::doc_comment;
+use crate::parser::usage::{optional_typings, specialization_clauses};
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::combinator::{map, opt};
+use nom::combinator::map;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
@@ -125,46 +123,22 @@ fn occurrence_usage_tail(
 ) -> IResult<Input<'_>, Node<OccurrenceUsage>> {
     let start = input;
     let (input, name_str) = name(input)?;
-    let (input, subsets) = opt(preceded(
-        preceded(ws_and_comments, subset_operator),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, redefines) = opt(preceded(
-        preceded(ws_and_comments, redefine_operator),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, trailing_subsets) = opt(preceded(
-        preceded(ws_and_comments, subset_operator),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, trailing_redefines) = opt(preceded(
-        preceded(ws_and_comments, redefine_operator),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
+    let (input, leading_clauses) = specialization_clauses(input)?;
+    let (input, type_name) = optional_typings(input)?;
+    let type_name = type_name.map(|(_, name)| name);
+    let (input, trailing_clauses) = specialization_clauses(input)?;
     let (input, body) = occurrence_usage_body(input)?;
-    let (input, post_body_subsets) = opt(preceded(
-        preceded(ws_and_comments, subset_operator),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, post_body_redefines) = opt(preceded(
-        preceded(ws_and_comments, redefine_operator),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let has_post_body_modifier = post_body_subsets.is_some() || post_body_redefines.is_some();
-    let subsets = subsets.or(trailing_subsets).or(post_body_subsets);
-    let redefines = redefines.or(trailing_redefines).or(post_body_redefines);
-    let input = if has_post_body_modifier {
+    let (input, post_body_clauses) = specialization_clauses(input)?;
+    let subsets = post_body_clauses
+        .subsets
+        .map(|(name, _filter)| name)
+        .or_else(|| trailing_clauses.subsets.map(|(name, _filter)| name))
+        .or_else(|| leading_clauses.subsets.map(|(name, _filter)| name));
+    let redefines = post_body_clauses
+        .redefines
+        .or(trailing_clauses.redefines)
+        .or(leading_clauses.redefines);
+    let input = if post_body_clauses.had_any {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
     } else {

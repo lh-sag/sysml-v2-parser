@@ -11,9 +11,9 @@ mod action;
 mod alias;
 mod allocation;
 mod attribute;
+mod body;
 mod case;
 mod connection;
-mod body;
 mod constraint;
 mod definition_prefix;
 mod dependency;
@@ -32,14 +32,13 @@ mod package;
 mod part;
 mod port;
 mod requirement;
-mod specialization;
 mod span;
+mod specialization;
 mod state;
-mod usecase;
 mod usage;
+mod usecase;
 mod view;
 
-pub(crate) use span::{node_from_to, span_from_to, with_span, Input};
 use crate::ast::{
     ActionDefBody, ActionDefBodyElement, ActionUsageBody, ActionUsageBodyElement, CalcDefBody,
     CalcDefBodyElement, ConstraintDefBody, ConstraintDefBodyElement, PackageBody,
@@ -51,6 +50,7 @@ use crate::ast::{
 use crate::error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 use nom::error::Error;
 use nom_locate::LocatedSpan;
+pub(crate) use span::{node_from_to, span_from_to, with_span, Input};
 
 /// Result of parsing with error recovery: a (possibly partial) AST and zero or more diagnostics.
 #[derive(Debug, Clone)]
@@ -337,10 +337,25 @@ fn starts_with_missing_type_after_keyword(
         }
         break;
     }
-    if !fragment.starts_with(b":") {
+    if fragment.starts_with(b":") {
+        fragment = &fragment[1..];
+    } else if lex::starts_with_keyword(fragment, b"defined") {
+        fragment = &fragment[b"defined".len()..];
+        fragment = trim_ascii_start(fragment);
+        if !lex::starts_with_keyword(fragment, b"by") {
+            return false;
+        }
+        fragment = &fragment[b"by".len()..];
+    } else if lex::starts_with_keyword(fragment, b"typed") {
+        fragment = &fragment[b"typed".len()..];
+        fragment = trim_ascii_start(fragment);
+        if !lex::starts_with_keyword(fragment, b"by") {
+            return false;
+        }
+        fragment = &fragment[b"by".len()..];
+    } else {
         return false;
     }
-    fragment = &fragment[1..];
     while let Some(first) = fragment.first() {
         if first.is_ascii_whitespace() {
             fragment = &fragment[1..];
@@ -412,6 +427,7 @@ fn missing_type_diagnostic(fragment: &[u8]) -> Option<(&'static str, String, Str
         (b"ref", &[], "reference type"),
         (b"port", &[], "port type"),
         (b"attribute", &[], "attribute type"),
+        (b"occurrence", &[], "occurrence type"),
         (b"in", &[], "input type"),
         (b"out", &[], "output type"),
         (b"perform", &[b"action"], "action type"),
@@ -435,6 +451,8 @@ fn missing_type_diagnostic(fragment: &[u8]) -> Option<(&'static str, String, Str
                 "power"
             } else if keyword == &b"attribute"[..] {
                 "mass"
+            } else if keyword == &b"occurrence"[..] {
+                "event"
             } else if keyword == &b"in"[..] {
                 "speed"
             } else if keyword == &b"out"[..] {
@@ -460,6 +478,8 @@ fn missing_type_diagnostic(fragment: &[u8]) -> Option<(&'static str, String, Str
                 "PowerPort"
             } else if keyword == &b"attribute"[..] {
                 "MassValue"
+            } else if keyword == &b"occurrence"[..] {
+                "Event"
             } else if keyword == &b"in"[..] || keyword == &b"out"[..] {
                 "Real"
             } else if keyword == &b"perform"[..] {

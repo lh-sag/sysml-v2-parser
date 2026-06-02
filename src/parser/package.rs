@@ -781,6 +781,28 @@ pub(crate) fn package_body_element(
     {
         return Ok((input, node_from_to(start, input, elem)));
     }
+    if starts_with_keyword(input.fragment(), b"occurrence") {
+        if let Ok((next, _)) = recover_body_element(input, PACKAGE_BODY_STARTERS) {
+            if next.location_offset() != input.location_offset() {
+                let recovery = build_recovery_error_node_from_span(
+                    input,
+                    next,
+                    PACKAGE_BODY_STARTERS,
+                    "package body",
+                    "recovered_package_body_element",
+                );
+                if matches!(
+                    recovery.code.as_str(),
+                    "invalid_typing_operator" | "missing_type_reference"
+                ) {
+                    return Err(nom::Err::Error(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Tag,
+                    )));
+                }
+            }
+        }
+    }
     if let Ok((input, elem)) =
         map(kerml_feature_decl, PackageBodyElement::KermlFeatureDecl).parse(input)
     {

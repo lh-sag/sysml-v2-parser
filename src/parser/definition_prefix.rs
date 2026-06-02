@@ -141,9 +141,7 @@ pub(crate) fn parse_definition_prefix(
             let (input, _) = ws1(input)?;
             input
         }
-        DefKeywordMode::Optional => {
-            opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?.0
-        }
+        DefKeywordMode::Optional => opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?.0,
     };
 
     let (input, identification) = identification(input)?;
@@ -174,11 +172,8 @@ mod tests {
     #[test]
     fn prefix_parses_item_def_with_specializes() {
         let input = span_input("abstract item def Foo :> Base { }");
-        let (rest, prefix) = parse_definition_prefix(
-            input,
-            DefinitionPrefixOptions::new(b"item"),
-        )
-        .expect("prefix");
+        let (rest, prefix) =
+            parse_definition_prefix(input, DefinitionPrefixOptions::new(b"item")).expect("prefix");
         assert!(prefix.is_abstract);
         assert_eq!(prefix.identification.name.as_deref(), Some("Foo"));
         assert_eq!(prefix.specializes.as_deref(), Some("Base"));
@@ -193,14 +188,8 @@ mod tests {
             DefinitionPrefixOptions::new(b"connection").no_abstract(),
         )
         .expect("prefix");
-        assert_eq!(
-            prefix.identification.name.as_deref(),
-            Some("connections")
-        );
-        assert_eq!(
-            prefix.specializes.as_deref(),
-            Some("linkObjects, parts")
-        );
+        assert_eq!(prefix.identification.name.as_deref(), Some("connections"));
+        assert_eq!(prefix.specializes.as_deref(), Some("linkObjects, parts"));
         assert!(rest.fragment().starts_with(b"{"));
     }
 

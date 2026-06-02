@@ -5,14 +5,14 @@ use crate::ast::{
     ThenStmt, Transition,
 };
 use crate::parser::build_recovery_error_node_from_span;
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    skip_until_brace_end, starts_with_any_keyword, starts_with_keyword, take_until_terminator,
-    ws1, ws_and_comments, STATE_BODY_STARTERS,
+    skip_until_brace_end, starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1,
+    ws_and_comments, STATE_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::annotation;
-use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
 use crate::parser::requirement::{doc_comment, requirement_usage};
 use crate::parser::Input;
@@ -24,10 +24,8 @@ use nom::{IResult, Parser};
 
 pub(crate) fn state_def(input: Input<'_>) -> IResult<Input<'_>, Node<StateDef>> {
     let start = input;
-    let (input, prefix) = parse_definition_prefix(
-        input,
-        DefinitionPrefixOptions::new(b"state").def_required(),
-    )?;
+    let (input, prefix) =
+        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"state").def_required())?;
     let (input, body) = state_def_body(input)?;
     Ok((
         input,

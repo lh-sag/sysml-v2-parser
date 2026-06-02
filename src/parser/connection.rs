@@ -5,13 +5,13 @@ use crate::ast::{
     ConnectStmt, ConnectionDef, ConnectionDefBody, ConnectionDefBodyElement, EndDecl, Node,
     RefBody, RefDecl,
 };
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_until_brace_end,
     starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
     CONNECTION_DEF_BODY_STARTERS,
 };
-use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
 use crate::parser::with_span;
 use crate::parser::Input;

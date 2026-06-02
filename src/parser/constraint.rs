@@ -5,6 +5,7 @@ use crate::ast::{
     ConstraintDefBodyElement, Expression, Node, ParseErrorNode, ReturnDecl,
 };
 use crate::parser::action::in_out_decl;
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
@@ -12,7 +13,6 @@ use crate::parser::lex::{
     ws_and_comments, CALC_DEF_BODY_STARTERS, CONSTRAINT_DEF_BODY_STARTERS,
 };
 use crate::parser::Input;
-use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;

@@ -6,14 +6,14 @@ use crate::ast::{
     ThenIncludeUseCase, ThenUseCaseUsage, UseCaseDef, UseCaseDefBody, UseCaseDefBodyElement,
     UseCaseUsage, Visibility,
 };
+use crate::parser::attribute::attribute_def;
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
     skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
     USE_CASE_BODY_STARTERS,
 };
-use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
-use crate::parser::attribute::attribute_def;
 use crate::parser::requirement::{doc_comment, parse_requirement_usage_payload, subject_decl};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span};
@@ -453,7 +453,10 @@ pub(crate) fn use_case_def_body_element(
     let start = input;
     let (input, elem) = alt((
         map(doc_comment, UseCaseDefBodyElement::Doc),
-        map(|i| attribute_def(i, false), UseCaseDefBodyElement::AttributeDef),
+        map(
+            |i| attribute_def(i, false),
+            UseCaseDefBodyElement::AttributeDef,
+        ),
         map(subject_decl, UseCaseDefBodyElement::SubjectDecl),
         map(subject_ref, UseCaseDefBodyElement::SubjectRef),
         map(actor_usage, UseCaseDefBodyElement::ActorUsage),

@@ -1,10 +1,8 @@
 //! Enumeration definition parsing (BNF EnumerationDefinition).
 
 use crate::ast::{EnumDef, EnumerationBody, Node};
-use crate::parser::lex::{
-    name, skip_until_brace_end, take_until_terminator, ws1, ws_and_comments,
-};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
+use crate::parser::lex::{name, skip_until_brace_end, take_until_terminator, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::requirement::{comment_annotation, doc_comment};
 use crate::parser::Input;

@@ -3,8 +3,8 @@
 use crate::ast::{Expression, Node, Span};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    qualified_name, redefine_operator, starts_with_keyword, subset_operator, typed_by_operator,
-    ws_and_comments,
+    name, qualified_name, redefine_operator, starts_with_keyword, subset_operator,
+    typed_by_operator, ws_and_comments,
 };
 use crate::parser::{span_from_to, Input};
 use nom::bytes::complete::{tag, take_until};
@@ -75,6 +75,34 @@ fn conjugated_qualified_name(input: Input<'_>) -> IResult<Input<'_>, String> {
     ))
 }
 
+fn specialization_target(input: Input<'_>) -> IResult<Input<'_>, String> {
+    let (input, base) = qualified_name(input)?;
+    let (input, dotted) = many0(preceded(
+        preceded(ws_and_comments, tag(&b"."[..])),
+        preceded(ws_and_comments, name),
+    ))
+    .parse(input)?;
+    if dotted.is_empty() {
+        return Ok((input, base));
+    }
+    Ok((input, format!("{base}.{}", dotted.join("."))))
+}
+
+fn specialization_targets(input: Input<'_>) -> IResult<Input<'_>, String> {
+    let (input, first) = specialization_target(input)?;
+    let (input, rest) = many0(preceded(
+        preceded(ws_and_comments, tag(&b","[..])),
+        preceded(ws_and_comments, specialization_target),
+    ))
+    .parse(input)?;
+    if rest.is_empty() {
+        return Ok((input, first));
+    }
+    let mut targets = vec![first];
+    targets.extend(rest);
+    Ok((input, targets.join(", ")))
+}
+
 /// Subsettings: `:>` / `subsets` target, with optional `= expression` value.
 pub(crate) fn subsetting(
     input: Input<'_>,
@@ -83,7 +111,7 @@ pub(crate) fn subsetting(
     preceded(
         ws_and_comments,
         (
-            qualified_name,
+            specialization_targets,
             opt(preceded(
                 preceded(ws_and_comments, tag(&b"="[..])),
                 preceded(ws_and_comments, expression),
@@ -97,7 +125,7 @@ pub(crate) fn subsetting(
 pub(crate) fn redefinition(input: Input<'_>) -> IResult<Input<'_>, String> {
     preceded(
         preceded(ws_and_comments, redefine_operator),
-        preceded(ws_and_comments, qualified_name),
+        preceded(ws_and_comments, specialization_targets),
     )
     .parse(input)
 }
@@ -110,7 +138,9 @@ enum SpecializationClause {
 /// Parse zero or more subsetting/redefinition clauses in any order.
 ///
 /// When multiple clauses of the same kind are present, the last one wins.
-pub(crate) fn specialization_clauses(input: Input<'_>) -> IResult<Input<'_>, SpecializationClauses> {
+pub(crate) fn specialization_clauses(
+    input: Input<'_>,
+) -> IResult<Input<'_>, SpecializationClauses> {
     let (input, clauses) = many0(preceded(
         ws_and_comments,
         nom::branch::alt((
@@ -173,5 +203,28 @@ mod tests {
         );
         assert_eq!(clauses.redefines.as_deref(), Some("newest"));
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
+
+    #[test]
+    fn specialization_clauses_accept_dotted_feature_chain_targets() {
+        let input = span_input(":> electricGrid.outlets :>> Vehicle::mass.value ;");
+        let (rest, clauses) = specialization_clauses(input).expect("specialization clauses");
+        assert_eq!(
+            clauses.subsets.as_ref().map(|(name, _)| name.as_str()),
+            Some("electricGrid.outlets")
+        );
+        assert_eq!(clauses.redefines.as_deref(), Some("Vehicle::mass.value"));
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
+
+    #[test]
+    fn specialization_clauses_accept_multiple_targets() {
+        let input = span_input(":> CoordinateTransformation, List {");
+        let (rest, clauses) = specialization_clauses(input).expect("specialization clauses");
+        assert_eq!(
+            clauses.subsets.as_ref().map(|(name, _)| name.as_str()),
+            Some("CoordinateTransformation, List")
+        );
+        assert!(rest.fragment().trim_ascii_start().starts_with(b"{"));
     }
 }

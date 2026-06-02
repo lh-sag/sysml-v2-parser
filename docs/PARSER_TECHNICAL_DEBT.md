@@ -30,13 +30,13 @@ A recent example: library declarations such as `abstract connection name : Type[
 
 **Still on local preludes (intentional):** `part_def` (usage disambiguation), `*_usage`, `alias_def`, `dependency`, `calc_def`, `attribute_def`.
 
-### 2. Body terminators — **opaque helper done (P1)**
+### 2. Body terminators — **statement body helper done (P1), structured body still open**
 
-[`src/parser/body.rs`](../src/parser/body.rs) exports `semicolon_or_opaque_brace_body`. Used by **flow**, **allocation**, and **metadata** definitions (and allocation/flow usages that share the same terminator).
+[`src/parser/body.rs`](../src/parser/body.rs) exports shared semicolon/body helpers. **Flow**, **allocation**, and **metadata** definitions and usages now use `semicolon_or_statement_brace_body`: brace bodies are no longer consumed as one opaque blob, but they are still parsed as generic statement nodes rather than family-specific structured AST members.
 
-**Opaque-body families (June 2026):** flow, allocation, metadata.
+**Statement-only body families (June 2026):** flow, allocation, metadata.
 
-**Still local:** occurrence and other modules with their own `definition_body` helpers; structured bodies unchanged.
+**Still local or opaque:** occurrence definitions and other modules with their own `definition_body` helpers; attribute brace bodies still use `skip_until_brace_end`; structured bodies remain construct-specific.
 
 **P2 (not done):** `semicolon_or_structured_brace_body` with member parsing and recovery.
 
@@ -60,7 +60,11 @@ Many `*Def` structs repeat `identification`, `specializes`, `specializes_span`, 
 
 ### 6. Shared usage grammar fragments — **started**
 
-[`src/parser/usage.rs`](../src/parser/usage.rs) now centralizes small `UsageDeclaration` / `FeatureSpecializationPart` fragments: multiplicity, `TypedBy` (`:` / `defined by`), subsetting, and redefinition. `port_usage` and `part_usage` have been migrated first, including `defined by` and multiple typing targets. Next candidates are `attribute_usage`, occurrence usages, and requirement/case usages that still parse these fragments locally.
+[`src/parser/usage.rs`](../src/parser/usage.rs) now centralizes small `UsageDeclaration` / `FeatureSpecializationPart` fragments: multiplicity, `TypedBy` (`:` / `defined by` / `typed by`), subsetting, and redefinition. `part_usage`, `port_usage`, `attribute_def`, `attribute_usage`, and occurrence usages have been migrated first, including `defined by` / `typed by` and multiple specialization clauses where the public AST can currently preserve them.
+
+**Current AST caveat:** `attribute_usage` accepts extra specialization clauses for grammar coverage, but the existing public `AttributeUsage` AST only stores `typing` and `redefines`. `occurrence_usage` stores `type_name`, `subsets`, and `redefines`, using the current last-wins behavior for multiple clauses. Structured AST fidelity for `references` / `crosses` and richer body members remains a later tranche.
+
+**Next candidates:** requirement/case usages, action/state usages, and remaining families that still parse typing or specialization fragments locally.
 
 ## What is not wasteful duplication
 
@@ -76,7 +80,7 @@ Many `*Def` structs repeat `identification`, `specializes`, `specializes_span`, 
 From [`SYSML_V2_COMPLIANCE_GAP.md`](./SYSML_V2_COMPLIANCE_GAP.md):
 
 1. **Generic definition/usage/specialization** — still distributed across construct-specific parsers instead of one unified layer (largest architectural gap).
-2. **Permissive bodies** — `skip_until_brace_end` and related helpers in metadata, occurrence, alias, import, and parts of other modules.
+2. **Permissive bodies** — `skip_until_brace_end` and statement-only body helpers still appear in attribute, occurrence definition, alias, import, flow/allocation/metadata, and parts of other modules.
 3. **Expression subset** — `expr.rs` is precedence-aware but not full `OwnedExpression`.
 4. **Recovery / LSP** — solid baseline; more specific diagnostics and coverage still wanted.
 
@@ -94,7 +98,7 @@ Duplication in code and “partial grammar” in the spec sense overlap: the sam
 | ~~**P1**~~ | ~~`semicolon_or_opaque_brace_body`~~ | Done | flow / allocation / metadata |
 | **P2** | Generic structured body loop with recovery | Medium | Less recovery duplication; better editor behavior |
 | **P2** | Split `package_body_element` into keyword-group sub-dispatchers | Medium | Easier extension without reordering dozens of branches |
-| **P3** | Unified definition/usage header (typing, multiplicity, subsets, redefines) | Started | Spec-aligned; fixes whole classes of library edge cases |
+| **P3** | Unified definition/usage header (typing, multiplicity, subsets, redefines) | Started; part/port/attribute/occurrence migrated | Spec-aligned; fixes whole classes of library edge cases |
 | **P3** | Replace `skip_until_brace_end` in high-traffic bodies | Large | Deeper AST; significant work per module |
 
 ## What to avoid

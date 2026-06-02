@@ -10,8 +10,7 @@ use nom::IResult;
 /// Item definition: `item def` Identification body
 pub(crate) fn item_def(input: Input<'_>) -> IResult<Input<'_>, Node<ItemDef>> {
     let start = input;
-    let (input, prefix) =
-        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"item"))?;
+    let (input, prefix) = parse_definition_prefix(input, DefinitionPrefixOptions::new(b"item"))?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,

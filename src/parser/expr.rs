@@ -58,12 +58,7 @@ fn numeric_literal_text(input: Input<'_>) -> IResult<Input<'_>, String> {
 
 fn classify_numeric_literal(text: &str) -> Expression {
     let normalized = text.trim();
-    if normalized.contains('.')
-        || normalized
-            .chars()
-            .skip(1)
-            .any(|c| c == 'e' || c == 'E')
-    {
+    if normalized.contains('.') || normalized.chars().skip(1).any(|c| c == 'e' || c == 'E') {
         Expression::LiteralReal(normalized.to_string())
     } else {
         Expression::LiteralInteger(normalized.parse().unwrap_or(0))
@@ -166,6 +161,20 @@ fn metadata_ref_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>
         input,
         node_from_to(start, input, Expression::FeatureRef(format!("@{}", n))),
     ))
+}
+
+fn constructor_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"new"[..]).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, type_name) = qualified_name(input)?;
+    let current = node_from_to(
+        start,
+        input,
+        Expression::FeatureRef(format!("new {type_name}")),
+    );
+    postfix(input, start, current)
 }
 
 /// Literal only (no unit): integer, real, string, boolean.
@@ -346,6 +355,7 @@ fn primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         literal_only,
         null_expression,
         metadata_ref_primary,
+        constructor_expression,
         feature_ref_primary,
         parenthesized,
     ))

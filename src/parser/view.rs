@@ -6,6 +6,7 @@ use crate::ast::{
     RenderingUsage, SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef, ViewDefBody,
     ViewDefBodyElement, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
@@ -14,7 +15,6 @@ use crate::parser::lex::{
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::Input;
-use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -142,10 +142,8 @@ fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
 
 pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {
     let start = input;
-    let (input, prefix) = parse_definition_prefix(
-        input,
-        DefinitionPrefixOptions::new(b"view").def_required(),
-    )?;
+    let (input, prefix) =
+        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"view").def_required())?;
     let (input, body) = view_def_body(input)?;
     Ok((
         input,

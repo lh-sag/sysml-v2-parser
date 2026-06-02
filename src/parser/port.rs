@@ -4,12 +4,12 @@
 use crate::ast::{Node, PortBody, PortDef, PortDefBody, PortDefBodyElement, PortUsage};
 use crate::parser::action::in_out_decl;
 use crate::parser::attribute::{attribute_def, attribute_usage};
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_name, skip_until_brace_end, specialization_operator,
     take_until_terminator, ws1, ws_and_comments,
 };
-use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{multiplicity, optional_typings, specialization_clauses};
@@ -139,8 +139,7 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
 /// Port definition: 'port' 'def' Identification ( (':>' | 'specializes') qualified_name )? body
 pub(crate) fn port_def(input: Input<'_>) -> IResult<Input<'_>, Node<PortDef>> {
     let start = input;
-    let (input, prefix) =
-        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"port"))?;
+    let (input, prefix) = parse_definition_prefix(input, DefinitionPrefixOptions::new(b"port"))?;
     let (input, body) = port_def_body(input)?;
     Ok((
         input,

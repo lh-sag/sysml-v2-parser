@@ -2,10 +2,8 @@ use crate::ast::{
     AnalysisCaseDef, AnalysisCaseUsage, CaseDef, CaseUsage, Node, VerificationCaseDef,
     VerificationCaseUsage,
 };
-use crate::parser::lex::{
-    name, qualified_name, take_until_terminator, ws1, ws_and_comments,
-};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
+use crate::parser::lex::{name, qualified_name, take_until_terminator, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
@@ -16,10 +14,8 @@ use nom::Parser;
 
 pub(crate) fn case_def(input: Input<'_>) -> IResult<Input<'_>, Node<CaseDef>> {
     let start = input;
-    let (input, prefix) = parse_definition_prefix(
-        input,
-        DefinitionPrefixOptions::new(b"case").def_required(),
-    )?;
+    let (input, prefix) =
+        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"case").def_required())?;
     let (input, body) = loose_use_case_body(input)?;
     Ok((
         input,

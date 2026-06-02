@@ -202,15 +202,28 @@ fn assert_all_productions_are_classified(
     rules: &[CoverageRule],
 ) {
     let mut counts = BTreeMap::<CoverageStatus, usize>::new();
+    let mut productions_by_status = BTreeMap::<CoverageStatus, Vec<String>>::new();
     let mut errors = Vec::new();
     for production in productions {
         match classify(rules, grammar, production) {
-            Ok(rule) => *counts.entry(rule.status).or_insert(0) += 1,
+            Ok(rule) => {
+                *counts.entry(rule.status).or_insert(0) += 1;
+                productions_by_status
+                    .entry(rule.status)
+                    .or_default()
+                    .push(production.clone());
+            }
             Err(err) => errors.push(err),
         }
     }
 
     eprintln!("{grammar:?} BNF coverage counts: {counts:?}");
+    for (status, productions) in &productions_by_status {
+        eprintln!(
+            "{grammar:?} {status:?} productions: {}",
+            productions.join(", ")
+        );
+    }
 
     assert!(
         errors.is_empty(),
@@ -240,8 +253,16 @@ fn textual_bnf_productions_are_covered_by_status_map() {
 
     let sysml = extract_productions(&sysml_bnf);
     let kerml = extract_productions(&kerml_bnf);
-    assert_eq!(sysml.len(), 350, "unexpected SysML textual BNF production count");
-    assert_eq!(kerml.len(), 290, "unexpected KerML textual BNF production count");
+    assert_eq!(
+        sysml.len(),
+        350,
+        "unexpected SysML textual BNF production count"
+    );
+    assert_eq!(
+        kerml.len(),
+        290,
+        "unexpected KerML textual BNF production count"
+    );
 
     assert_all_productions_are_classified(Grammar::SysML, &sysml, &rules);
     assert_all_productions_are_classified(Grammar::KerML, &kerml, &rules);
@@ -264,5 +285,58 @@ fn implemented_patterns_do_not_target_opaque_body_helper_families() {
     assert!(
         implemented_opaque_rules.is_empty(),
         "opaque helper families must not be marked implemented: {implemented_opaque_rules:?}"
+    );
+}
+
+#[test]
+fn implemented_productions_do_not_use_skip_or_statement_only_bodies() {
+    let rules = parse_coverage_rules(&manifest_dir().join("docs").join("bnf_coverage.map"));
+    let guarded_productions = [
+        ("AttributeDefinition", "src/parser/attribute.rs"),
+        ("AttributeUsage", "src/parser/attribute.rs"),
+        ("OccurrenceDefinition", "src/parser/occurrence.rs"),
+        ("OccurrenceUsage", "src/parser/occurrence.rs"),
+        ("PartDefinition", "src/parser/part.rs"),
+        ("PartUsage", "src/parser/part.rs"),
+        ("PortDefinition", "src/parser/port.rs"),
+        ("PortUsage", "src/parser/port.rs"),
+        ("FlowDefinition", "src/parser/flow.rs"),
+        ("FlowUsage", "src/parser/flow.rs"),
+        ("AllocationDefinition", "src/parser/allocation.rs"),
+        ("AllocationUsage", "src/parser/allocation.rs"),
+        ("MetadataDefinition", "src/parser/metadata.rs"),
+        ("MetadataUsage", "src/parser/metadata.rs"),
+    ];
+
+    let mut violations = Vec::new();
+    for (production, parser_path) in guarded_productions {
+        let rule = classify(&rules, Grammar::SysML, production)
+            .unwrap_or_else(|err| panic!("guarded production must be classified: {err}"));
+        if rule.status != CoverageStatus::Implemented {
+            continue;
+        }
+
+        let path = manifest_dir().join(parser_path);
+        let parser = fs::read_to_string(&path)
+            .unwrap_or_else(|err| panic!("failed to read parser file {}: {err}", path.display()));
+        for forbidden in [
+            "skip_until_brace_end",
+            "semicolon_or_statement_brace_body",
+            "take_until_terminator(input, b\";{\")",
+        ] {
+            if parser.contains(forbidden) {
+                violations.push(format!(
+                    "SysML.{production} is implemented by rule line {} but {} still contains {forbidden}",
+                    rule.line,
+                    path.display()
+                ));
+            }
+        }
+    }
+
+    assert!(
+        violations.is_empty(),
+        "implemented productions must not rely on opaque or statement-only body parsing:\n{}",
+        violations.join("\n")
     );
 }

@@ -16,10 +16,20 @@ Status labels:
 - `partial`: dedicated parser exists and is validated for common forms, but coverage may still rely on permissive body parsing or subset-only grammar support
 - `modeled`: parsed into BNF-aligned modeled declaration nodes (`KermlSemanticDecl` / `KermlFeatureDecl` / `ExtendedLibraryDecl`) instead of a fully dedicated construct-specific AST
 
+Important distinction:
+
+- **Accepted grammar fragment** means strict parsing recognizes the BNF surface form and preserves the existing public AST shape where fields exist.
+- **Fully structured AST body** means brace body contents are parsed into construct-specific member nodes, not consumed by `skip_until_brace_end` or generic statement-only body parsing.
+
+The coverage gate treats `implemented` as the stronger claim. Attribute, occurrence, part, port, flow, allocation, and metadata productions remain `partial` while any associated body path still relies on opaque or statement-only parsing, even when their headers now accept more BNF forms.
+
 ## Package-level declaration families
 
 - `package`, `library package`, `namespace`, `import`: `implemented`
-- `part`, `port`, `attribute`, `action`, `state`, `requirement`, `case`, `analysis`, `verification`, `flow`, `allocation`, `interface`, `view`, `viewpoint`, `rendering`, `metadata`, `enum`: `partial`
+- `part`, `port`: `partial`; shared usage typing/specialization fragments are accepted, but body coverage is still not a full BNF-modeled AST for every member
+- `attribute`: `partial`; `:` / `defined by` / `typed by` and specialization clauses are accepted for definitions/usages, but extra usage specializations are not all public AST fields yet and brace bodies are still opaque
+- `occurrence`: `partial`; `:` / `defined by` / `typed by`, `subsets`, and `redefines` are accepted on usages with current last-wins normalization
+- `action`, `state`, `requirement`, `case`, `analysis`, `verification`, `flow`, `allocation`, `interface`, `view`, `viewpoint`, `rendering`, `metadata`, `enum`: `partial`
 - KerML semantic families (`behavior`, `function`, `datatype`, `assoc`, `struct`, `metaclass`, `class`, `classifier`, `feature`, `step`): `modeled`
 - KerML feature logic families (`occurrence`, `expr`, `predicate`, `succession`): `modeled`
 - Extended declaration starters (`message`, `concern` and remaining library declarations): `modeled`

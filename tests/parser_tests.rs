@@ -1139,11 +1139,11 @@ fn test_kerml_fallback_family_keywords_map_to_dedicated_nodes() {
         elements[0].value,
         PackageBodyElement::ClassifierDecl(_)
     ));
-    for idx in 1..9 {
+    for (idx, element) in elements.iter().enumerate().take(9).skip(1) {
         assert!(
-            matches!(elements[idx].value, PackageBodyElement::KermlSemanticDecl(_)),
+            matches!(element.value, PackageBodyElement::KermlSemanticDecl(_)),
             "expected KermlSemanticDecl at index {idx}, got {:?}",
-            elements[idx].value
+            element.value
         );
     }
     assert!(matches!(
@@ -1225,7 +1225,8 @@ fn test_expression_precedence_parse() {
 
 #[test]
 fn test_expression_allows_qualified_names_and_invocation_arguments() {
-    let input = "package P { attribute x = Vehicles::Engine.power + normalize(System::Sensors::rpm); }";
+    let input =
+        "package P { attribute x = Vehicles::Engine.power + normalize(System::Sensors::rpm); }";
     let result = parse(input).expect("parse should succeed");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => &p.value,
@@ -1239,7 +1240,11 @@ fn test_expression_allows_qualified_names_and_invocation_arguments() {
         PackageBodyElement::AttributeDef(attr) => attr,
         other => panic!("expected AttributeDef, got {other:?}"),
     };
-    let value = attr.value.value.as_ref().expect("expected value expression");
+    let value = attr
+        .value
+        .value
+        .as_ref()
+        .expect("expected value expression");
     match &value.value {
         sysml_v2_parser::ast::Expression::BinaryOp { op, right, .. } => {
             assert_eq!(op, "+");
@@ -2098,6 +2103,71 @@ fn test_parse_with_diagnostics_reports_missing_part_type_in_part_body() {
 }
 
 #[test]
+fn test_parse_with_diagnostics_reports_missing_attribute_type_in_part_body() {
+    let input = "package P {\npart Vehicle {\nattribute bad : ;\nattribute ok : MassValue;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        !result.is_ok(),
+        "missing attribute type should produce diagnostics"
+    );
+    assert!(
+        !result.errors.is_empty(),
+        "missing attribute type should be reported"
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let part = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartUsage(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("part usage should survive recovery");
+    let PartUsageBody::Brace { elements } = &part.body else {
+        panic!("expected part body");
+    };
+    assert!(
+        elements.iter().any(|e| matches!(
+            &e.value,
+            PartUsageBodyElement::AttributeUsage(a) if a.value.name == "ok"
+        )),
+        "later attribute sibling should remain parseable"
+    );
+}
+
+#[test]
+fn test_parse_with_diagnostics_reports_missing_occurrence_type_and_keeps_sibling() {
+    let input = "package P {\noccurrence bad defined by ;\npart def Good;\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        !result.is_ok(),
+        "missing occurrence type should produce diagnostics"
+    );
+    assert!(
+        !result.errors.is_empty(),
+        "missing occurrence type should be reported"
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    assert!(
+        elements
+            .iter()
+            .any(|e| matches!(&e.value, PackageBodyElement::PartDef(p) if p.value.identification.name.as_deref() == Some("Good"))),
+        "later package sibling should remain parseable"
+    );
+}
+
+#[test]
 fn test_parse_with_diagnostics_reports_missing_part_name_in_part_body() {
     let input = "package P {\npart def Vehicle {\npart: Wheel;\nattribute mass: MassValue;\n}\n}";
     let result = parse_with_diagnostics(input);
@@ -2536,6 +2606,52 @@ occurrence rover subsets BaseOccurrence redefines LegacyOccurrence;
 }
 
 #[test]
+fn test_occurrence_usage_accepts_typed_by_and_specialization_clauses() {
+    let input = r#"package P {
+occurrence event typed by Mission::Event subsets events redefines oldEvent;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let occ = match &elements[0].value {
+        PackageBodyElement::OccurrenceUsage(o) => o,
+        other => panic!("expected occurrence usage, got {:?}", other),
+    };
+    assert_eq!(occ.value.name, "event");
+    assert_eq!(occ.value.type_name.as_deref(), Some("Mission::Event"));
+    assert_eq!(occ.value.subsets.as_deref(), Some("events"));
+    assert_eq!(occ.value.redefines.as_deref(), Some("oldEvent"));
+}
+
+#[test]
+fn test_occurrence_usage_post_body_specialization_still_parses() {
+    let input = r#"package P {
+occurrence rover; subsets BaseOccurrence redefines LegacyOccurrence;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let occ = match &elements[0].value {
+        PackageBodyElement::OccurrenceUsage(o) => o,
+        other => panic!("expected occurrence usage, got {:?}", other),
+    };
+    assert_eq!(occ.value.subsets.as_deref(), Some("BaseOccurrence"));
+    assert_eq!(occ.value.redefines.as_deref(), Some("LegacyOccurrence"));
+}
+
+#[test]
 fn test_requirement_usage_accepts_subsets_keyword_alias() {
     let input = r#"package P {
 requirement VehicleReq; subsets BaseReq;
@@ -2709,7 +2825,8 @@ part def Carrier {
   port fuelPort : FuelPort subsets basePort redefines oldPort :> latestPort :>> newestPort;
 }
 }"#;
-    let result = parse(input).expect("port usage with multiple specialization clauses should parse");
+    let result =
+        parse(input).expect("port usage with multiple specialization clauses should parse");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => p,
         other => panic!("expected package, got {:?}", other),
@@ -2962,6 +3079,314 @@ fn test_parse_typed_attribute_usage_in_part_usage_body() {
 }
 
 #[test]
+fn test_attribute_usage_accepts_defined_by_typing() {
+    let input = r#"package P {
+  part Vehicle {
+    attribute mass defined by ISQ::MassValue;
+  }
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "defined-by attribute usage should parse cleanly: {:?}",
+        result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let part = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartUsage(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("part usage");
+    let PartUsageBody::Brace { elements } = &part.body else {
+        panic!("expected part body");
+    };
+    let attribute = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PartUsageBodyElement::AttributeUsage(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("attribute usage");
+    assert_eq!(attribute.name, "mass");
+    assert_eq!(attribute.typing.as_deref(), Some("ISQ::MassValue"));
+}
+
+#[test]
+fn test_attribute_usage_accepts_typed_by_default_value() {
+    let input = r#"package P {
+  part Vehicle {
+    attribute speed typed by ISQ::SpeedValue default = 1;
+  }
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "typed-by attribute usage should parse cleanly: {:?}",
+        result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let part = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartUsage(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("part usage");
+    let PartUsageBody::Brace { elements } = &part.body else {
+        panic!("expected part body");
+    };
+    let attribute = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PartUsageBodyElement::AttributeUsage(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("attribute usage");
+    assert_eq!(attribute.name, "speed");
+    assert_eq!(attribute.typing.as_deref(), Some("ISQ::SpeedValue"));
+    assert!(attribute.value.is_some(), "default value should parse");
+}
+
+#[test]
+fn test_attribute_usage_prefix_redefines_accepts_defined_by_typing() {
+    let input = r#"package P {
+  part Vehicle {
+    attribute :>> Vehicle::mass defined by ISQ::MassValue;
+  }
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "prefix-redefines attribute usage should parse cleanly: {:?}",
+        result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let part = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartUsage(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("part usage");
+    let PartUsageBody::Brace { elements } = &part.body else {
+        panic!("expected part body");
+    };
+    let attribute = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PartUsageBodyElement::AttributeUsage(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("attribute usage");
+    assert_eq!(attribute.name, "mass");
+    assert_eq!(attribute.redefines.as_deref(), Some("Vehicle::mass"));
+    assert_eq!(attribute.typing.as_deref(), Some("ISQ::MassValue"));
+}
+
+#[test]
+fn test_attribute_usage_accepts_subsets_clause_without_ast_field() {
+    let input = r#"package P {
+  part Vehicle {
+    attribute outlet : PowerPort subsets gridPorts;
+  }
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "subsets attribute usage should parse cleanly: {:?}",
+        result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let part = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartUsage(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("part usage");
+    let PartUsageBody::Brace { elements } = &part.body else {
+        panic!("expected part body");
+    };
+    let attribute = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PartUsageBodyElement::AttributeUsage(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("attribute usage");
+    assert_eq!(attribute.name, "outlet");
+    assert_eq!(attribute.typing.as_deref(), Some("PowerPort"));
+}
+
+#[test]
+fn test_attribute_def_accepts_multiplicity_and_uniqueness_before_specialization() {
+    let input = r#"package P {
+  attribute length: LengthValue[*] nonunique :> scalarQuantities;
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "attribute header modifiers should parse cleanly: {:?}",
+        result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let attribute = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::AttributeDef(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("attribute definition");
+    assert_eq!(attribute.name, "length");
+    assert_eq!(attribute.typing.as_deref(), Some("LengthValue"));
+}
+
+#[test]
+fn test_attribute_def_accepts_untyped_multiplicity_uniqueness_brace_body() {
+    let input = r#"package P {
+  attribute measuresOfEffectiveness[*] nonunique { doc /* Base feature. */ }
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "untyped attribute modifiers should parse cleanly: {:?}",
+        result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    assert!(
+        elements
+            .iter()
+            .any(|e| matches!(&e.value, PackageBodyElement::AttributeDef(a) if a.value.name == "measuresOfEffectiveness")),
+        "attribute definition should be dedicated, not fallback"
+    );
+}
+
+#[test]
+fn test_attribute_def_accepts_default_value_without_equals_after_specialization() {
+    let input = r#"package P {
+  attribute xoffset : LengthValue [0..*] :> scalarQuantities default 0 [m];
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "attribute default shorthand should parse cleanly: {:?}",
+        result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let attribute = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::AttributeDef(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("attribute definition");
+    assert_eq!(attribute.typing.as_deref(), Some("LengthValue"));
+    assert!(attribute.value.is_some(), "default value should parse");
+}
+
+#[test]
+fn test_attribute_def_accepts_multiple_specialization_targets() {
+    let input = r#"package P {
+  attribute def TranslationRotationSequence :> CoordinateTransformation, List {
+    attribute :>> elements : TranslationOrRotation[1..*] ordered nonunique;
+  }
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "multi-target attribute definition should parse cleanly: {:?}",
+        result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    assert!(
+        elements.iter().any(|e| matches!(
+            &e.value,
+            PackageBodyElement::AttributeDef(a) if a.value.name == "TranslationRotationSequence"
+        )),
+        "attribute definition should be dedicated"
+    );
+}
+
+#[test]
+fn test_attribute_def_accepts_constructor_default_value() {
+    let input = r#"package P {
+  attribute one : DimensionOneUnit[1] = new DimensionOneUnit();
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "constructor default should parse cleanly: {:?}",
+        result.errors
+    );
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {other:?}"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let attribute = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::AttributeDef(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("attribute definition");
+    assert_eq!(attribute.name, "one");
+    assert!(attribute.value.is_some(), "constructor value should parse");
+}
+
+#[test]
 fn test_qualified_package_declaration_parses() {
     let input = "package AstronomyReference::Domain { part def Thing; }";
     let result = sysml_v2_parser::parse_with_diagnostics(input);
@@ -3144,7 +3569,8 @@ part def Carrier {
   part engine : Engine subsets baseEngine redefines oldEngine :> latestEngine :>> newestEngine;
 }
 }"#;
-    let result = parse(input).expect("part usage with multiple specialization clauses should parse");
+    let result =
+        parse(input).expect("part usage with multiple specialization clauses should parse");
     let pkg = match &result.elements[0].value {
         RootElement::Package(p) => p,
         other => panic!("expected package, got {:?}", other),

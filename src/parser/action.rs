@@ -6,14 +6,14 @@ use crate::ast::{
     MergeStmt, Node, ParseErrorNode, ThenAction,
 };
 use crate::parser::build_recovery_error_node_from_span;
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
-    name, qualified_name, skip_statement_or_block, skip_until_brace_end,
-    take_until_terminator, ws1, ws_and_comments,
+    name, qualified_name, skip_statement_or_block, skip_until_brace_end, take_until_terminator,
+    ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::annotation;
-use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
 use crate::parser::with_span;
