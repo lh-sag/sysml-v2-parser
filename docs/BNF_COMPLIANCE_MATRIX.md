@@ -31,11 +31,12 @@ The coverage gate treats `implemented` as the stronger claim. Productions marked
 - `part*`, `port*` wildcards: `partial` (member-depth gaps remain in broader families)
 - `attribute definition`, `attribute usage`: `implemented`; brace bodies use structured member parsing (`AttributeBody::Brace { elements }`) with doc/nested attribute recovery
 - `occurrence definition`: `implemented`; definition brace bodies use structured `DefinitionBody::Brace { elements }` with occurrence member parsing
-- `flow definition`, `allocation definition`, `metadata definition`: `implemented`; brace bodies use shared structured parsing (doc members plus statement recovery)
+- `flow definition`, `flow usage`, `allocation definition`, `allocation usage`, `metadata definition`: `implemented`; def and usage brace bodies use shared structured parsing (doc members plus statement recovery)
+- `action definition`, `state definition`, `requirement definition`: `implemented` at package level; definition bodies use structured member loops with `advance_to_closing_brace` / `skip_statement_or_block` recovery (no `skip_until_brace_end`)
 - `occurrence usage`: `partial`; `:` / `defined by` / `typed by`, `subsets`, and `redefines` are accepted on usages with current last-wins normalization
-- `requirement usage`, `case usage`, `analysis case usage`, `verification case usage`, `action usage`, `state usage`, `view usage`, `rendering usage`, `use case usage`, `viewpoint usage`: `implemented` (shared `usage_header` flow accepts `:` / `defined by` / `typed by` plus specialization clauses)
+- `requirement usage`, `case usage`, `analysis case usage`, `verification case usage`, `action usage`, `state usage`, `view usage`, `rendering usage`, `use case usage`, `viewpoint usage`: `implemented` (shared `usage_header` flow accepts `:` / `defined by` / `typed by` plus specialization clauses; requirement usages also accept optional multiplicity before typing)
 - `rendering definition`: `implemented`; structured `RenderingDefBody::Brace { elements }`
-- `action`, `state`, `requirement`, `case`, `analysis`, `verification`, `flow usage`, `allocation usage`, `interface`, `view`, `viewpoint`, `metadata usage`, `enum`: `partial` for the broader families due to remaining body/member-depth gaps outside the promoted productions
+- `action`, `state`, `requirement`, `case`, `analysis`, `verification`, `interface`, `view`, `viewpoint`, `metadata usage`, `enum`: `partial` for the broader families due to remaining body/member-depth gaps outside the promoted productions
 - KerML semantic families (`behavior`, `function`, `datatype`, `assoc`, `struct`, `metaclass`, `class`, `classifier`, `feature`, `step`): `modeled`
 - KerML feature logic families (`occurrence`, `expr`, `predicate`, `succession`): `modeled`
 - Extended declaration starters (`message`, `concern` and remaining library declarations): `modeled`
@@ -52,7 +53,7 @@ The coverage gate treats `implemented` as the stronger claim. Productions marked
 
 ## Current quality baseline (2026-06-02)
 
-- `cargo test` is green (124 parser tests + bnf_compliance gate).
+- `cargo test` is green (127 parser tests + bnf_compliance gate).
 - `cargo test --test validation -- --include-ignored` is green, including the full validation suite and full SysML library gates.
 - Systems Library node-shape validation passes with `ExtendedLibraryDecl = 0`.
 - Full std-library node-shape validation also passes with `ExtendedLibraryDecl = 0`.

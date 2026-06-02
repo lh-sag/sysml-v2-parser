@@ -38,7 +38,7 @@ A recent example: library declarations such as `abstract connection name : Type[
 
 **Part/port bodies (June 2026):** part def/usage bodies retain structured member AST; port def/usage use `parse_structured_brace_members` with `PortBody::Brace { elements }` (nested ports, in/out, doc, recovery).
 
-**Still local or opaque:** part/port/action/state/requirement deep body members; alias/import paths; connect bodies in interface parsing.
+**Still local or opaque:** deep action/state/requirement body members beyond definition-level structured loops; alias/import paths; connect bodies in interface parsing.
 
 **P2 (in progress):** extend structured member grammars per family beyond doc + recovery stubs.
 
@@ -68,7 +68,7 @@ Many `*Def` structs repeat `identification`, `specializes`, `specializes_span`, 
 
 **Recently migrated (June 2026):** requirement/case/analysis/verification usages, action/state usages, view/rendering/viewpoint/use-case usages, and `concern_usage` route through shared `usage_header` parsing. `calc_def` uses `parse_definition_prefix`.
 
-**Next candidates:** remaining families with local typing fragments; deep action/state/requirement body member grammar.
+**Next candidates:** remaining families with local typing fragments; member-level action/state/requirement grammar (transitions, perform, satisfy, etc.).
 
 ## What is not wasteful duplication
 

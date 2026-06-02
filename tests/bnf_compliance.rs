@@ -307,6 +307,9 @@ fn implemented_productions_do_not_use_skip_or_statement_only_bodies() {
         ("AllocationUsage", "src/parser/allocation.rs"),
         ("MetadataDefinition", "src/parser/metadata.rs"),
         ("MetadataUsage", "src/parser/metadata.rs"),
+        ("ActionDefinition", "src/parser/action.rs"),
+        ("StateDefinition", "src/parser/state.rs"),
+        ("RequirementDefinition", "src/parser/requirement.rs"),
     ];
 
     let mut violations = Vec::new();

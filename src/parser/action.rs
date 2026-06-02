@@ -9,9 +9,9 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
 use crate::parser::interface::connect_body;
+use crate::parser::body::advance_to_closing_brace;
 use crate::parser::lex::{
-    name, qualified_name, skip_statement_or_block, skip_until_brace_end, take_until_terminator,
-    ws1, ws_and_comments,
+    name, qualified_name, skip_statement_or_block, take_until_terminator, ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
@@ -46,6 +46,8 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"@",
     b"#",
 ];
+
+const UNTIL_SEMI_OR_BRACE: &[u8] = b";{";
 
 fn doc_comment_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::DocComment>> {
     let (input, doc) = crate::parser::requirement::doc_comment(input)?;
@@ -119,7 +121,7 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
         && !input.fragment().starts_with(b";")
         && !input.fragment().starts_with(b"{")
     {
-        let (next, _) = take_until_terminator(input, b";{")?;
+        let (next, _) = take_until_terminator(input, UNTIL_SEMI_OR_BRACE)?;
         input = next;
     }
 
@@ -130,7 +132,7 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
             map(
                 delimited(
                     tag(&b"{"[..]),
-                    skip_until_brace_end,
+                    advance_to_closing_brace,
                     preceded(ws_and_comments, tag(&b"}"[..])),
                 ),
                 |_| crate::ast::RefBody::Brace,
@@ -164,7 +166,7 @@ fn first_merge_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
         map(
             nom::sequence::delimited(
                 tag(&b"{"[..]),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| FirstMergeBody::Brace,
@@ -211,7 +213,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
             ws1,
             delimited(
                 tag(&b"{"[..]),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
         ))
@@ -226,7 +228,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
                 map(
                     delimited(
                         tag(&b"{"[..]),
-                        skip_until_brace_end,
+                        advance_to_closing_brace,
                         preceded(ws_and_comments, tag(&b"}"[..])),
                     ),
                     |_| (),
@@ -240,7 +242,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
         Ok(v) => v,
         Err(_) => {
             // Best-effort fallback: consume to `;` or start of a braced body.
-            let (input, raw_text) = take_until_terminator(input, b";{")?;
+            let (input, raw_text) = take_until_terminator(input, UNTIL_SEMI_OR_BRACE)?;
             let raw_text = raw_text.trim().to_string();
             let name_guess = raw_text
                 .split(|c: char| c.is_whitespace() || c == ':' || c == '[' || c == ',' || c == ';')
@@ -255,7 +257,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
                     map(
                         delimited(
                             tag(&b"{"[..]),
-                            skip_until_brace_end,
+                            advance_to_closing_brace,
                             preceded(ws_and_comments, tag(&b"}"[..])),
                         ),
                         |_| (),
@@ -674,14 +676,14 @@ fn action_body_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>
     ))
     .parse(input)?;
 
-    let (input, text) = take_until_terminator(input, b";{")?;
+    let (input, text) = take_until_terminator(input, UNTIL_SEMI_OR_BRACE)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = alt((
         map(tag(&b";"[..]), |_| ()),
         map(
             delimited(
                 tag(&b"{"[..]),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| (),
@@ -717,7 +719,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     ))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    let (input, _) = take_until_terminator(input, UNTIL_SEMI_OR_BRACE)?;
     let type_name = header.type_name.unwrap_or_default();
     let type_ref_span = None;
     let accept = accept.map(|(param_name, _, param_type)| (param_name, param_type));

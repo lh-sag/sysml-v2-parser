@@ -11,16 +11,17 @@ use crate::parser::constraint::{structured_constraint_body, StructuredConstraint
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
+use crate::parser::body::advance_to_closing_brace;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    skip_until_brace_end, specialization_operator, starts_with_any_keyword, subset_operator,
-    take_until_terminator, ws, ws1, ws_and_comments, REQUIREMENT_BODY_STARTERS,
+    specialization_operator, starts_with_any_keyword, subset_operator, ws, ws1, ws_and_comments,
+    REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span, span_from_to};
-use crate::parser::usage::{specialization_clauses, usage_header};
+use crate::parser::usage::{multiplicity, specialization_clauses, usage_header};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
@@ -139,7 +140,7 @@ fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Requiremen
                 let (next, _) = recover_body_element(input, REQUIREMENT_BODY_STARTERS)?;
                 if next.location_offset() == start_unknown.location_offset() {
                     // Fallback: abort this body to avoid infinite loops.
-                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = advance_to_closing_brace(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                     return Ok((input, RequirementDefBody::Brace { elements }));
                 }
@@ -245,8 +246,8 @@ pub(crate) fn parse_requirement_usage_payload<'a>(
             name(input)?
         }
     };
+    let (input, _multiplicity) = opt(multiplicity).parse(input)?;
     let (input, header) = usage_header(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = requirement_def_body(input)?;
     let (input, post_body_specialization) = specialization_clauses(input)?;
     let input = if post_body_specialization.had_any {
@@ -332,7 +333,7 @@ pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectD
         map(
             delimited(
                 preceded(ws_and_comments, tag(&b"{"[..])),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| (),
@@ -380,7 +381,7 @@ pub(crate) fn constraint_body(input: Input<'_>) -> IResult<Input<'_>, Constraint
         map(
             delimited(
                 preceded(ws_and_comments, tag(&b"{"[..])),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| ConstraintBody::Brace,
@@ -558,7 +559,7 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
         map(
             delimited(
                 preceded(ws_and_comments, tag(&b"{"[..])),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| crate::ast::ConnectBody::Brace,
@@ -588,7 +589,6 @@ pub(crate) fn concern_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Concern
     let (input, _) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let (input, ident) = name(input)?;
     let (input, header) = usage_header(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = requirement_def_body(input)?;
     let val = ConcernUsage {
         name: ident,

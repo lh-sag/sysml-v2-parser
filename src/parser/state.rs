@@ -5,13 +5,16 @@ use crate::ast::{
     ThenStmt, Transition,
 };
 use crate::parser::build_recovery_error_node_from_span;
+use crate::parser::body::advance_to_closing_brace;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    skip_until_brace_end, starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1,
-    ws_and_comments, STATE_BODY_STARTERS,
+    starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1, ws_and_comments,
+    STATE_BODY_STARTERS,
 };
+
+const UNTIL_BODY: &[u8] = b";{";
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::requirement::{doc_comment, requirement_usage};
@@ -115,7 +118,7 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
                     "recovered_state_body_element",
                 );
                 if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = advance_to_closing_brace(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                     return Ok((input, StateDefBody::Brace { elements }));
                 }
@@ -159,7 +162,7 @@ fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
     .parse(input)?;
     let action_name = action_name.map(|(_, n)| n);
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
+    let (input, _) = take_until_terminator(input, UNTIL_BODY)?;
     let (input, body) = state_def_body(input)?;
     Ok((
         input,
@@ -176,8 +179,6 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let (input, name_str) = name(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
     let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = preceded(
         ws_and_comments,
         alt((
@@ -185,7 +186,7 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             map(
                 delimited(
                     tag(&b"{"[..]),
-                    skip_until_brace_end,
+                    advance_to_closing_brace,
                     preceded(ws_and_comments, tag(&b"}"[..])),
                 ),
                 |_| RefBody::Brace,
@@ -266,7 +267,6 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     )))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = state_def_body(input)?;
     Ok((
         input,
@@ -335,7 +335,7 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
             map(
                 delimited(
                     tag(&b"{"[..]),
-                    skip_until_brace_end,
+                    advance_to_closing_brace,
                     preceded(ws_and_comments, tag(&b"}"[..])),
                 ),
                 |_| crate::ast::ConnectBody::Brace,
