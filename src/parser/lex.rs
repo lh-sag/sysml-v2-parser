@@ -697,3 +697,13 @@ pub(crate) fn redefine_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
     ))
     .parse(input)
 }
+
+/// Parse typing marker in SysML concrete syntax:
+/// either symbolic `:` or keyword pair `defined by`.
+pub(crate) fn typed_by_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    alt((
+        value((), tag(&b":"[..])),
+        value((), (tag(&b"defined"[..]), ws1, tag(&b"by"[..]), ws1)),
+    ))
+    .parse(input)
+}

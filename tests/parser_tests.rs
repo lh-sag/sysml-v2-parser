@@ -2386,6 +2386,49 @@ part def Carrier {
 }
 
 #[test]
+fn test_port_usage_accepts_defined_by_typings() {
+    let input = r#"package P {
+part def Carrier {
+  port fuelPort defined by ~Ports::FuelPort, Ports::CommandPort[1] subsets basePort;
+}
+}"#;
+    let result = parse(input).expect("defined-by port usage should parse");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = match &elements[0].value {
+        PackageBodyElement::PartDef(p) => p,
+        other => panic!("expected part def, got {:?}", other),
+    };
+    let part_body = match &part_def.value.body {
+        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    let port_usage = match &part_body[0].value {
+        sysml_v2_parser::ast::PartDefBodyElement::PortUsage(p) => p,
+        other => panic!("expected port usage, got {:?}", other),
+    };
+    assert_eq!(
+        port_usage.value.type_name.as_deref(),
+        Some("~Ports::FuelPort, Ports::CommandPort")
+    );
+    assert_eq!(port_usage.value.multiplicity.as_deref(), Some("[1]"));
+    assert_eq!(
+        port_usage
+            .value
+            .subsets
+            .as_ref()
+            .map(|(name, _)| name.as_str()),
+        Some("basePort")
+    );
+}
+
+#[test]
 fn test_requirement_body_attribute_typed_with_value_and_redefine_forms() {
     let input = r#"package P {
 requirement def R {

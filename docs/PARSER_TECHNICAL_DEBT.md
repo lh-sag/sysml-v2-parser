@@ -58,6 +58,10 @@ Many `*Def` structs repeat `identification`, `specializes`, `specializes_span`, 
 
 **Recommended improvement (larger):** an internal `DefinitionDecl { keyword, prefixes, identification, header, body }` mapped to typed AST variants for downstream consumers. Drive this from grammar work, not from deduplication alone.
 
+### 6. Shared usage grammar fragments — **started**
+
+[`src/parser/usage.rs`](../src/parser/usage.rs) now centralizes small `UsageDeclaration` / `FeatureSpecializationPart` fragments: multiplicity, `TypedBy` (`:` / `defined by`), subsetting, and redefinition. `port_usage` has been migrated first, including `defined by` and multiple typing targets. Next candidates are `part_usage`, `attribute_usage`, occurrence usages, and requirement/case usages that still parse these fragments locally.
+
 ## What is not wasteful duplication
 
 | Pattern | Why it stays |
@@ -90,7 +94,7 @@ Duplication in code and “partial grammar” in the spec sense overlap: the sam
 | ~~**P1**~~ | ~~`semicolon_or_opaque_brace_body`~~ | Done | flow / allocation / metadata |
 | **P2** | Generic structured body loop with recovery | Medium | Less recovery duplication; better editor behavior |
 | **P2** | Split `package_body_element` into keyword-group sub-dispatchers | Medium | Easier extension without reordering dozens of branches |
-| **P3** | Unified definition/usage header (typing, multiplicity, subsets, redefines) | Large | Spec-aligned; fixes whole classes of library edge cases |
+| **P3** | Unified definition/usage header (typing, multiplicity, subsets, redefines) | Started | Spec-aligned; fixes whole classes of library edge cases |
 | **P3** | Replace `skip_until_brace_end` in high-traffic bodies | Large | Deeper AST; significant work per module |
 
 ## What to avoid

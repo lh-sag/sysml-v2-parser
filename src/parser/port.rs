@@ -6,12 +6,13 @@ use crate::parser::action::in_out_decl;
 use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, qualified_name, redefine_operator, skip_until_brace_end,
-    specialization_operator, subset_operator, take_until_terminator, ws1, ws_and_comments,
+    identification, name, qualified_name, skip_until_brace_end, specialization_operator,
+    take_until_terminator, ws1, ws_and_comments,
 };
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
+use crate::parser::usage::{multiplicity, redefinition, subsetting, typings};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -64,49 +65,13 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
         .map(|(i, o)| (i, o.is_some()))?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    let (input, type_result) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(
-            ws_and_comments,
-            (
-                nom::combinator::opt(tag(&b"~"[..])),
-                with_span(qualified_name),
-            ),
-        ),
-    ))
-    .parse(input)?;
+    let (input, type_result) = opt(typings).parse(input)?;
     let (type_ref_span, type_name) = type_result
-        .map(|(tilde, (span, name))| {
-            (
-                Some(span),
-                Some(if tilde.is_some() {
-                    format!("~{}", name)
-                } else {
-                    name
-                }),
-            )
-        })
+        .map(|(span, name)| (Some(span), Some(name)))
         .unwrap_or((None, None));
     let (input, multiplicity) = opt(multiplicity).parse(input)?;
-    let (input, subsets) = opt(preceded(
-        preceded(ws_and_comments, subset_operator),
-        preceded(
-            ws_and_comments,
-            (
-                name,
-                opt(preceded(
-                    preceded(ws_and_comments, tag(&b"="[..])),
-                    preceded(ws_and_comments, expression),
-                )),
-            ),
-        ),
-    ))
-    .parse(input)?;
-    let (input, explicit_redefines) = opt(preceded(
-        preceded(ws_and_comments, redefine_operator),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
+    let (input, subsets) = opt(subsetting).parse(input)?;
+    let (input, explicit_redefines) = opt(redefinition).parse(input)?;
     let redefines = explicit_redefines.or_else(|| {
         if prefix_redefines {
             Some(name_str.clone())
@@ -132,15 +97,6 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
             },
         ),
     ))
-}
-
-fn multiplicity(input: Input<'_>) -> IResult<Input<'_>, String> {
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"["[..]).parse(input)?;
-    let (input, content) = take_until(&b"]"[..]).parse(input)?;
-    let (input, _) = tag(&b"]"[..]).parse(input)?;
-    let s = format!("[{}]", String::from_utf8_lossy(content.fragment()).trim());
-    Ok((input, s))
 }
 
 /// Port def body: ';' or '{' PortDefBodyElement* '}' (or skip to '}' when body is unparseable).
