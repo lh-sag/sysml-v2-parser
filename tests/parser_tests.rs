@@ -1113,6 +1113,52 @@ fn test_feature_and_classifier_decls_map_to_dedicated_package_nodes() {
 }
 
 #[test]
+fn test_kerml_fallback_family_keywords_map_to_dedicated_nodes() {
+    let input = r#"package P {
+        structure PhysicalStructure;
+        behavior B;
+        function F;
+        interaction I;
+        datatype D;
+        association A;
+        metaclass M;
+        step S;
+        invariant Inv;
+        predicate P;
+    }"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected brace body"),
+    };
+    assert!(matches!(
+        elements[0].value,
+        PackageBodyElement::ClassifierDecl(_)
+    ));
+    for idx in 1..9 {
+        assert!(
+            matches!(elements[idx].value, PackageBodyElement::KermlSemanticDecl(_)),
+            "expected KermlSemanticDecl at index {idx}, got {:?}",
+            elements[idx].value
+        );
+    }
+    assert!(matches!(
+        elements[9].value,
+        PackageBodyElement::KermlFeatureDecl(_)
+    ));
+    assert!(
+        !elements
+            .iter()
+            .any(|e| matches!(e.value, PackageBodyElement::ExtendedLibraryDecl(_))),
+        "samples should not fall back to ExtendedLibraryDecl"
+    );
+}
+
+#[test]
 fn test_quantities_abstract_attribute_def_maps_dedicated() {
     let input = "package P { abstract attribute def TensorQuantityValue :> Array { attribute num: Number[1..*]; } }";
     let result = parse(input).expect("parse should succeed");

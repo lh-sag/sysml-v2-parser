@@ -78,7 +78,7 @@
 * MembershipImport partial
 * NamespaceImport partial
 * FilterPackage* partial
-* Namespace* fallback
+* Namespace* partial
 * VisibilityIndicator implemented
 * PrefixMetadata* partial
 
@@ -131,21 +131,21 @@
 * GeneralType partial
 * SpecificType partial
 * Classifier partial
-* Classifier* fallback
-* Class fallback
-* DataType fallback
-* Structure fallback
-* Association fallback
-* AssociationStructure fallback
+* Classifier* partial
+* Class partial
+* DataType partial
+* Structure partial
+* Association partial
+* AssociationStructure partial
 * Connector partial
 * BindingConnector partial
-* Behavior fallback
-* Function fallback
-* Predicate fallback
-* Interaction fallback
-* Metaclass fallback
-* Step fallback
-* Invariant fallback
+* Behavior partial
+* Function partial
+* Predicate partial
+* Interaction partial
+* Metaclass partial
+* Step partial
+* Invariant partial
 
 # SysML structural families.
 SysML Attribute* partial

@@ -315,8 +315,10 @@ fn kerml_semantic_decl(input: Input<'_>) -> IResult<Input<'_>, Node<KermlSemanti
         b"interaction",
         b"datatype",
         b"inv",
+        b"invariant",
         b"multiplicity",
         b"assoc",
+        b"association",
         b"metaclass",
         b"step",
     ];
@@ -363,7 +365,13 @@ fn feature_decl(input: Input<'_>) -> IResult<Input<'_>, Node<FeatureDecl>> {
 
 fn classifier_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ClassifierDecl>> {
     let start = input;
-    let starters: &[&[u8]] = &[b"class", b"classifier", b"struct", b"subclassifier"];
+    let starters: &[&[u8]] = &[
+        b"class",
+        b"classifier",
+        b"struct",
+        b"structure",
+        b"subclassifier",
+    ];
     let (input, (keyword, text)) = parse_modeled_decl(input, starters)?;
     Ok((
         input,
