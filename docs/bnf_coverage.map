@@ -1,0 +1,278 @@
+# SysML/KerML textual BNF coverage map.
+#
+# Format:
+#   <Grammar> <Pattern> <Status>
+#
+# Grammar:
+#   SysML | KerML | *
+#
+# Pattern:
+#   ExactName       exact production name
+#   Prefix*         prefix match
+#   *Suffix         suffix match
+#   *Contains*      contains match
+#
+# Status:
+#   implemented | partial | opaque | fallback | untested | not_supported
+#
+# The compliance test resolves the most-specific matching pattern. If a BNF
+# production has no matching pattern, the test fails. This file intentionally
+# has no catch-all wildcard.
+
+# Lexical and terminal productions.
+* RESERVED_KEYWORD implemented
+* RESERVED_SYMBOL implemented
+* DEFINED_BY implemented
+* SPECIALIZES implemented
+* SUBSETS implemented
+* REFERENCES implemented
+* CROSSES partial
+* REDEFINES implemented
+* CONJUGATES partial
+* TYPED_BY partial
+* ALPHABETIC_CHARACTER partial
+* BASIC_INITIAL_CHARACTER partial
+* BASIC_NAME partial
+* BASIC_NAME_CHARACTER partial
+* COMMENT_LINE_TEXT partial
+* COMMENT_TEXT partial
+* DECIMAL_DIGIT partial
+* DECIMAL_VALUE partial
+* ESCAPE_SEQUENCE partial
+* EXPONENTIAL_VALUE partial
+* LINE_TERMINATOR partial
+* LINE_TEXT partial
+* MULTILINE_NOTE partial
+* NAME partial
+* NAME_CHARACTER partial
+* REGULAR_COMMENT partial
+* SINGLE_LINE_NOTE partial
+* SINGLE_QUOTE partial
+* STRING_CHARACTER partial
+* STRING_VALUE partial
+* UNRESTRICTED_NAME partial
+* WHITE_SPACE implemented
+
+# Root, package, namespace, imports, aliases, annotations.
+* RootNamespace implemented
+* Identification implemented
+* RelationshipBody partial
+* Annotation partial
+* OwnedAnnotation partial
+* Annotating* partial
+* Comment partial
+* Documentation partial
+* TextualRepresentation partial
+* QualifiedName implemented
+* Package implemented
+* LibraryPackage implemented
+* PackageDeclaration implemented
+* PackageBody implemented
+* PackageBodyElement partial
+* PackageMember partial
+* MemberPrefix implemented
+* AliasMember partial
+* Dependency partial
+* Import partial
+* ImportDeclaration partial
+* MembershipImport partial
+* NamespaceImport partial
+* FilterPackage* partial
+* Namespace* fallback
+* VisibilityIndicator implemented
+* PrefixMetadata* partial
+
+# Shared definition/usage/specialization grammar.
+* Definition partial
+* Definition* partial
+* Usage partial
+* Usage* partial
+* BasicDefinitionPrefix implemented
+* DefinitionPrefix implemented
+* BasicUsagePrefix partial
+* UsagePrefix partial
+* UnextendedUsagePrefix partial
+* UsageCompletion partial
+* ValuePart partial
+* FeatureValue partial
+* Feature* partial
+* Type partial
+* Type* partial
+* Specialization partial
+* Specialization* partial
+* Subclassification partial
+* Subclassification* partial
+* Subsetting partial
+* Subsettings partial
+* Subsets partial
+* Redefinition partial
+* Redefinitions partial
+* Redefines partial
+* ParameterRedefinition partial
+* Typings partial
+* TypedBy partial
+* Multiplicity partial
+* Multiplicity* partial
+* Owned* partial
+* Empty* partial
+* DefaultReferenceUsage partial
+* ReferenceUsage partial
+* Reference* partial
+* RefPrefix partial
+* Crosses partial
+* ChainingPart partial
+* InvertingPart partial
+* Unioning* partial
+* Intersecting* partial
+* Differencing* partial
+* Disjoining* partial
+* Conjugation* partial
+* Conjugated* partial
+* GeneralType partial
+* SpecificType partial
+* Classifier partial
+* Classifier* fallback
+* Class fallback
+* DataType fallback
+* Structure fallback
+* Association fallback
+* AssociationStructure fallback
+* Connector partial
+* BindingConnector partial
+* Behavior fallback
+* Function fallback
+* Predicate fallback
+* Interaction fallback
+* Metaclass fallback
+* Step fallback
+* Invariant fallback
+
+# SysML structural families.
+SysML Attribute* partial
+SysML Enumeration* partial
+SysML EnumeratedValue partial
+SysML Occurrence* partial
+SysML EventOccurrenceUsage partial
+SysML Individual* partial
+SysML Item* partial
+SysML Part* partial
+SysML Portion* partial
+SysML Port* partial
+SysML Connection* partial
+SysML Connector* partial
+SysML BindingConnector* partial
+SysML BinaryConnector* partial
+SysML NaryConnector* partial
+SysML SourceEnd* partial
+SysML Interface* partial
+SysML BinaryInterface* partial
+SysML NaryInterface* partial
+SysML DefaultInterfaceEnd partial
+SysML Flow* opaque
+KerML Flow partial
+KerML FlowFeatureRedefinition partial
+KerML SuccessionFlow partial
+SysML Payload* partial
+SysML Allocation* opaque
+
+# SysML behavior, state, requirement, case, view, and metadata families.
+SysML Action* partial
+SysML Accept* partial
+SysML AssertConstraintUsage partial
+SysML Assignment* partial
+SysML ControlNode partial
+SysML ControlNodePrefix partial
+SysML DecisionNode partial
+SysML ForkNode partial
+SysML ForLoopNode partial
+SysML ForVariable* partial
+SysML IfNode partial
+SysML JoinNode partial
+SysML MergeNode partial
+SysML SendNode* partial
+SysML TerminateNode partial
+SysML Trigger* partial
+SysML WhileLoopNode partial
+SysML Calculation* partial
+SysML Constraint* partial
+SysML Requirement* partial
+SysML Objective* partial
+SysML Subject* partial
+SysML Actor* partial
+SysML Stakeholder* partial
+SysML Satisfaction* partial
+SysML SatisfyRequirementUsage partial
+SysML Verification* partial
+SysML Case* partial
+SysML AnalysisCase* partial
+SysML UseCase* partial
+SysML IncludeUseCaseUsage partial
+SysML ExhibitStateUsage partial
+SysML State* partial
+SysML Transition* partial
+SysML Entry* partial
+SysML DoActionMember partial
+SysML ExitActionMember partial
+SysML EffectBehavior* partial
+SysML Succession* partial
+SysML Guard* partial
+SysML Target* partial
+SysML SourceSuccession* partial
+SysML View* partial
+SysML Viewpoint* partial
+SysML Rendering* partial
+SysML FramedConcern* partial
+SysML Concern* partial
+SysML Metadata* opaque
+SysML Message* partial
+
+# KerML expression and argument families.
+* Expression partial
+* *Expression partial
+* *Expression* partial
+* Argument partial
+* *Argument partial
+* *Argument* partial
+* BinaryOperator partial
+* UnaryOperator partial
+* ConditionalBinaryOperator partial
+* CastOperator partial
+* MetaCastOperator partial
+* ClassificationTestOperator partial
+* MetaclassificationTestOperator partial
+* Literal* partial
+* BooleanValue partial
+* RealValue partial
+* NullExpression partial
+* Sequence* partial
+* SelectExpression partial
+* CollectExpression partial
+* Constructor* partial
+* InvocationExpression partial
+* Function* partial
+* MetadataAccessExpression partial
+
+# Generic residual grammar shapes.
+* *Body partial
+* *BodyItem partial
+* *BodyElement partial
+* *Member partial
+* *Element partial
+* *Declaration partial
+* *Prefix partial
+* *Part partial
+* *Parameter partial
+* *Value partial
+* *Feature partial
+* *Typing partial
+* *Relationship partial
+* *Reference partial
+* *List partial
+* *Operator partial
+* *Node partial
+* *End partial
+* *Succession partial
+* *Import partial
+* *Expose partial
+* *Usage partial
+* *Definition partial

@@ -6,6 +6,10 @@ Reference grammar:
 
 - `sysml-v2-release/bnf/SysML-textual-bnf.kebnf`
 
+Machine-readable coverage gate:
+
+- [`docs/bnf_coverage.map`](./bnf_coverage.map), validated by `cargo test --test bnf_compliance`
+
 Status labels:
 
 - `implemented`: dedicated AST + dedicated parser path, exercised by the current validation baseline
