@@ -185,6 +185,14 @@ SysML Payload* partial
 SysML Allocation* partial
 
 # SysML behavior, state, requirement, case, view, and metadata families.
+SysML RequirementUsage implemented
+SysML CaseUsage implemented
+SysML AnalysisCaseUsage implemented
+SysML VerificationCaseUsage implemented
+SysML ActionUsage implemented
+SysML StateUsage implemented
+SysML ViewUsage implemented
+SysML RenderingUsage implemented
 SysML Action* partial
 SysML Accept* partial
 SysML AssertConstraintUsage partial

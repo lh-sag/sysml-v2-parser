@@ -16,6 +16,7 @@ use crate::parser::lex::{
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
+use crate::parser::usage::usage_header;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -702,54 +703,24 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     let (input, _) = tag(&b"action"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
-    let (input, type_accept) = nom::combinator::opt(nom::branch::alt((
-        nom::combinator::map(
+    let (input, header) = usage_header(input)?;
+    let (input, accept) = nom::combinator::opt(preceded(
+        preceded(ws_and_comments, tag(&b"accept"[..])),
+        preceded(
+            ws1,
             (
+                name,
                 preceded(ws_and_comments, tag(&b":"[..])),
-                preceded(
-                    ws_and_comments,
-                    nom::combinator::map(
-                        (with_span(qualified_name), optional_multiplicity_brackets),
-                        |((span, tn), _)| (span, tn),
-                    ),
-                ),
-                nom::combinator::opt(preceded(
-                    preceded(ws_and_comments, tag(&b"accept"[..])),
-                    preceded(
-                        ws1,
-                        (
-                            name,
-                            preceded(ws_and_comments, tag(&b":"[..])),
-                            preceded(ws_and_comments, qualified_name),
-                        ),
-                    ),
-                )),
+                preceded(ws_and_comments, qualified_name),
             ),
-            |(_, (span, type_name), accept)| {
-                (Some(span), type_name, accept.map(|(pn, _, tn)| (pn, tn)))
-            },
         ),
-        nom::combinator::map(
-            preceded(
-                preceded(ws_and_comments, tag(&b"accept"[..])),
-                preceded(
-                    ws1,
-                    (
-                        name,
-                        preceded(ws_and_comments, tag(&b":"[..])),
-                        preceded(ws_and_comments, name),
-                    ),
-                ),
-            ),
-            |(param_name, _, param_type)| {
-                (None, param_type.clone(), Some((param_name, param_type)))
-            },
-        ),
-    )))
+    ))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
-    let (type_ref_span, type_name, accept) = type_accept.unwrap_or((None, String::new(), None));
+    let type_name = header.type_name.unwrap_or_default();
+    let type_ref_span = None;
+    let accept = accept.map(|(param_name, _, param_type)| (param_name, param_type));
     let (input, body) = action_usage_body(input)?;
     // Spec-wise, a braced body does not require a trailing semicolon. However, in practice some
     // sources write `... { ... };` as a statement terminator. We accept an optional `;` here to

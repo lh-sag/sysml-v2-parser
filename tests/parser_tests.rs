@@ -2694,6 +2694,87 @@ requirement VehicleReq; subsets BaseReq :> LatestReq;
 }
 
 #[test]
+fn test_case_usage_accepts_typed_by_and_specialization_clauses() {
+    let input = r#"package P {
+case analyze typed by Mission::CaseType subsets BaseCase;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let case_usage = match &elements[0].value {
+        PackageBodyElement::CaseUsage(c) => c,
+        other => panic!("expected case usage, got {:?}", other),
+    };
+    assert_eq!(case_usage.value.type_name.as_deref(), Some("Mission::CaseType"));
+}
+
+#[test]
+fn test_action_state_and_view_usage_accept_typed_by_alias() {
+    let input = r#"package P {
+action send typed by Mission::SendAction;
+state running typed by Mission::Mode;
+view dashboard typed by Mission::DashboardView;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+
+    let action_usage = match &elements[0].value {
+        PackageBodyElement::ActionUsage(a) => a,
+        other => panic!("expected action usage, got {:?}", other),
+    };
+    assert_eq!(action_usage.value.type_name, "Mission::SendAction");
+
+    let state_usage = match &elements[1].value {
+        PackageBodyElement::StateUsage(s) => s,
+        other => panic!("expected state usage, got {:?}", other),
+    };
+    assert_eq!(state_usage.value.type_name.as_deref(), Some("Mission::Mode"));
+
+    let view_usage = match &elements[2].value {
+        PackageBodyElement::ViewUsage(v) => v,
+        other => panic!("expected view usage, got {:?}", other),
+    };
+    assert_eq!(view_usage.value.type_name.as_deref(), Some("Mission::DashboardView"));
+}
+
+#[test]
+fn test_rendering_usage_accepts_typed_by_alias() {
+    let input = r#"package P {
+rendering skin typed by Mission::Renderer;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let rendering_usage = match &elements[0].value {
+        PackageBodyElement::RenderingUsage(r) => r,
+        other => panic!("expected rendering usage, got {:?}", other),
+    };
+    assert_eq!(
+        rendering_usage.value.type_name.as_deref(),
+        Some("Mission::Renderer")
+    );
+}
+
+#[test]
 fn test_port_usage_normalizes_subset_redefine_aliases() {
     let input = r#"package P {
 part def Carrier {

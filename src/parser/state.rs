@@ -15,6 +15,7 @@ use crate::parser::lex::{
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::requirement::{doc_comment, requirement_usage};
+use crate::parser::usage::usage_header;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -257,16 +258,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     let (input, _) = tag(&b"state"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, n) = name(input)?;
-    let (input, typ) = {
-        let (peek, _) = ws_and_comments(input)?;
-        if peek.fragment().starts_with(b":") && !peek.fragment().starts_with(b":>") {
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, typ) = preceded(ws_and_comments, qualified_name).parse(input)?;
-            (input, Some(typ))
-        } else {
-            (input, None)
-        }
-    };
+    let (input, header) = usage_header(input)?;
     // Optional modifier before body: `parallel` or `initial` (SysML state usage)
     let (input, _) = opt(alt((
         preceded(preceded(ws_and_comments, tag(&b"parallel"[..])), ws1),
@@ -283,7 +275,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
             input,
             StateUsage {
                 name: n,
-                type_name: typ,
+                type_name: header.type_name,
                 body,
             },
         ),

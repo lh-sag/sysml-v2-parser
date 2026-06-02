@@ -3,8 +3,9 @@ use crate::ast::{
     VerificationCaseUsage,
 };
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, qualified_name, take_until_terminator, ws1, ws_and_comments};
+use crate::parser::lex::{name, take_until_terminator, ws1, ws_and_comments};
 use crate::parser::node_from_to;
+use crate::parser::usage::usage_header;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
@@ -134,19 +135,14 @@ pub(crate) fn verification_case_usage(
 
 fn case_like_usage_body(input: Input<'_>) -> IResult<Input<'_>, CaseUsage> {
     let (input, name) = name(input)?;
-    let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, header) = usage_header(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = loose_use_case_body(input)?;
     Ok((
         input,
         CaseUsage {
             name,
-            type_name,
+            type_name: header.type_name,
             body,
         },
     ))

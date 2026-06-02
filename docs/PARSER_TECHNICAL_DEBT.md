@@ -64,7 +64,9 @@ Many `*Def` structs repeat `identification`, `specializes`, `specializes_span`, 
 
 **Current AST caveat:** `attribute_usage` accepts extra specialization clauses for grammar coverage, but the existing public `AttributeUsage` AST only stores `typing` and `redefines`. `occurrence_usage` stores `type_name`, `subsets`, and `redefines`, using the current last-wins behavior for multiple clauses. Structured AST fidelity for `references` / `crosses` and richer body members remains a later tranche.
 
-**Next candidates:** requirement/case usages, action/state usages, and remaining families that still parse typing or specialization fragments locally.
+**Recently migrated (June 2026):** requirement/case/analysis/verification usages, action/state usages, and view/rendering usages now route through shared `usage_header` parsing.
+
+**Next candidates:** use-case usage and viewpoint usage, then remaining families that still parse typing or specialization fragments locally.
 
 ## What is not wasteful duplication
 
@@ -98,7 +100,7 @@ Duplication in code and “partial grammar” in the spec sense overlap: the sam
 | ~~**P1**~~ | ~~`semicolon_or_opaque_brace_body`~~ | Done | flow / allocation / metadata |
 | **P2** | Generic structured body loop with recovery | Medium | Less recovery duplication; better editor behavior |
 | **P2** | Split `package_body_element` into keyword-group sub-dispatchers | Medium | Easier extension without reordering dozens of branches |
-| **P3** | Unified definition/usage header (typing, multiplicity, subsets, redefines) | Started; part/port/attribute/occurrence migrated | Spec-aligned; fixes whole classes of library edge cases |
+| **P3** | Unified definition/usage header (typing, multiplicity, subsets, redefines) | In progress; part/port/attribute/occurrence + requirement/case/action/state/view usages migrated | Spec-aligned; fixes whole classes of library edge cases |
 | **P3** | Replace `skip_until_brace_end` in high-traffic bodies | Large | Deeper AST; significant work per module |
 
 ## What to avoid

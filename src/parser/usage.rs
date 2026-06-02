@@ -21,6 +21,14 @@ pub(crate) struct SpecializationClauses {
     pub had_any: bool,
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct UsageHeader {
+    pub type_name: Option<String>,
+    pub subsets: Option<String>,
+    pub redefines: Option<String>,
+    pub had_specialization: bool,
+}
+
 /// Multiplicity part: '[' ... ']'.
 pub(crate) fn multiplicity(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = ws_and_comments(input)?;
@@ -160,6 +168,33 @@ pub(crate) fn specialization_clauses(
     Ok((input, out))
 }
 
+/// Parse optional usage typing and specialization in either order:
+/// - `<typing> <specialization>*`
+/// - `<specialization>* <typing> <specialization>*`
+pub(crate) fn usage_header(input: Input<'_>) -> IResult<Input<'_>, UsageHeader> {
+    let (input, leading) = specialization_clauses(input)?;
+    let (input, type_result) = optional_typings(input)?;
+    let (input, trailing) = specialization_clauses(input)?;
+
+    let subsets = trailing
+        .subsets
+        .or(leading.subsets)
+        .map(|(target, _value)| target);
+    let redefines = trailing.redefines.or(leading.redefines);
+    let had_specialization = leading.had_any || trailing.had_any;
+    let type_name = type_result.map(|(_, name)| name);
+
+    Ok((
+        input,
+        UsageHeader {
+            type_name,
+            subsets,
+            redefines,
+            had_specialization,
+        },
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -226,5 +261,24 @@ mod tests {
             Some("CoordinateTransformation, List")
         );
         assert!(rest.fragment().trim_ascii_start().starts_with(b"{"));
+    }
+
+    #[test]
+    fn usage_header_accepts_typing_then_specialization() {
+        let input = span_input(": Engine :> BasePart :>> oldPart ;");
+        let (rest, header) = usage_header(input).expect("usage header");
+        assert_eq!(header.type_name.as_deref(), Some("Engine"));
+        assert_eq!(header.subsets.as_deref(), Some("BasePart"));
+        assert_eq!(header.redefines.as_deref(), Some("oldPart"));
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
+
+    #[test]
+    fn usage_header_accepts_specialization_then_typing() {
+        let input = span_input("subsets base : Engine ;");
+        let (rest, header) = usage_header(input).expect("usage header");
+        assert_eq!(header.type_name.as_deref(), Some("Engine"));
+        assert_eq!(header.subsets.as_deref(), Some("base"));
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 }

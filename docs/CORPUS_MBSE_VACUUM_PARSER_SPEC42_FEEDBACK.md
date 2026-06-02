@@ -85,6 +85,16 @@ Related docs in this repo:
 
 This avoids licensing/size issues if the corpus is not vendored.
 
+### 3.6 Shared usage-header parsing (Spec42 sync point)
+
+`sysml-v2-parser` now routes additional usage families through shared usage-header parsing (`:` / `defined by` / `typed by` + specialization clauses) for requirement/case/action/state/view/rendering usages.
+
+**Spec42 alignment notes:**
+
+- Keep consuming normalized usage typing from existing `type_name` fields (same public field names, broader accepted syntax).
+- For requirement usage, `subsets` continues to be exposed as a single normalized target (`last-wins` when multiple clauses are present).
+- Treat broader acceptance of typed/specialized headers as parser coverage growth, not as a semantic model change by itself.
+
 ---
 
 ## 4. Recommended improvements — Spec42 (LSP / semantic layer)

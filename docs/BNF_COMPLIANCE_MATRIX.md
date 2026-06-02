@@ -29,7 +29,8 @@ The coverage gate treats `implemented` as the stronger claim. Attribute, occurre
 - `part`, `port`: `partial`; shared usage typing/specialization fragments are accepted, but body coverage is still not a full BNF-modeled AST for every member
 - `attribute`: `partial`; `:` / `defined by` / `typed by` and specialization clauses are accepted for definitions/usages, but extra usage specializations are not all public AST fields yet and brace bodies are still opaque
 - `occurrence`: `partial`; `:` / `defined by` / `typed by`, `subsets`, and `redefines` are accepted on usages with current last-wins normalization
-- `action`, `state`, `requirement`, `case`, `analysis`, `verification`, `flow`, `allocation`, `interface`, `view`, `viewpoint`, `rendering`, `metadata`, `enum`: `partial`
+- `requirement usage`, `case usage`, `analysis case usage`, `verification case usage`, `action usage`, `state usage`, `view usage`, `rendering usage`: `implemented` (shared `usage_header` flow accepts `:` / `defined by` / `typed by` plus specialization clauses)
+- `action`, `state`, `requirement`, `case`, `analysis`, `verification`, `flow`, `allocation`, `interface`, `view`, `viewpoint`, `rendering`, `metadata`, `enum`: `partial` for the broader families due to remaining body/member-depth gaps outside the promoted usage productions
 - KerML semantic families (`behavior`, `function`, `datatype`, `assoc`, `struct`, `metaclass`, `class`, `classifier`, `feature`, `step`): `modeled`
 - KerML feature logic families (`occurrence`, `expr`, `predicate`, `succession`): `modeled`
 - Extended declaration starters (`message`, `concern` and remaining library declarations): `modeled`
@@ -44,7 +45,7 @@ The coverage gate treats `implemented` as the stronger claim. Attribute, occurre
   - supports staged migration threshold via env var `FULL_LIBRARY_EXTENDED_MAX`
   - default threshold is `0` (strict)
 
-## Current quality baseline (2026-04-09)
+## Current quality baseline (2026-06-02)
 
 - `cargo test` is green.
 - `cargo test --test validation -- --include-ignored` is green, including the full validation suite and full SysML library gates.

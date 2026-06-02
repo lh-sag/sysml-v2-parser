@@ -20,6 +20,7 @@ use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span, span_from_to};
+use crate::parser::usage::{specialization_clauses, usage_header};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
@@ -244,21 +245,11 @@ pub(crate) fn parse_requirement_usage_payload<'a>(
             name(input)?
         }
     };
-    let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, header) = usage_header(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = requirement_def_body(input)?;
-    let (input, subsets_all) = many0(preceded(
-        preceded(ws_and_comments, subset_operator),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let subsets = subsets_all.last().cloned();
-    let input = if subsets.is_some() {
+    let (input, post_body_specialization) = specialization_clauses(input)?;
+    let input = if post_body_specialization.had_any {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
     } else {
@@ -268,8 +259,11 @@ pub(crate) fn parse_requirement_usage_payload<'a>(
         input,
         RequirementUsage {
             name,
-            type_name,
-            subsets,
+            type_name: header.type_name,
+            subsets: post_body_specialization
+                .subsets
+                .map(|(target, _)| target)
+                .or(header.subsets),
             body,
         },
     ))

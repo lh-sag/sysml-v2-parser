@@ -14,6 +14,7 @@ use crate::parser::lex::{
     VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
+use crate::parser::usage::usage_header;
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::branch::alt;
@@ -44,11 +45,7 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
     let (input, _) = preceded(ws_and_comments, tag(&b"render"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, type_name) = nom::combinator::opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
+    let (input, header) = usage_header(input)?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,
@@ -57,7 +54,7 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
             input,
             ViewRenderingUsage {
                 name: name_str,
-                type_name,
+                type_name: header.type_name,
                 body,
             },
         ),
@@ -390,15 +387,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
     let (input, _) = tag(&b"view"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, type_name) = preceded(
-        ws_and_comments,
-        nom::combinator::opt(preceded(
-            tag(&b":"[..]),
-            preceded(ws_and_comments, qualified_name),
-        )),
-    )
-    .parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, header) = usage_header(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = view_body(input)?;
     Ok((
@@ -408,7 +397,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
             input,
             ViewUsage {
                 name: name_str,
-                type_name,
+                type_name: header.type_name,
                 body,
             },
         ),
@@ -448,15 +437,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     let (input, _) = tag(&b"rendering"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, type_name) = preceded(
-        ws_and_comments,
-        nom::combinator::opt(preceded(
-            tag(&b":"[..]),
-            preceded(ws_and_comments, qualified_name),
-        )),
-    )
-    .parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
+    let (input, header) = usage_header(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = connect_body(input)?;
     Ok((
@@ -466,7 +447,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
             input,
             RenderingUsage {
                 name: name_str,
-                type_name,
+                type_name: header.type_name,
                 body,
             },
         ),
