@@ -18,7 +18,8 @@ const UNTIL_BODY: &[u8] = b";{";
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
 use crate::parser::requirement::{doc_comment, requirement_usage};
-use crate::parser::usage::usage_header;
+use crate::parser::usage::{feature_usage_header, multiplicity, usage_header};
+use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -170,15 +171,46 @@ fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
     ))
 }
 
-/// Ref in state body: `ref` name `:` type body
+/// Ref in state body: `ref` (`state`)? name (`:` type)? (`:>>` / `:>` redeclarations)? body
 fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = opt(preceded(ws1, tag(&b"state"[..]))).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-    let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
+    let (input, parsed_name) = opt(with_span(name)).parse(input)?;
+    let (input, _multiplicity) = opt(multiplicity).parse(input)?;
+    let (name_span, name_str) = parsed_name.unwrap_or((crate::ast::Span::dummy(), String::new()));
+
+    let (input, uses_shift) = preceded(
+        ws_and_comments,
+        alt((
+            map(tag(&b":>>"[..]), |_| true),
+            map(tag(&b":>"[..]), |_| false),
+            map(tag(&b":"[..]), |_| false),
+        )),
+    )
+    .parse(input)?;
+    let (input, (type_ref_span, type_name)) = if uses_shift {
+        (input, (crate::ast::Span::dummy(), String::new()))
+    } else {
+        preceded(ws_and_comments, with_span(qualified_name)).parse(input)?
+    };
+
+    let (input, _) = ws_and_comments(input)?;
+    let (mut input, value) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"="[..])),
+        preceded(ws_and_comments, expression),
+    ))
+    .parse(input)?;
+
+    if !input.fragment().is_empty()
+        && !input.fragment().starts_with(b";")
+        && !input.fragment().starts_with(b"{")
+    {
+        let (next, _) = take_until_terminator(input, UNTIL_BODY)?;
+        input = next;
+    }
+
     let (input, body) = preceded(
         ws_and_comments,
         alt((
@@ -202,10 +234,10 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
             RefDecl {
                 name: name_str,
                 type_name,
-                value: None,
+                value,
                 body,
-                name_span: None,
-                type_ref_span: None,
+                name_span: Some(name_span),
+                type_ref_span: Some(type_ref_span),
             },
         ),
     ))
@@ -259,7 +291,7 @@ pub(crate) fn state_usage(input: Input<'_>) -> IResult<Input<'_>, Node<StateUsag
     let (input, _) = tag(&b"state"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, n) = name(input)?;
-    let (input, header) = usage_header(input)?;
+    let (input, header) = feature_usage_header(input)?;
     // Optional modifier before body: `parallel` or `initial` (SysML state usage)
     let (input, _) = opt(alt((
         preceded(preceded(ws_and_comments, tag(&b"parallel"[..])), ws1),

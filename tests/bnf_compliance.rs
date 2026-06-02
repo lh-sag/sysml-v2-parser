@@ -77,11 +77,6 @@ fn release_root() -> PathBuf {
         return PathBuf::from(path);
     }
 
-    let external = PathBuf::from(r"C:\Git\sysml-v2-release");
-    if external.exists() {
-        return external;
-    }
-
     manifest_dir().join("sysml-v2-release")
 }
 

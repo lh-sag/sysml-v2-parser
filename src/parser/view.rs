@@ -14,7 +14,7 @@ use crate::parser::lex::{
     VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
-use crate::parser::usage::usage_header;
+use crate::parser::usage::{feature_usage_header, usage_header};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::branch::alt;
@@ -45,7 +45,7 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
     let (input, _) = preceded(ws_and_comments, tag(&b"render"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, header) = usage_header(input)?;
+    let (input, header) = feature_usage_header(input)?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,
@@ -420,7 +420,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
     let (input, _) = tag(&b"view"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, header) = usage_header(input)?;
+    let (input, header) = feature_usage_header(input)?;
     let (input, body) = view_body(input)?;
     Ok((
         input,
@@ -443,7 +443,7 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
     let (input, _) = tag(&b"viewpoint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, header) = usage_header(input)?;
+    let (input, header) = feature_usage_header(input)?;
     let (input, body) = requirement_def_body(input)?;
     Ok((
         input,
@@ -466,7 +466,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     let (input, _) = tag(&b"rendering"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, header) = usage_header(input)?;
+    let (input, header) = feature_usage_header(input)?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,

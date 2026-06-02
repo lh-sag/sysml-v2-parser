@@ -6,8 +6,26 @@
 //! Logging defaults to WARN so test output stays small. Use `RUST_LOG=debug` (or
 //! `RUST_LOG=sysml_v2_parser=debug`) and `--nocapture` when debugging parser behavior.
 
+use std::path::PathBuf;
+
 #[path = "validation/parts_tree_1a.rs"]
 mod parts_tree_1a;
+
+/// Root of the SysML v2 Release tree (`SYSML_V2_RELEASE_DIR` or `./sysml-v2-release`).
+pub(crate) fn release_root() -> PathBuf {
+    std::env::var_os("SYSML_V2_RELEASE_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sysml-v2-release"))
+}
+
+/// Path to a fixture under `sysml/src/validation/`.
+pub(crate) fn validation_fixture_path(relative: &str) -> PathBuf {
+    release_root()
+        .join("sysml")
+        .join("src")
+        .join("validation")
+        .join(relative)
+}
 
 /// Initialize the logger. Default level is WARN so failures don't flood with DEBUG.
 /// Set `RUST_LOG=debug` (or `RUST_LOG=sysml_v2_parser=debug`) when debugging.
@@ -17,6 +35,20 @@ pub(crate) fn init_log() {
         builder.filter_level(log::LevelFilter::Warn);
     }
     let _ = builder.try_init();
+}
+
+fn diff_debug_strings(parsed: &str, expected: &str) -> (usize, String) {
+    let pos = parsed
+        .chars()
+        .zip(expected.chars())
+        .position(|(a, b)| a != b)
+        .unwrap_or(parsed.len().min(expected.len()));
+    let snippet: String = parsed
+        .chars()
+        .skip(pos.saturating_sub(80))
+        .take(160)
+        .collect();
+    (pos, snippet)
 }
 
 /// Asserts that parsed and expected ASTs are equal. Normalizes parsed (strips optional
@@ -31,22 +63,54 @@ pub(crate) fn assert_ast_eq(
     if normalized == *expected {
         return;
     }
-    let pa = format!("{:?}", normalized);
-    let pe = format!("{:?}", expected);
-    let pos = pa
-        .chars()
-        .zip(pe.chars())
-        .position(|(a, b)| a != b)
-        .unwrap_or(pa.len().min(pe.len()));
-    let snippet: String = pa.chars().skip(pos.saturating_sub(80)).take(160).collect();
+    let pa = format!("{normalized:?}");
+    let pe = format!("{expected:?}");
+    let (pos, snippet) = diff_debug_strings(&pa, &pe);
     panic!(
-        "{}: AST mismatch at char {} (parsed {} chars, expected {} chars). Snippet: ...{}... \
+        "{msg}: AST mismatch at char {pos} (parsed {} chars, expected {} chars). Snippet: ...{snippet}... \
          Set RUST_LOG=debug and run with --nocapture for full parser trace.",
-        msg,
-        pos,
         pa.len(),
         pe.len(),
-        snippet
+    );
+}
+
+/// Compare parsed AST against a checked-in snapshot under `tests/validation/snapshots/`.
+/// Regenerate with `UPDATE_VALIDATION_AST=1 cargo test --test validation -- --include-ignored`.
+pub(crate) fn assert_ast_snapshot(
+    parsed: &sysml_v2_parser::ast::RootNamespace,
+    snapshot_name: &str,
+    msg: &str,
+) {
+    let normalized = format!("{:?}", parsed.normalize_for_test_comparison());
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("validation")
+        .join("snapshots")
+        .join(format!("{snapshot_name}.txt"));
+
+    if std::env::var("UPDATE_VALIDATION_AST").as_deref() == Ok("1") {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).expect("create snapshot dir");
+        }
+        std::fs::write(&path, &normalized).expect("write snapshot");
+        return;
+    }
+
+    let expected = std::fs::read_to_string(&path).unwrap_or_else(|err| {
+        panic!(
+            "read snapshot {}: {err}. Run fetch script for sysml-v2-release, or regenerate with UPDATE_VALIDATION_AST=1",
+            path.display()
+        )
+    });
+    if normalized == expected {
+        return;
+    }
+    let (pos, snippet) = diff_debug_strings(&normalized, &expected);
+    panic!(
+        "{msg}: AST mismatch at char {pos} (parsed {} chars, expected {} chars). Snippet: ...{snippet}... \
+         Regenerate with UPDATE_VALIDATION_AST=1 cargo test --test validation -- --include-ignored",
+        normalized.len(),
+        expected.len(),
     );
 }
 

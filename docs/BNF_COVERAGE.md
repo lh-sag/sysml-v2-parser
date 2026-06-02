@@ -4,7 +4,7 @@ This repo now keeps a machine-readable coverage map for the SysML/KerML textual 
 
 - coverage map: `docs/bnf_coverage.map`
 - gate: `tests/bnf_compliance.rs`
-- normative BNF source: `SYSML_V2_RELEASE_DIR/bnf/*.kebnf`, falling back to `C:\Git\sysml-v2-release` and then the vendored `sysml-v2-release`
+- normative BNF source: `SYSML_V2_RELEASE_DIR/bnf/*.kebnf`, defaulting to `./sysml-v2-release` in the repo root
 
 The coverage status labels are:
 
@@ -18,7 +18,6 @@ The coverage status labels are:
 Run the gate with:
 
 ```powershell
-$env:SYSML_V2_RELEASE_DIR="C:\Git\sysml-v2-release"
 cargo test --test bnf_compliance -- --nocapture
 ```
 

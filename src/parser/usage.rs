@@ -8,7 +8,7 @@ use crate::parser::lex::{
 };
 use crate::parser::{span_from_to, Input};
 use nom::bytes::complete::{tag, take_until};
-use nom::combinator::opt;
+use nom::combinator::{map, opt};
 use nom::multi::many0;
 use nom::sequence::preceded;
 use nom::IResult;
@@ -168,6 +168,62 @@ pub(crate) fn specialization_clauses(
     Ok((input, out))
 }
 
+fn skip_usage_feature_modifiers(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = many0(preceded(
+        ws_and_comments,
+        nom::branch::alt((
+            map(tag(&b"ordered"[..]), |_| ()),
+            map(tag(&b"nonunique"[..]), |_| ()),
+        )),
+    ))
+    .parse(input)?;
+    Ok((input, ()))
+}
+
+fn skip_intersects_clause(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _) = opt(preceded(
+        preceded(ws_and_comments, tag(&b"intersects"[..])),
+        preceded(ws_and_comments, specialization_targets),
+    ))
+    .parse(input)?;
+    Ok((input, ()))
+}
+
+fn merge_usage_header(
+    leading: SpecializationClauses,
+    trailing: SpecializationClauses,
+    type_result: Option<(Span, String)>,
+) -> UsageHeader {
+    let subsets = trailing
+        .subsets
+        .or(leading.subsets)
+        .map(|(target, _value)| target);
+    let redefines = trailing.redefines.or(leading.redefines);
+    UsageHeader {
+        type_name: type_result.map(|(_, name)| name),
+        subsets,
+        redefines,
+        had_specialization: leading.had_any || trailing.had_any,
+    }
+}
+
+/// Usage header for library-style feature usages: optional leading multiplicity,
+/// typing, trailing multiplicity, `ordered` / `nonunique`, subsetting/redefinition,
+/// and optional `intersects` before the body.
+pub(crate) fn feature_usage_header(input: Input<'_>) -> IResult<Input<'_>, UsageHeader> {
+    let (input, _) = opt(multiplicity).parse(input)?;
+    let (input, leading) = specialization_clauses(input)?;
+    let (input, type_result) = optional_typings(input)?;
+    let (input, _) = opt(multiplicity).parse(input)?;
+    let (input, _) = skip_usage_feature_modifiers(input)?;
+    let (input, trailing) = specialization_clauses(input)?;
+    let (input, _) = skip_intersects_clause(input)?;
+    Ok((
+        input,
+        merge_usage_header(leading, trailing, type_result),
+    ))
+}
+
 /// Parse optional usage typing and specialization in either order:
 /// - `<typing> <specialization>*`
 /// - `<specialization>* <typing> <specialization>*`
@@ -176,22 +232,9 @@ pub(crate) fn usage_header(input: Input<'_>) -> IResult<Input<'_>, UsageHeader> 
     let (input, type_result) = optional_typings(input)?;
     let (input, trailing) = specialization_clauses(input)?;
 
-    let subsets = trailing
-        .subsets
-        .or(leading.subsets)
-        .map(|(target, _value)| target);
-    let redefines = trailing.redefines.or(leading.redefines);
-    let had_specialization = leading.had_any || trailing.had_any;
-    let type_name = type_result.map(|(_, name)| name);
-
     Ok((
         input,
-        UsageHeader {
-            type_name,
-            subsets,
-            redefines,
-            had_specialization,
-        },
+        merge_usage_header(leading, trailing, type_result),
     ))
 }
 
