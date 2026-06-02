@@ -24,7 +24,9 @@ use crate::parser::occurrence::{
 };
 use crate::parser::port::port_usage;
 use crate::parser::requirement::{comment_annotation, doc_comment, requirement_usage, satisfy};
-use crate::parser::usage::{multiplicity, optional_typings, redefinition, subsetting, typings};
+use crate::parser::usage::{
+    multiplicity, optional_typings, redefinition, specialization_clauses, subsetting, typings,
+};
 use crate::parser::with_span;
 use crate::parser::Input;
 use crate::parser::{node_from_to, span_from_to};
@@ -592,17 +594,21 @@ fn part_usage_named<'a>(start: Input<'a>, input: Input<'a>) -> IResult<Input<'a>
     let (input, trailing_multiplicity_opt) = opt(multiplicity).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(trailing_multiplicity_opt);
     let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
-    let (input, subsets) = opt(subsetting).parse(input)?;
-    let (input, redefines) = opt(redefinition).parse(input)?;
+    let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = part_usage_body(input)?;
-    let (input, trailing_subsets) = opt(subsetting).parse(input)?;
-    let (input, trailing_redefines) = opt(redefinition).parse(input)?;
-    let subsets = subsets.or(trailing_subsets.clone());
-    let redefines = redefines.or(trailing_redefines.clone());
-    let input = if trailing_subsets.is_some() || trailing_redefines.is_some() {
+    let (input, trailing_clauses) = specialization_clauses(input)?;
+    let subsets = trailing_clauses
+        .subsets
+        .clone()
+        .or(leading_clauses.subsets.clone());
+    let redefines = trailing_clauses
+        .redefines
+        .clone()
+        .or(leading_clauses.redefines.clone());
+    let input = if trailing_clauses.had_any {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
     } else {
@@ -666,8 +672,7 @@ fn anonymous_part_usage<'a>(
     let (input, (type_ref_span, type_name)) = typings(input)?;
     let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
     let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
-    let (input, subsets) = opt(subsetting).parse(input)?;
-    let (input, redefines) = opt(redefinition).parse(input)?;
+    let (input, clauses) = specialization_clauses(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
@@ -683,8 +688,8 @@ fn anonymous_part_usage<'a>(
                 type_name,
                 multiplicity: multiplicity_opt,
                 ordered: ordered.is_some(),
-                subsets,
-                redefines,
+                subsets: clauses.subsets,
+                redefines: clauses.redefines,
                 value,
                 body,
                 name_span: None,

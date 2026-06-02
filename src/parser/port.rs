@@ -12,7 +12,7 @@ use crate::parser::lex::{
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
-use crate::parser::usage::{multiplicity, optional_typings, redefinition, subsetting};
+use crate::parser::usage::{multiplicity, optional_typings, specialization_clauses};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -70,9 +70,8 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
         .map(|(span, name)| (Some(span), Some(name)))
         .unwrap_or((None, None));
     let (input, multiplicity) = opt(multiplicity).parse(input)?;
-    let (input, subsets) = opt(subsetting).parse(input)?;
-    let (input, explicit_redefines) = opt(redefinition).parse(input)?;
-    let redefines = explicit_redefines.or_else(|| {
+    let (input, clauses) = specialization_clauses(input)?;
+    let redefines = clauses.redefines.or_else(|| {
         if prefix_redefines {
             Some(name_str.clone())
         } else {
@@ -89,7 +88,7 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
                 name: name_str,
                 type_name,
                 multiplicity,
-                subsets,
+                subsets: clauses.subsets,
                 redefines,
                 body,
                 name_span: Some(name_span),

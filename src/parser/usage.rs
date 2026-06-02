@@ -14,6 +14,13 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct SpecializationClauses {
+    pub subsets: Option<(String, Option<Node<Expression>>)>,
+    pub redefines: Option<String>,
+    pub had_any: bool,
+}
+
 /// Multiplicity part: '[' ... ']'.
 pub(crate) fn multiplicity(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = ws_and_comments(input)?;
@@ -95,6 +102,34 @@ pub(crate) fn redefinition(input: Input<'_>) -> IResult<Input<'_>, String> {
     .parse(input)
 }
 
+enum SpecializationClause {
+    Subsets((String, Option<Node<Expression>>)),
+    Redefines(String),
+}
+
+/// Parse zero or more subsetting/redefinition clauses in any order.
+///
+/// When multiple clauses of the same kind are present, the last one wins.
+pub(crate) fn specialization_clauses(input: Input<'_>) -> IResult<Input<'_>, SpecializationClauses> {
+    let (input, clauses) = many0(preceded(
+        ws_and_comments,
+        nom::branch::alt((
+            nom::combinator::map(subsetting, SpecializationClause::Subsets),
+            nom::combinator::map(redefinition, SpecializationClause::Redefines),
+        )),
+    ))
+    .parse(input)?;
+    let mut out = SpecializationClauses::default();
+    for clause in clauses {
+        match clause {
+            SpecializationClause::Subsets(value) => out.subsets = Some(value),
+            SpecializationClause::Redefines(value) => out.redefines = Some(value),
+        }
+    }
+    out.had_any = out.subsets.is_some() || out.redefines.is_some();
+    Ok((input, out))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -126,5 +161,17 @@ mod tests {
         let (_, (target, value)) = subsetting(input).expect("subsetting");
         assert_eq!(target, "wheel");
         assert!(value.is_some());
+    }
+
+    #[test]
+    fn specialization_clauses_accepts_multiple_mixed_clauses() {
+        let input = span_input("subsets base redefines old :> latest :>> newest ;");
+        let (rest, clauses) = specialization_clauses(input).expect("specialization clauses");
+        assert_eq!(
+            clauses.subsets.as_ref().map(|(name, _)| name.as_str()),
+            Some("latest")
+        );
+        assert_eq!(clauses.redefines.as_deref(), Some("newest"));
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 }

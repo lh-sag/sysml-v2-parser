@@ -2451,6 +2451,27 @@ requirement VehicleReq; subsets BaseReq;
 }
 
 #[test]
+fn test_requirement_usage_accepts_multiple_subsets_clauses() {
+    let input = r#"package P {
+requirement VehicleReq; subsets BaseReq :> LatestReq;
+}"#;
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let req = match &elements[0].value {
+        PackageBodyElement::RequirementUsage(r) => r,
+        other => panic!("expected requirement usage, got {:?}", other),
+    };
+    assert_eq!(req.value.subsets.as_deref(), Some("LatestReq"));
+}
+
+#[test]
 fn test_port_usage_normalizes_subset_redefine_aliases() {
     let input = r#"package P {
 part def Carrier {
@@ -2573,6 +2594,45 @@ part def Carrier {
             .map(|(name, _)| name.as_str()),
         Some("basePort")
     );
+}
+
+#[test]
+fn test_port_usage_accepts_multiple_specialization_clauses() {
+    let input = r#"package P {
+part def Carrier {
+  port fuelPort : FuelPort subsets basePort redefines oldPort :> latestPort :>> newestPort;
+}
+}"#;
+    let result = parse(input).expect("port usage with multiple specialization clauses should parse");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = match &elements[0].value {
+        PackageBodyElement::PartDef(p) => p,
+        other => panic!("expected part def, got {:?}", other),
+    };
+    let part_body = match &part_def.value.body {
+        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    let port_usage = match &part_body[0].value {
+        sysml_v2_parser::ast::PartDefBodyElement::PortUsage(p) => p,
+        other => panic!("expected port usage, got {:?}", other),
+    };
+    assert_eq!(
+        port_usage
+            .value
+            .subsets
+            .as_ref()
+            .map(|(name, _)| name.as_str()),
+        Some("latestPort")
+    );
+    assert_eq!(port_usage.value.redefines.as_deref(), Some("newestPort"));
 }
 
 #[test]
@@ -2969,6 +3029,45 @@ part def Carrier {
             .map(|(name, _)| name.as_str()),
         Some("components")
     );
+}
+
+#[test]
+fn test_part_usage_accepts_multiple_specialization_clauses() {
+    let input = r#"package P {
+part def Carrier {
+  part engine : Engine subsets baseEngine redefines oldEngine :> latestEngine :>> newestEngine;
+}
+}"#;
+    let result = parse(input).expect("part usage with multiple specialization clauses should parse");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => p,
+        other => panic!("expected package, got {:?}", other),
+    };
+    let elements = match &pkg.value.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = match &elements[0].value {
+        PackageBodyElement::PartDef(p) => p,
+        other => panic!("expected part def, got {:?}", other),
+    };
+    let body = match &part_def.value.body {
+        sysml_v2_parser::ast::PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    let part_usage = match &body[0].value {
+        sysml_v2_parser::ast::PartDefBodyElement::PartUsage(p) => p,
+        other => panic!("expected part usage, got {:?}", other),
+    };
+    assert_eq!(
+        part_usage
+            .value
+            .subsets
+            .as_ref()
+            .map(|(name, _)| name.as_str()),
+        Some("latestEngine")
+    );
+    assert_eq!(part_usage.value.redefines.as_deref(), Some("newestEngine"));
 }
 
 #[test]

@@ -249,11 +249,12 @@ pub(crate) fn parse_requirement_usage_payload<'a>(
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = requirement_def_body(input)?;
-    let (input, subsets) = opt(preceded(
+    let (input, subsets_all) = many0(preceded(
         preceded(ws_and_comments, subset_operator),
         preceded(ws_and_comments, qualified_name),
     ))
     .parse(input)?;
+    let subsets = subsets_all.last().cloned();
     let input = if subsets.is_some() {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
