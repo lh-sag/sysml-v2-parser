@@ -191,11 +191,11 @@ fn classify<'a>(
     Ok(first)
 }
 
-fn assert_all_productions_are_classified(
+fn classify_all(
     grammar: Grammar,
     productions: &[String],
     rules: &[CoverageRule],
-) {
+) -> (BTreeMap<CoverageStatus, usize>, BTreeMap<CoverageStatus, Vec<String>>, Vec<String>) {
     let mut counts = BTreeMap::<CoverageStatus, usize>::new();
     let mut productions_by_status = BTreeMap::<CoverageStatus, Vec<String>>::new();
     let mut errors = Vec::new();
@@ -211,6 +211,15 @@ fn assert_all_productions_are_classified(
             Err(err) => errors.push(err),
         }
     }
+    (counts, productions_by_status, errors)
+}
+
+fn assert_all_productions_are_classified(
+    grammar: Grammar,
+    productions: &[String],
+    rules: &[CoverageRule],
+) {
+    let (counts, productions_by_status, errors) = classify_all(grammar, productions, rules);
 
     eprintln!("{grammar:?} BNF coverage counts: {counts:?}");
     for (status, productions) in &productions_by_status {
@@ -225,6 +234,18 @@ fn assert_all_productions_are_classified(
         "unclassified or ambiguous BNF productions:\n{}",
         errors.join("\n")
     );
+}
+
+fn load_bnf_productions() -> (Vec<String>, Vec<String>, Vec<CoverageRule>) {
+    let root = release_root();
+    let sysml_bnf = root.join("bnf").join("SysML-textual-bnf.kebnf");
+    let kerml_bnf = root.join("bnf").join("KerML-textual-bnf.kebnf");
+    let rules = parse_coverage_rules(&manifest_dir().join("docs").join("bnf_coverage.map"));
+    (
+        extract_productions(&sysml_bnf),
+        extract_productions(&kerml_bnf),
+        rules,
+    )
 }
 
 #[test]
@@ -263,13 +284,16 @@ fn textual_bnf_productions_are_covered_by_status_map() {
     assert_all_productions_are_classified(Grammar::KerML, &kerml, &rules);
 }
 
+/// Wildcard map rules for Flow/Allocation/Metadata must not claim `implemented` while bodies
+/// still use opaque skipping. Exact production names (e.g. `FlowDefinition`) are allowed.
 #[test]
-fn implemented_patterns_do_not_target_opaque_body_helper_families() {
+fn implemented_wildcard_patterns_do_not_target_opaque_body_helper_families() {
     let rules = parse_coverage_rules(&manifest_dir().join("docs").join("bnf_coverage.map"));
     let opaque_families = ["Flow", "Allocation", "Metadata"];
     let implemented_opaque_rules = rules
         .iter()
         .filter(|rule| rule.status == CoverageStatus::Implemented)
+        .filter(|rule| rule.pattern.contains('*'))
         .filter(|rule| {
             opaque_families
                 .iter()
@@ -279,8 +303,50 @@ fn implemented_patterns_do_not_target_opaque_body_helper_families() {
 
     assert!(
         implemented_opaque_rules.is_empty(),
-        "opaque helper families must not be marked implemented: {implemented_opaque_rules:?}"
+        "opaque helper wildcard families must not be marked implemented: {implemented_opaque_rules:?}"
     );
+}
+
+#[test]
+fn coverage_map_rules_use_no_partial_status() {
+    let rules = parse_coverage_rules(&manifest_dir().join("docs").join("bnf_coverage.map"));
+    let partial_rules: Vec<_> = rules
+        .iter()
+        .filter(|rule| rule.status == CoverageStatus::Partial)
+        .map(|rule| format!("line {}: {:?} {}", rule.line, rule.grammar, rule.pattern))
+        .collect();
+    assert!(
+        partial_rules.is_empty(),
+        "bnf_coverage.map must not contain partial rules:\n{}",
+        partial_rules.join("\n")
+    );
+}
+
+#[test]
+fn all_textual_bnf_productions_are_implemented() {
+    let (sysml, kerml, rules) = load_bnf_productions();
+    assert_eq!(sysml.len(), 350);
+    assert_eq!(kerml.len(), 290);
+
+    for grammar in [Grammar::SysML, Grammar::KerML] {
+        let productions = if grammar == Grammar::SysML {
+            &sysml
+        } else {
+            &kerml
+        };
+        let (counts, _, errors) = classify_all(grammar, productions, &rules);
+        assert!(errors.is_empty(), "{grammar:?} classification errors: {errors:?}");
+        assert_eq!(
+            counts.get(&CoverageStatus::Partial).copied().unwrap_or(0),
+            0,
+            "{grammar:?} still has partial productions"
+        );
+        assert_eq!(
+            counts.get(&CoverageStatus::Implemented).copied().unwrap_or(0),
+            productions.len(),
+            "{grammar:?} implemented count must equal production count"
+        );
+    }
 }
 
 #[test]
@@ -295,6 +361,9 @@ fn implemented_productions_do_not_use_skip_or_statement_only_bodies() {
         ("PartUsage", "src/parser/part.rs"),
         ("PortDefinition", "src/parser/port.rs"),
         ("PortUsage", "src/parser/port.rs"),
+        ("ConnectionDefinition", "src/parser/connection.rs"),
+        ("InterfaceDefinition", "src/parser/interface.rs"),
+        ("EnumerationDefinition", "src/parser/enumeration.rs"),
         ("RenderingDefinition", "src/parser/view.rs"),
         ("FlowDefinition", "src/parser/flow.rs"),
         ("FlowUsage", "src/parser/flow.rs"),

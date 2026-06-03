@@ -7,9 +7,9 @@ use crate::ast::{
 };
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
+use crate::parser::body::advance_to_closing_brace;
 use crate::parser::lex::{
-    identification, name, qualified_name, skip_until_brace_end, take_until_terminator, ws1,
-    ws_and_comments,
+    identification, name, qualified_name, take_until_terminator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -71,7 +71,7 @@ fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
         map(
             nom::sequence::delimited(
                 tag(&b"{"[..]),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| RefBody::Brace,
@@ -116,7 +116,7 @@ pub(crate) fn connect_body(input: Input<'_>) -> IResult<Input<'_>, ConnectBody> 
         map(
             nom::sequence::delimited(
                 tag(&b"{"[..]),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| ConnectBody::Brace,
@@ -179,7 +179,7 @@ fn interface_def_body(input: Input<'_>) -> IResult<Input<'_>, InterfaceDefBody> 
     let (input, _) = if input.fragment().starts_with(b"}") {
         (input, ())
     } else {
-        skip_until_brace_end(input)?
+        advance_to_closing_brace(input)?
     };
     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
     Ok((input, InterfaceDefBody::Brace { elements }))

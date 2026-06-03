@@ -1,9 +1,8 @@
 //! Alias definition parsing.
 
 use crate::ast::{AliasBody, AliasDef, Node};
-use crate::parser::lex::{
-    identification, qualified_name, skip_until_brace_end, ws1, ws_and_comments,
-};
+use crate::parser::body::advance_to_closing_brace;
+use crate::parser::lex::{identification, qualified_name, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -21,7 +20,7 @@ fn alias_body(input: Input<'_>) -> IResult<Input<'_>, AliasBody> {
         map(
             nom::sequence::delimited(
                 tag(&b"{"[..]),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| AliasBody::Brace,

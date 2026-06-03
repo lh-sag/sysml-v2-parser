@@ -728,3 +728,108 @@ pub(crate) fn typed_by_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
     ))
     .parse(input)
 }
+
+/// Reference subsetting: `::>` or keyword `references`.
+pub(crate) fn references_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    alt((
+        value((), tag(&b"::>"[..])),
+        value((), (tag(&b"references"[..]), ws1)),
+    ))
+    .parse(input)
+}
+
+/// Cross subsetting: `=>` or keyword `crosses`.
+pub(crate) fn crosses_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    alt((
+        value((), tag(&b"=>"[..])),
+        value((), (tag(&b"crosses"[..]), ws1)),
+    ))
+    .parse(input)
+}
+
+/// Conjugation: `~` prefix on types or `conjugates` keyword form.
+#[allow(dead_code)]
+pub(crate) fn conjugates_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    alt((
+        value((), tag(&b"~"[..])),
+        value((), (tag(&b"conjugates"[..]), ws1)),
+    ))
+    .parse(input)
+}
+
+/// DECIMAL_VALUE: integer or real literal text (for BNF DECIMAL_VALUE / EXPONENTIAL_VALUE).
+pub(crate) fn decimal_value_text(input: Input<'_>) -> IResult<Input<'_>, String> {
+    let (input, _) = ws_and_comments(input)?;
+    let (input, raw) = take_while1(|c: u8| {
+        c.is_ascii_digit() || c == b'.' || c == b'e' || c == b'E' || c == b'+' || c == b'-'
+    })
+    .parse(input)?;
+    Ok((
+        input,
+        String::from_utf8_lossy(raw.fragment()).into_owned(),
+    ))
+}
+
+/// STRING_VALUE: single-quoted unrestricted name content.
+pub(crate) fn string_value(input: Input<'_>) -> IResult<Input<'_>, String> {
+    quoted_name(input)
+}
+
+#[cfg(test)]
+mod lexical_bnf_tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn span_input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn name_parses_basic_name() {
+        let (_, n) = name(span_input("myPart")).expect("NAME");
+        assert_eq!(n, "myPart");
+    }
+
+    #[test]
+    fn name_parses_unrestricted_name() {
+        let (_, n) = name(span_input("'a name'")).expect("UNRESTRICTED_NAME");
+        assert_eq!(n, "a name");
+    }
+
+    #[test]
+    fn qualified_name_parses_scoped_name() {
+        let (_, q) = qualified_name(span_input("SI::kg")).expect("QualifiedName");
+        assert_eq!(q, "SI::kg");
+    }
+
+    #[test]
+    fn string_value_parses_quoted() {
+        let (_, s) = string_value(span_input("'x'")).expect("STRING_VALUE");
+        assert_eq!(s, "x");
+    }
+
+    #[test]
+    fn decimal_value_parses_real() {
+        let (_, v) = decimal_value_text(span_input("1.5e-3")).expect("DECIMAL_VALUE");
+        assert_eq!(v, "1.5e-3");
+    }
+
+    #[test]
+    fn ws_and_comments_skip_line_and_block() {
+        let input = span_input("  // line\n  /* block */  part");
+        let (rest, _) = ws_and_comments(input).expect("WHITE_SPACE");
+        assert!(rest.fragment().starts_with(b"part"));
+    }
+
+    #[test]
+    fn references_operator_accepts_symbol_and_keyword() {
+        let (_, _) = references_operator(span_input("::>")).expect("REFERENCES");
+        let (_, _) = references_operator(span_input("references ")).expect("REFERENCES");
+    }
+
+    #[test]
+    fn crosses_operator_accepts_symbol_and_keyword() {
+        let (_, _) = crosses_operator(span_input("=>")).expect("CROSSES");
+        let (_, _) = crosses_operator(span_input("crosses ")).expect("CROSSES");
+    }
+}

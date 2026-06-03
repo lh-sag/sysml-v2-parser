@@ -11,7 +11,8 @@ use crate::parser::expr::path_expression;
 use crate::parser::interface::connect_body;
 use crate::parser::body::advance_to_closing_brace;
 use crate::parser::lex::{
-    name, qualified_name, skip_statement_or_block, take_until_terminator, ws1, ws_and_comments,
+    name, qualified_name, skip_statement_or_block, starts_with_any_keyword, take_until_terminator,
+    ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
@@ -43,8 +44,27 @@ const ACTION_BODY_STARTERS: &[&[u8]] = &[
     b"attribute",
     b"calc",
     b"event",
+    b"accept",
+    b"decision",
+    b"fork",
+    b"join",
+    b"send",
+    b"terminate",
+    b"while",
+    b"if",
     b"@",
     b"#",
+];
+
+const CONTROL_NODE_KEYWORDS: &[&[u8]] = &[
+    b"accept",
+    b"decision",
+    b"fork",
+    b"join",
+    b"send",
+    b"terminate",
+    b"while",
+    b"if",
 ];
 
 const UNTIL_SEMI_OR_BRACE: &[u8] = b";{";
@@ -431,6 +451,18 @@ pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenActio
 ///
 /// SysML v2 ActionBodyItem includes both declarations and action behavior usages.
 /// We support a pragmatic subset used by function-based behavior examples.
+/// Control-node action usages (`accept`, `decision`, `fork`, …) map to `ActionUsage` nodes.
+fn control_node_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
+    let (peek, _) = ws_and_comments(input)?;
+    if starts_with_any_keyword(peek.fragment(), CONTROL_NODE_KEYWORDS) {
+        return visibility_action_usage(input);
+    }
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Alt,
+    )))
+}
+
 fn action_def_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<crate::ast::ActionDefBodyElement>> {
@@ -455,6 +487,9 @@ fn action_def_body_element(
         map(first_stmt, ActionDefBodyElement::FirstStmt),
         map(merge_stmt, ActionDefBodyElement::MergeStmt),
         map(state_usage, ActionDefBodyElement::StateUsage),
+        map(control_node_action_usage, |a| {
+            ActionDefBodyElement::ActionUsage(Box::new(a))
+        }),
         map(visibility_action_usage, |a| {
             ActionDefBodyElement::ActionUsage(Box::new(a))
         }),

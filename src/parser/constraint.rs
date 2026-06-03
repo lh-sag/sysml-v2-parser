@@ -5,11 +5,12 @@ use crate::ast::{
     ConstraintDefBodyElement, Expression, Node, ParseErrorNode, ReturnDecl,
 };
 use crate::parser::action::in_out_decl;
+use crate::parser::body::advance_to_closing_brace;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    skip_until_brace_end, starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1,
+    starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1,
     ws_and_comments, CALC_DEF_BODY_STARTERS, CONSTRAINT_DEF_BODY_STARTERS,
 };
 use crate::parser::Input;
@@ -116,7 +117,7 @@ pub(crate) fn structured_constraint_body(
                 let start_unknown = input;
                 let (next, _) = skip_statement_or_block(input)?;
                 if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = advance_to_closing_brace(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                     return Ok((input, StructuredConstraintBody::Brace { elements }));
                 }
@@ -259,7 +260,7 @@ fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
                 let (next, _) = skip_statement_or_block(input)?;
                 if next.location_offset() == start_unknown.location_offset() {
                     // Fallback: avoid infinite loop by bailing out to end of calc body.
-                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = advance_to_closing_brace(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                     return Ok((input, CalcDefBody::Brace { elements }));
                 }

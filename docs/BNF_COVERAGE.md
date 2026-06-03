@@ -22,3 +22,9 @@ cargo test --test bnf_compliance -- --nocapture
 ```
 
 The test fails when a BNF production is not covered by the map, when two equally-specific rules assign conflicting statuses, or when the BNF production counts drift from the current SysML v2 release baseline.
+
+Additional gate tests (see `tests/bnf_compliance.rs`):
+
+- `coverage_map_rules_use_no_partial_status` — every map rule must be `implemented` (no `partial` rows).
+- `all_textual_bnf_productions_are_implemented` — all 640 SysML/KerML productions resolve to `implemented`.
+- `implemented_wildcard_patterns_do_not_target_opaque_body_helper_families` — wildcard `Flow*` / `Allocation*` / `Metadata*` rules must not claim `implemented` while bodies are opaque.

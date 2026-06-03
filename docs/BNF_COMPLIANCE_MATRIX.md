@@ -51,10 +51,10 @@ The coverage gate treats `implemented` as the stronger claim. Productions marked
   - supports staged migration threshold via env var `FULL_LIBRARY_EXTENDED_MAX`
   - default threshold is `0` (strict)
 
-## Current quality baseline (2026-06-02)
+## Current quality baseline (2026-06-03)
 
-- `cargo test` is green (127 parser tests + bnf_compliance gate).
+- `cargo test` is green, including `bnf_compliance` (640/640 productions classified as `implemented`).
 - `cargo test --test validation -- --include-ignored` is green, including the full validation suite and full SysML library gates.
-- Systems Library node-shape validation passes with `ExtendedLibraryDecl = 0`.
-- Full std-library node-shape validation also passes with `ExtendedLibraryDecl = 0`.
-- The main remaining work is deeper body-level modeling precision and language-server hardening, not package-level fallback elimination.
+- Systems Library and full std-library node-shape validation pass with `ExtendedLibraryDecl = 0`.
+- Map status `implemented` means the production is covered by dedicated parser paths and tests; it does not claim full semantic conformance.
+- Remaining depth work: richer AST for every body member, unified KerML definition/usage layer in code, and language-server recovery polish.

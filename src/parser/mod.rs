@@ -11,6 +11,7 @@ mod action;
 mod alias;
 mod allocation;
 mod attribute;
+mod bnf_surface;
 mod body;
 mod case;
 mod connection;

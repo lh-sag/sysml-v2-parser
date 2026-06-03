@@ -7,10 +7,10 @@ use crate::ast::{
 };
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
+use crate::parser::body::advance_to_closing_brace;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_until_brace_end,
-    starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
-    CONNECTION_DEF_BODY_STARTERS,
+    identification, name, qualified_name, recover_body_element, starts_with_any_keyword,
+    take_until_terminator, ws1, ws_and_comments, CONNECTION_DEF_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::with_span;
@@ -89,7 +89,7 @@ fn ref_body(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
         map(
             nom::sequence::delimited(
                 tag(&b"{"[..]),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| RefBody::Brace,
@@ -132,7 +132,7 @@ fn connect_body(input: Input<'_>) -> IResult<Input<'_>, crate::ast::ConnectBody>
         map(
             nom::sequence::delimited(
                 tag(&b"{"[..]),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| crate::ast::ConnectBody::Brace,
@@ -216,7 +216,7 @@ pub(crate) fn connection_member_body(input: Input<'_>) -> IResult<Input<'_>, Con
                 input = next;
             }
             Err(_) => {
-                let (input, _) = skip_until_brace_end(input)?;
+                let (input, _) = advance_to_closing_brace(input)?;
                 let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                 return Ok((input, ConnectionDefBody::Brace { elements }));
             }

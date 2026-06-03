@@ -7,10 +7,11 @@ use crate::ast::{
     UseCaseUsage, Visibility,
 };
 use crate::parser::attribute::attribute_def;
+use crate::parser::body::advance_to_closing_brace;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    skip_until_brace_end, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
+    starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
     USE_CASE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
@@ -373,7 +374,7 @@ fn use_case_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBod
                 let (next, _) = recover_body_element(input, USE_CASE_BODY_STARTERS)?;
                 if next.location_offset() == start_unknown.location_offset() {
                     // Fall back to aborting this body to avoid infinite loops.
-                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = advance_to_closing_brace(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                     return Ok((input, UseCaseDefBody::Brace { elements }));
                 }

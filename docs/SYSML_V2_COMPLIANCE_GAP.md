@@ -146,13 +146,12 @@ For a maintainability-focused view (duplication, refactors, priorities), see [`P
 
 ## Recommended next work
 
-If the goal is deeper parser fidelity rather than just keeping the current suites green, the highest-value work is:
+BNF coverage map status is now 100% `implemented` for all 640 textual productions (see `cargo test --test bnf_compliance`). Next fidelity work:
 
-1. introduce a more explicit shared definition/usage/specialization layer
-2. replace permissive body skipping with real grammar parsing in the remaining high-value modules
-3. continue expanding expression coverage
-4. deepen behavioral grammar for actions and states
-5. continue language-server hardening: more specific diagnostics, broader error-node coverage, and more recovery-focused tests
+1. Introduce a more explicit shared definition/usage/specialization layer in code (not only in the map).
+2. Replace remaining `take_until_terminator` header scraping with structured parses where library fixtures need them.
+3. Continue expanding expression and body-member AST precision (select/collect, control nodes, case bodies).
+4. Continue language-server hardening: more specific diagnostics, broader error-node coverage, and more recovery-focused tests.
 
 ## Summary
 

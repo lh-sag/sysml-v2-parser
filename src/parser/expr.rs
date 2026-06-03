@@ -347,6 +347,64 @@ fn null_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     Ok((input, node_from_to(start, input, Expression::Null)))
 }
 
+/// SelectExpression: base `.?` selector
+fn select_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
+    let (input, base) = feature_ref_primary(input)?;
+    let (input, _) = tag(&b".?"[..]).parse(input)?;
+    let (input, selector) = preceded(ws_and_comments, name).parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            Expression::MemberAccess(Box::new(base), format!("?{selector}")),
+        ),
+    ))
+}
+
+/// CollectExpression: base `.`**` selector
+fn collect_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
+    let (input, base) = feature_ref_primary(input)?;
+    let (input, _) = tag(&b".**"[..]).parse(input)?;
+    let (input, selector) = preceded(ws_and_comments, name).parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            Expression::MemberAccess(Box::new(base), format!("**{selector}")),
+        ),
+    ))
+}
+
+/// SequenceExpression: `(` expr (`,` expr)* `)`
+fn sequence_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
+    let (input, _) = tag(&b"("[..]).parse(input)?;
+    let (input, first) = preceded(ws_and_comments, expression).parse(input)?;
+    let (input, rest) = nom::multi::many0(preceded(
+        preceded(ws_and_comments, tag(&b","[..])),
+        preceded(ws_and_comments, expression),
+    ))
+    .parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b")"[..])).parse(input)?;
+    let mut args = vec![first];
+    args.extend(rest);
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            Expression::Invocation {
+                callee: Box::new(node_from_to(start, start, Expression::Null)),
+                args,
+            },
+        ),
+    ))
+}
+
 /// Primary expression: literal with unit, literal only, metadata ref, feature ref, null, or parenthesized.
 fn primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
@@ -356,8 +414,11 @@ fn primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         null_expression,
         metadata_ref_primary,
         constructor_expression,
+        collect_expression,
+        select_expression,
         feature_ref_primary,
         parenthesized,
+        sequence_expression,
     ))
     .parse(input)
 }

@@ -104,7 +104,7 @@ Duplication in code and “partial grammar” in the spec sense overlap: the sam
 | **P2** | Family-specific structured body members (action/state/requirement depth) | Medium | Full BNF member fidelity |
 | **P2** | Split `package_body_element` into keyword-group sub-dispatchers | Medium | Easier extension without reordering dozens of branches |
 | **P3** | Unified definition/usage header (typing, multiplicity, subsets, redefines) | In progress; part/port/attribute/occurrence + requirement/case/action/state/view usages migrated | Spec-aligned; fixes whole classes of library edge cases |
-| **P3** | Replace `skip_until_brace_end` in high-traffic bodies | Large | Deeper AST; significant work per module |
+| ~~**P3**~~ | ~~Replace `skip_until_brace_end` in high-traffic bodies~~ | In progress (connection/interface/import/alias/enumeration/usecase/constraint use `advance_to_closing_brace`) | Deeper AST; significant work per module |
 
 ## What to avoid
 

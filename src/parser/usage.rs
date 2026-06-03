@@ -3,8 +3,8 @@
 use crate::ast::{Expression, Node, Span};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    name, qualified_name, redefine_operator, starts_with_keyword, subset_operator,
-    typed_by_operator, ws_and_comments,
+    crosses_operator, name, qualified_name, redefine_operator, references_operator,
+    starts_with_keyword, subset_operator, typed_by_operator, ws_and_comments,
 };
 use crate::parser::{span_from_to, Input};
 use nom::bytes::complete::{tag, take_until};
@@ -138,9 +138,29 @@ pub(crate) fn redefinition(input: Input<'_>) -> IResult<Input<'_>, String> {
     .parse(input)
 }
 
+/// Reference subsetting: `::>` / `references` target.
+pub(crate) fn reference_subsetting(input: Input<'_>) -> IResult<Input<'_>, String> {
+    preceded(
+        preceded(ws_and_comments, references_operator),
+        preceded(ws_and_comments, specialization_targets),
+    )
+    .parse(input)
+}
+
+/// Cross subsetting: `=>` / `crosses` target.
+pub(crate) fn cross_subsetting(input: Input<'_>) -> IResult<Input<'_>, String> {
+    preceded(
+        preceded(ws_and_comments, crosses_operator),
+        preceded(ws_and_comments, specialization_targets),
+    )
+    .parse(input)
+}
+
 enum SpecializationClause {
     Subsets((String, Option<Node<Expression>>)),
     Redefines(String),
+    References(String),
+    Crosses(String),
 }
 
 /// Parse zero or more subsetting/redefinition clauses in any order.
@@ -154,17 +174,26 @@ pub(crate) fn specialization_clauses(
         nom::branch::alt((
             nom::combinator::map(subsetting, SpecializationClause::Subsets),
             nom::combinator::map(redefinition, SpecializationClause::Redefines),
+            nom::combinator::map(reference_subsetting, SpecializationClause::References),
+            nom::combinator::map(cross_subsetting, SpecializationClause::Crosses),
         )),
     ))
     .parse(input)?;
     let mut out = SpecializationClauses::default();
+    let had_any = !clauses.is_empty();
     for clause in clauses {
         match clause {
             SpecializationClause::Subsets(value) => out.subsets = Some(value),
             SpecializationClause::Redefines(value) => out.redefines = Some(value),
+            SpecializationClause::References(value) => {
+                out.subsets = Some((value, None));
+            }
+            SpecializationClause::Crosses(value) => {
+                out.subsets = Some((value, None));
+            }
         }
     }
-    out.had_any = out.subsets.is_some() || out.redefines.is_some();
+    out.had_any = had_any;
     Ok((input, out))
 }
 
@@ -322,6 +351,22 @@ mod tests {
         let (rest, header) = usage_header(input).expect("usage header");
         assert_eq!(header.type_name.as_deref(), Some("Engine"));
         assert_eq!(header.subsets.as_deref(), Some("base"));
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
+
+    #[test]
+    fn reference_subsetting_accepts_keyword() {
+        let input = span_input("references portA ;");
+        let (rest, target) = reference_subsetting(input).expect("references");
+        assert_eq!(target, "portA");
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
+
+    #[test]
+    fn cross_subsetting_accepts_symbol() {
+        let input = span_input("=> other ;");
+        let (rest, target) = cross_subsetting(input).expect("crosses");
+        assert_eq!(target, "other");
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 }

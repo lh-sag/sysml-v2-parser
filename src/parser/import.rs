@@ -2,7 +2,8 @@
 
 use crate::ast::{FilterPackageMember, Import, Node, Visibility};
 use crate::parser::expr::expression;
-use crate::parser::lex::{qualified_name, skip_until_brace_end, ws1, ws_and_comments};
+use crate::parser::body::advance_to_closing_brace;
+use crate::parser::lex::{qualified_name, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -21,7 +22,7 @@ pub(crate) fn relationship_body(input: Input<'_>) -> IResult<Input<'_>, ()> {
         map(
             delimited(
                 tag(&b"{"[..]),
-                skip_until_brace_end,
+                advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| (),

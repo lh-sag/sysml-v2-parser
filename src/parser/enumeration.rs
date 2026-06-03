@@ -2,7 +2,8 @@
 
 use crate::ast::{EnumDef, EnumerationBody, Node};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
-use crate::parser::lex::{name, skip_until_brace_end, take_until_terminator, ws1, ws_and_comments};
+use crate::parser::body::advance_to_closing_brace;
+use crate::parser::lex::{name, take_until_terminator, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::requirement::{comment_annotation, doc_comment};
 use crate::parser::Input;
@@ -21,7 +22,7 @@ fn enumerated_value(input: Input<'_>) -> IResult<Input<'_>, String> {
     if input.fragment().starts_with(b"{") {
         let (input, _) = delimited(
             tag(&b"{"[..]),
-            skip_until_brace_end,
+            advance_to_closing_brace,
             preceded(ws_and_comments, tag(&b"}"[..])),
         )
         .parse(input)?;
@@ -66,7 +67,7 @@ fn enumeration_body(input: Input<'_>) -> IResult<Input<'_>, EnumerationBody> {
                 input = next;
             }
             Err(_) => {
-                let (input, _) = skip_until_brace_end(input)?;
+                let (input, _) = advance_to_closing_brace(input)?;
                 let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                 return Ok((input, EnumerationBody::Brace { values }));
             }
