@@ -12,7 +12,8 @@ Release notes and migration hints: [`CHANGELOG.md`](CHANGELOG.md).
 
 - library parser for a broad SysML v2 subset
 - strict and resilient parsing entry points
-- green unit/integration test suite
+- BNF coverage gate: all 640 SysML/KerML textual productions classified as `implemented` (see [`docs/BNF_COVERAGE.md`](docs/BNF_COVERAGE.md))
+- green unit/integration test suite (including `cargo test --test bnf_compliance`)
 - green full validation and std-library gates when run with the SysML v2 release fixtures
 
 ## API
