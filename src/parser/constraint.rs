@@ -1,7 +1,7 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    CalcDef, CalcDefBody, CalcDefBodyElement, ConstraintDef, ConstraintDefBody,
+    CalcDef, CalcDefBody, CalcDefBodyElement, CalcUsage, ConstraintDef, ConstraintDefBody,
     ConstraintDefBodyElement, Expression, Node, ParseErrorNode, ReturnDecl,
 };
 use crate::parser::action::in_out_decl;
@@ -180,6 +180,33 @@ fn safe_constraint_def_body_element(
         }),
     ));
     parser.parse(input)
+}
+
+/// Calculation usage: `calc` Identification (`:` type)? body (SysML §7.19.2).
+pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"calc"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, identification) = identification(input)?;
+    let (input, type_name) = opt(preceded(
+        preceded(ws_and_comments, tag(&b":"[..])),
+        preceded(ws_and_comments, qualified_name),
+    ))
+    .parse(input)?;
+    let (input, body) = calc_def_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            CalcUsage {
+                identification,
+                type_name,
+                body,
+            },
+        ),
+    ))
 }
 
 pub(crate) fn calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {

@@ -3,7 +3,8 @@
 
 use crate::ast::{
     Allocate, AttributeBody, AttributeUsage, Bind, Connect, ConnectBody, ConnectionUsageMember,
-    DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage, InterfaceUsageBodyElement,
+    CalcUsage, DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage,
+    InterfaceUsageBodyElement,
     Node, OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody,
     PartUsageBodyElement, Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody,
     RefDecl,
@@ -12,6 +13,7 @@ use crate::parser::attribute::{attribute_def, attribute_usage, attribute_usage_s
 use crate::parser::body::advance_to_closing_brace;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connection::connection_member_body;
+use crate::parser::constraint::calc_usage;
 use crate::parser::expr::{expression, path_expression};
 use crate::parser::interface::{connect_body, interface_def};
 use crate::parser::item::item_usage;
@@ -208,6 +210,7 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(comment_annotation, PartDefBodyElement::Comment),
             map(annotation, PartDefBodyElement::Annotation),
             map(exhibit_state, PartDefBodyElement::ExhibitState),
+            map(calc_usage, PartDefBodyElement::CalcUsage),
             map(perform_action_decl, PartDefBodyElement::Perform),
             map(perform_usage, PartDefBodyElement::Perform),
             map(allocate_, PartDefBodyElement::Allocate),

@@ -607,47 +607,73 @@ fn missing_semicolon_or_body_diagnostic(
     None
 }
 
+/// Declaration header only (stops at `{` or `;`) so body usages with `:` are not misclassified.
+fn definition_declaration_header(fragment: &[u8]) -> &[u8] {
+    let fragment = trim_ascii_start(fragment);
+    let end = fragment
+        .iter()
+        .position(|&b| b == b'{' || b == b';')
+        .unwrap_or(fragment.len());
+    trim_ascii_end(&fragment[..end])
+}
+
+/// True when a definition header uses `:` for subclassification instead of `:>`.
+fn definition_header_has_invalid_specialization_colon(header: &[u8]) -> bool {
+    let header = trim_ascii_start(header);
+    let prefixes: &[(&[u8], &str)] = &[(b"part def", "part def"), (b"port def", "port def")];
+    for (prefix, _) in prefixes {
+        if !header.starts_with(prefix) {
+            continue;
+        }
+        let mut rest = trim_ascii_start(&header[prefix.len()..]);
+        if rest.starts_with(b"<") {
+            if let Some(close) = rest[1..].iter().position(|&b| b == b'>') {
+                rest = trim_ascii_start(&rest[close + 2..]);
+            } else {
+                return false;
+            }
+        }
+        while !rest.is_empty() && !rest[0].is_ascii_whitespace() && rest[0] != b':' {
+            rest = &rest[1..];
+        }
+        rest = trim_ascii_start(rest);
+        if rest.starts_with(b":>") || rest.starts_with(b":>>") {
+            return false;
+        }
+        if rest.starts_with(b"specializes") {
+            return false;
+        }
+        if rest.first() == Some(&b':') {
+            return true;
+        }
+    }
+    false
+}
+
 fn invalid_typing_operator_diagnostic(
     fragment: &[u8],
 ) -> Option<(&'static str, String, String, String)> {
-    let fragment = trim_ascii_start(fragment);
-    let cases: &[(&[u8], &str, &str)] = &[
+    let header = definition_declaration_header(fragment);
+    if !definition_header_has_invalid_specialization_colon(header) {
+        return None;
+    }
+    let (label, suggestion) = if header.starts_with(b"port def") {
         (
-            b"part def",
-            "part definition specialization",
-            "Use `part def Vehicle :> BaseVehicle;` when specializing a definition.",
-        ),
-        (
-            b"port def",
             "port definition specialization",
             "Use `port def PowerPort :> BasePort;` when specializing a definition.",
-        ),
-    ];
-
-    for (prefix, label, suggestion) in cases {
-        if fragment.starts_with(prefix) && fragment.windows(3).any(|w| w == b": ") {
-            return Some((
-                "invalid_typing_operator",
-                format!("invalid typing operator in {label}: use ':>' instead of ':'"),
-                "':>' specialization operator".to_string(),
-                suggestion.to_string(),
-            ));
-        }
-    }
-
-    if fragment.starts_with(b"part def")
-        && fragment.contains(&b':')
-        && !fragment.windows(2).any(|w| w == b":>")
-    {
-        return Some((
-            "invalid_typing_operator",
-            "invalid typing operator in part definition: use ':>' instead of ':'".to_string(),
-            "':>' specialization operator".to_string(),
-            "Use `part def Vehicle :> BaseVehicle;` when specializing a definition.".to_string(),
-        ));
-    }
-
-    None
+        )
+    } else {
+        (
+            "part definition specialization",
+            "Use `part def Vehicle :> BaseVehicle;` when specializing a definition.",
+        )
+    };
+    Some((
+        "invalid_typing_operator",
+        format!("invalid typing operator in {label}: use ':>' instead of ':'"),
+        "':>' specialization operator".to_string(),
+        suggestion.to_string(),
+    ))
 }
 
 fn missing_expression_after_operator_diagnostic(

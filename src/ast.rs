@@ -377,6 +377,8 @@ pub enum PartDefBodyElement {
     OpaqueMember(Node<OpaqueMemberDecl>),
     /// `exhibit state` name `:` type (`;` or body).
     ExhibitState(Node<ExhibitState>),
+    /// Calculation usage (`calc` keyword) inside a part definition body.
+    CalcUsage(Node<CalcUsage>),
 }
 
 /// Library-tolerant part member preserved without forcing it into an unrelated node shape.
@@ -1611,6 +1613,14 @@ pub struct CalcDef {
     pub body: CalcDefBody,
 }
 
+/// Calculation usage: `calc` Identification (`:` type)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CalcUsage {
+    pub identification: Identification,
+    pub type_name: Option<String>,
+    pub body: CalcDefBody,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CalcDefBody {
     Semicolon,
@@ -2096,6 +2106,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         }
         PartDefBodyElement::ExhibitState(n) => {
             PartDefBodyElement::ExhibitState(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::CalcUsage(n) => {
+            PartDefBodyElement::CalcUsage(dummy_node(n, n.value.clone()))
         }
     };
     dummy_node(el, value)

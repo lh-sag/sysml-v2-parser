@@ -493,6 +493,35 @@ fn fixture_invalid_typing_operator_reports_specific_fix() {
 }
 
 #[test]
+fn fixture_calc_usage_in_part_def_body_parses_without_unexpected_keyword() {
+    let input = fixture("calc-usage-in-part-def.sysml");
+    let (result, _) = package_elements(&input);
+
+    assert!(
+        !result.errors.iter().any(|e| {
+            e.code.as_deref() == Some("unexpected_keyword_in_scope") && e.message.contains("calc")
+        }),
+        "calc usage in part def body should parse: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn fixture_nested_part_def_typed_usages_no_invalid_typing_operator() {
+    let input = fixture("nested-part-def-typed-usages.sysml");
+    let (result, _) = package_elements(&input);
+
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("invalid_typing_operator")),
+        "nested part defs with typed usages should not emit invalid_typing_operator: {:?}",
+        result.errors
+    );
+}
+
+#[test]
 fn fixture_unexpected_keyword_in_requirement_body_reports_scope_specific_error() {
     let input = fixture("unexpected-keyword-in-requirement-body.sysml");
     let (result, elements) = package_elements(&input);
