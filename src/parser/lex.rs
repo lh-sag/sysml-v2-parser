@@ -762,6 +762,7 @@ pub(crate) fn conjugates_operator(input: Input<'_>) -> IResult<Input<'_>, ()> {
 }
 
 /// DECIMAL_VALUE: integer or real literal text (for BNF DECIMAL_VALUE / EXPONENTIAL_VALUE).
+#[allow(dead_code)] // used by BNF lexical conformance tests in `bnf_surface`
 pub(crate) fn decimal_value_text(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = ws_and_comments(input)?;
     let (input, raw) = take_while1(|c: u8| {
@@ -775,6 +776,7 @@ pub(crate) fn decimal_value_text(input: Input<'_>) -> IResult<Input<'_>, String>
 }
 
 /// STRING_VALUE: single-quoted unrestricted name content.
+#[allow(dead_code)] // used by BNF lexical conformance tests in `bnf_surface`
 pub(crate) fn string_value(input: Input<'_>) -> IResult<Input<'_>, String> {
     quoted_name(input)
 }
