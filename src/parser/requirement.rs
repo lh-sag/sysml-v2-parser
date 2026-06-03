@@ -3,7 +3,8 @@
 use crate::ast::{
     CommentAnnotation, ConcernUsage, ConstraintBody, DocComment, FrameMember, Node, ParseErrorNode,
     RequireConstraint, RequireConstraintBody, RequirementDef, RequirementDefBody,
-    RequirementDefBodyElement, RequirementUsage, Satisfy, SubjectDecl, TextualRepresentation,
+    RequirementActorDecl, RequirementDefBodyElement, RequirementUsage, Satisfy, SubjectDecl,
+    TextualRepresentation,
     VerifyRequirementMember,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage};
@@ -202,6 +203,7 @@ fn requirement_def_body_element(
             map(annotation, RequirementDefBodyElement::Annotation),
             map(import_, RequirementDefBodyElement::Import),
             map(subject_decl, RequirementDefBodyElement::SubjectDecl),
+            map(actor_decl, RequirementDefBodyElement::RequirementActorDecl),
             map(
                 |i| attribute_def(i, true),
                 RequirementDefBodyElement::AttributeDef,
@@ -314,12 +316,34 @@ fn frame_member(input: Input<'_>) -> IResult<Input<'_>, Node<FrameMember>> {
 }
 
 pub(crate) fn subject_decl(input: Input<'_>) -> IResult<Input<'_>, Node<SubjectDecl>> {
+    requirement_parameter_decl(input, b"subject", "subject")
+}
+
+pub(crate) fn actor_decl(input: Input<'_>) -> IResult<Input<'_>, Node<RequirementActorDecl>> {
+    let (input, decl) = requirement_parameter_decl(input, b"actor", "actor")?;
+    Ok((
+        input,
+        Node::new(
+            decl.span,
+            RequirementActorDecl {
+                name: decl.value.name,
+                type_name: decl.value.type_name,
+            },
+        ),
+    ))
+}
+
+fn requirement_parameter_decl<'a>(
+    input: Input<'a>,
+    keyword: &'a [u8],
+    default_name: &'a str,
+) -> IResult<Input<'a>, Node<SubjectDecl>> {
     let start = input;
-    let (input, _) = preceded(ws_and_comments, tag(&b"subject"[..])).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(keyword)).parse(input)?;
     let (input, n) = {
         let (after_gap, _) = ws_and_comments(input)?;
         if after_gap.fragment().starts_with(b":") {
-            (after_gap, "subject".to_string())
+            (after_gap, default_name.to_string())
         } else {
             let (input, _) = ws1(input)?;
             let (input, n) = name(input)?;

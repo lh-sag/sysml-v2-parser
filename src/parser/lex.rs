@@ -77,6 +77,7 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"connection",
     b"connect",
     b"doc",
+    b"enum",
     b"exhibit",
     b"individual",
     b"interface",
@@ -123,6 +124,7 @@ pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
     b"requirement",
     b"satisfy",
     b"subject",
+    b"actor",
     b"verify",
 ];
 

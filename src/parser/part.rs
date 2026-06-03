@@ -16,6 +16,7 @@ use crate::parser::connection::connection_member_body;
 use crate::parser::constraint::calc_usage;
 use crate::parser::expr::{expression, path_expression};
 use crate::parser::interface::{connect_body, interface_def};
+use crate::parser::enumeration::enum_usage;
 use crate::parser::item::item_usage;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element,
@@ -91,6 +92,19 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
                 input = next;
             }
             Err(_) if starts_with_any_keyword(input.fragment(), PART_BODY_STARTERS) => {
+                if starts_with_keyword(input.fragment(), b"part") {
+                    if let Ok((next, usage)) = part_usage(input) {
+                        if next.location_offset() > input.location_offset() {
+                            elements.push(node_from_to(
+                                input,
+                                next,
+                                PartDefBodyElement::PartUsage(Box::new(usage)),
+                            ));
+                            input = next;
+                            continue;
+                        }
+                    }
+                }
                 let (next, _) = recover_body_element(input, PART_BODY_STARTERS)?;
                 if next.location_offset() == input.location_offset() {
                     return Err(nom::Err::Error(nom::error::Error::new(
@@ -138,6 +152,8 @@ fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
                         | "unexpected_keyword_in_scope"
                         | "missing_semicolon"
                         | "missing_body_or_semicolon"
+                        | "bare_feature_declaration_in_part_def"
+                        | "invalid_requirement_short_name_syntax"
                 ) {
                     elements.push(node_from_to(
                         start_unknown,
@@ -244,6 +260,7 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
                 attribute_usage_shorthand,
                 PartDefBodyElement::AttributeUsage,
             ),
+            map(enum_usage, PartDefBodyElement::EnumerationUsage),
             map(requirement_usage, PartDefBodyElement::RequirementUsage),
             map(item_usage, PartDefBodyElement::ItemUsage),
             map(opaque_part_member_decl, PartDefBodyElement::OpaqueMember),
@@ -636,9 +653,11 @@ fn anonymous_part_usage<'a>(
     start: Input<'a>,
     input: Input<'a>,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
-    let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
+    let (input, multiplicity_before) = opt(multiplicity).parse(input)?;
     let (input, ordered_before_type) = usage_ordered_modifier(input)?;
     let (input, (type_ref_span, type_name)) = typings(input)?;
+    let (input, multiplicity_after) = opt(multiplicity).parse(input)?;
+    let multiplicity_opt = multiplicity_before.or(multiplicity_after);
     let (input, ordered_after_type) = usage_ordered_modifier(input)?;
     let ordered = ordered_before_type || ordered_after_type;
     let (input, clauses) = specialization_clauses(input)?;
@@ -1204,7 +1223,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
             attribute_usage_shorthand,
             PartUsageBodyElement::AttributeUsage,
         ),
-        map(part_usage, |p| PartUsageBodyElement::PartUsage(Box::new(p))),
+        alt((
+            map(enum_usage, PartUsageBodyElement::EnumerationUsage),
+            map(part_usage, |p| PartUsageBodyElement::PartUsage(Box::new(p))),
+        )),
         map(individual_usage, |n| {
             PartUsageBodyElement::OccurrenceUsage(Box::new(n))
         }),

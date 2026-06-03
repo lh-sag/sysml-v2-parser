@@ -1,11 +1,13 @@
 //! Enumeration definition parsing (BNF EnumerationDefinition).
 
-use crate::ast::{EnumDef, EnumerationBody, Node};
+use crate::ast::{EnumDef, EnumerationBody, EnumerationUsage, Node};
+use crate::parser::attribute::attribute_body;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::body::advance_to_closing_brace;
 use crate::parser::lex::{name, take_until_terminator, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::requirement::{comment_annotation, doc_comment};
+use crate::parser::usage::{feature_usage_header, multiplicity};
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
@@ -94,6 +96,31 @@ pub(crate) fn enum_def(input: Input<'_>) -> IResult<Input<'_>, Node<EnumDef>> {
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 specializes_span: prefix.specializes_span,
+                body,
+            },
+        ),
+    ))
+}
+
+/// Enumeration usage in a definition or usage body: `enum` name multiplicity? (`:` type)? body.
+pub(crate) fn enum_usage(input: Input<'_>) -> IResult<Input<'_>, Node<EnumerationUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) = tag(&b"enum"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, name) = name(input)?;
+    let (input, multiplicity) = opt(multiplicity).parse(input)?;
+    let (input, header) = feature_usage_header(input)?;
+    let (input, body) = attribute_body(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            EnumerationUsage {
+                name,
+                type_name: header.type_name,
+                multiplicity,
                 body,
             },
         ),

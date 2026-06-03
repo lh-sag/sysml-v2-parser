@@ -394,8 +394,8 @@ action def Done { }
         .filter(|e| e.code.as_deref() == Some("missing_semicolon"))
         .count();
     assert_eq!(
-        missing_semicolons, 3,
-        "only the first few cascade diagnostics should remain: {:?}",
+        missing_semicolons, 1,
+        "only the first cascade diagnostic should remain: {:?}",
         result.errors
     );
     let summary = result
@@ -617,4 +617,96 @@ fn invalid_unit_reference_reports_specific_diagnostic() {
         e.value,
         sysml_v2_parser::ast::ActionDefBodyElement::InOutDecl(_)
     )));
+}
+
+#[test]
+fn fixture_requirement_def_id_keyword_reports_short_name_hint() {
+    let input = fixture("requirement-def-id-keyword-dialect.sysml");
+    let result = parse_with_diagnostics(&input);
+    let err = result
+        .errors
+        .iter()
+        .find(|e| {
+            e.code.as_deref() == Some("invalid_requirement_short_name_syntax")
+                || e.code.as_deref() == Some("missing_body_or_semicolon")
+        })
+        .expect("expected requirement header diagnostic");
+    assert!(
+        err.message.contains("short name")
+            || err
+                .suggestion
+                .as_deref()
+                .is_some_and(|s| s.contains('<')),
+        "expected short-name guidance: {:?}",
+        err
+    );
+}
+
+#[test]
+fn fixture_bare_feature_in_part_def_reports_attribute_hint() {
+    let input = fixture("bare-feature-in-part-def.sysml");
+    let result = parse_with_diagnostics(&input);
+    let err = result
+        .errors
+        .iter()
+        .find(|e| e.code.as_deref() == Some("bare_feature_declaration_in_part_def"))
+        .expect("expected part-def feature diagnostic");
+    assert!(
+        err.message.contains("Capacity")
+            || err
+                .suggestion
+                .as_deref()
+                .is_some_and(|s| s.contains("attribute") || s.contains("Capacity")),
+        "expected Capacity-related guidance: {:?}",
+        err
+    );
+}
+
+#[test]
+fn fixture_glued_package_member_parses_without_separator_diagnostic() {
+    let input = fixture("glued-package-member.sysml");
+    let result = parse_with_diagnostics(&input);
+    assert!(
+        result.errors.is_empty(),
+        "glued `}}package` is valid surface syntax; unexpected errors: {:?}",
+        result.errors
+    );
+    let packages: Vec<_> = result
+        .root
+        .elements
+        .iter()
+        .filter_map(|e| match &e.value {
+            RootElement::Package(p) => Some(p.value.identification.name.as_deref()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(packages, vec![Some("A"), Some("B")]);
+}
+
+#[test]
+fn fixture_anonymous_actor_in_requirement_has_no_missing_member_name() {
+    let input = fixture("anonymous-actor-in-requirement.sysml");
+    let result = parse_with_diagnostics(&input);
+    assert!(
+        !result
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("missing_member_name")),
+        "anonymous `actor : Type` is valid; errors: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn fixture_enum_usage_in_part_def_has_no_unexpected_keyword() {
+    let input = fixture("enum-fill-level-in-part-def.sysml");
+    let result = parse_with_diagnostics(&input);
+    assert!(
+        !result.errors.iter().any(|e| {
+            e.code.as_deref() == Some("unexpected_keyword_in_scope")
+                && e.message.contains("enum")
+        }),
+        "enumeration usage in part def is allowed; errors: {:?}",
+        result.errors
+    );
 }

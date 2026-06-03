@@ -374,7 +374,10 @@ fn starts_with_missing_type_after_keyword(
         || lex::starts_with_keyword(fragment, b"do")
 }
 
-fn missing_name_diagnostic(fragment: &[u8]) -> Option<(&'static str, String, String, String)> {
+fn missing_name_diagnostic(
+    fragment: &[u8],
+    scope_label: &str,
+) -> Option<(&'static str, String, String, String)> {
     #[allow(clippy::type_complexity)]
     let cases: &[(&[u8], &[&[u8]], &str, &str)] = &[
         (
@@ -405,7 +408,15 @@ fn missing_name_diagnostic(fragment: &[u8]) -> Option<(&'static str, String, Str
         (b"return", &[], "return name", "Use `return result: Real;`."),
     ];
 
+    let allow_anonymous_requirement_params = scope_label == "requirement body";
     for (keyword, trailing, missing_what, suggestion) in cases {
+        if allow_anonymous_requirement_params
+            && (keyword == b"subject" || keyword == b"actor")
+            && starts_with_missing_name_after_keyword(fragment, keyword, trailing)
+        {
+            // SysML allows unnamed subject/actor parameters: `actor : Battery;`
+            continue;
+        }
         if starts_with_missing_name_after_keyword(fragment, keyword, trailing) {
             return Some((
                 "missing_member_name",
@@ -557,9 +568,131 @@ fn invalid_expose_separator_diagnostic(
     ))
 }
 
+fn invalid_requirement_short_name_syntax_diagnostic(
+    fragment: &[u8],
+) -> Option<(&'static str, String, String, String)> {
+    let fragment = trim_ascii_start(fragment);
+    if fragment.starts_with(b"requirement def") {
+        let mut rest = trim_ascii_start(&fragment[b"requirement def".len()..]);
+        if rest.starts_with(b"id") {
+            rest = trim_ascii_start(&rest[2..]);
+            if rest.first() == Some(&b'\'') || rest.first() == Some(&b'"') {
+                let quote = rest[0];
+                if let Some(close) = rest[1..].iter().position(|&b| b == quote) {
+                    let req_id = String::from_utf8_lossy(&rest[1..1 + close]);
+                    return Some((
+                        "invalid_requirement_short_name_syntax",
+                        format!(
+                            "requirement definition uses non-standard `id '{req_id}'` syntax; use a short name in angle brackets"
+                        ),
+                        "short name in angle brackets after `requirement def`".to_string(),
+                        format!(
+                            "Use `requirement def <'{req_id}'> ...` instead of `requirement def id '{req_id}' ...`."
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+
+    // Header already consumed `id` as a name; recovery starts at the quoted requirement ID.
+    if fragment.first() == Some(&b'\'') || fragment.first() == Some(&b'"') {
+        let quote = fragment[0];
+        if let Some(close) = fragment[1..].iter().position(|&b| b == quote) {
+            let req_id = String::from_utf8_lossy(&fragment[1..1 + close]);
+            return Some((
+                "invalid_requirement_short_name_syntax",
+                format!(
+                    "requirement ID `'{req_id}'` should use short-name syntax in angle brackets, not a separate `id` keyword"
+                ),
+                "short name in angle brackets after `requirement def`".to_string(),
+                format!("Use `requirement def <'{req_id}'> ...` instead of `requirement def id '{req_id}' ...`."),
+            ));
+        }
+    }
+    None
+}
+
+fn bare_feature_declaration_in_part_def_diagnostic(
+    fragment: &[u8],
+) -> Option<(&'static str, String, String, String)> {
+    let fragment = trim_ascii_start(fragment);
+    let feature_keywords: &[&[u8]] = &[
+        b"attribute",
+        b"part",
+        b"port",
+        b"item",
+        b"ref",
+        b"bind",
+        b"connection",
+        b"interface",
+        b"action",
+        b"state",
+        b"import",
+        b"doc",
+        b"comment",
+        b"constraint",
+        b"calc",
+        b"perform",
+        b"enum",
+    ];
+    if lex::starts_with_any_keyword(fragment, feature_keywords) {
+        return None;
+    }
+    let ident_end = fragment
+        .iter()
+        .position(|b| !b.is_ascii_alphanumeric() && *b != b'_')
+        .unwrap_or(fragment.len());
+    if ident_end == 0 || !fragment[0].is_ascii_alphabetic() {
+        return None;
+    }
+    let ident = String::from_utf8_lossy(&fragment[..ident_end]);
+    let rest = trim_ascii_start(&fragment[ident_end..]);
+    if !rest.starts_with(b":") {
+        return None;
+    }
+    if fragment.windows(3).any(|w| w == b":>>" || w == b":> " || w == b"::>")
+        || fragment.windows(8).any(|w| w == b" connect")
+        || fragment.windows(4).any(|w| w == b" to ")
+    {
+        return None;
+    }
+    let rest = trim_ascii_start(&rest[1..]);
+    let type_end = rest
+        .iter()
+        .position(|b| matches!(*b, b';' | b'{' | b'}' | b'\n' | b'\r' | b'['))
+        .unwrap_or(rest.len());
+    if type_end == 0 {
+        return None;
+    }
+    let type_name = String::from_utf8_lossy(&rest[..type_end]).trim().to_string();
+    let sample_ident = ident.to_lowercase();
+    Some((
+        "bare_feature_declaration_in_part_def",
+        format!("bare feature `{ident} : {type_name}` is not valid in a part definition body"),
+        "feature kind keyword such as `attribute`, `part`, or `port`".to_string(),
+        format!("Use `attribute {sample_ident} : {type_name};` (or `item` / `port` as appropriate)."),
+    ))
+}
+
+fn starts_declaration_header(fragment: &[u8], prefix: &[u8]) -> bool {
+    if !fragment.starts_with(prefix) {
+        return false;
+    }
+    let rest = &fragment[prefix.len()..];
+    rest.is_empty()
+        || rest[0].is_ascii_whitespace()
+        || rest[0] == b'<'
+        || rest[0] == b';'
+        || rest[0] == b'{'
+}
+
 fn missing_semicolon_or_body_diagnostic(
     fragment: &[u8],
 ) -> Option<(&'static str, String, String, String)> {
+    if let Some(diag) = invalid_requirement_short_name_syntax_diagnostic(fragment) {
+        return Some(diag);
+    }
     let fragment = trim_ascii_start(fragment);
     let cases: &[(&[u8], &str, &str)] = &[
         (
@@ -595,7 +728,7 @@ fn missing_semicolon_or_body_diagnostic(
     ];
 
     for (prefix, label, suggestion) in cases {
-        if fragment.starts_with(prefix) {
+        if starts_declaration_header(fragment, prefix) {
             return Some((
                 "missing_body_or_semicolon",
                 format!("expected ';' or '{{' after {label} header"),
@@ -913,6 +1046,39 @@ fn missing_closing_brace_error_at_eof(bytes: &[u8]) -> ParseError {
         .with_category(DiagnosticCategory::ParseError)
 }
 
+fn extra_closing_brace_at_eof(bytes: &[u8]) -> Option<ParseError> {
+    let opens = bytes.iter().filter(|&&b| b == b'{').count();
+    let closes = bytes.iter().filter(|&&b| b == b'}').count();
+    if closes <= opens {
+        return None;
+    }
+    let mut last_brace: Option<(usize, u32, usize)> = None;
+    let mut line = 1u32;
+    let mut column = 1usize;
+    for (offset, &b) in bytes.iter().enumerate() {
+        if b == b'}' {
+            last_brace = Some((offset, line, column));
+        }
+        if b == b'\n' {
+            line += 1;
+            column = 1;
+        } else {
+            column += 1;
+        }
+    }
+    let (offset, line, column) = last_brace?;
+    Some(
+        ParseError::new("unexpected closing '}' at end of file")
+            .with_location(offset, line, column)
+            .with_length(1)
+            .with_code("unexpected_closing_brace")
+            .with_expected("end of file or valid declaration")
+            .with_found("}")
+            .with_suggestion("Remove this extra '}' or add the missing opening '{' earlier in the file.")
+            .with_category(DiagnosticCategory::ParseError),
+    )
+}
+
 fn category_from_code(code: &str) -> DiagnosticCategory {
     if code == "unsupported_annotation_syntax" {
         DiagnosticCategory::UnsupportedGrammarForm
@@ -977,6 +1143,12 @@ enum RecoveryClassification {
         expected: String,
         suggestion: String,
     },
+    BareFeatureDeclarationInPartDef {
+        code: String,
+        message: String,
+        expected: String,
+        suggestion: String,
+    },
     MissingExpressionAfterOperator {
         code: String,
         message: String,
@@ -1031,7 +1203,8 @@ fn classify_recovery(
 ) -> RecoveryClassification {
     let trimmed = trim_ascii_start(input.fragment());
 
-    if let Some((code, message, expected, suggestion)) = missing_name_diagnostic(trimmed) {
+    if let Some((code, message, expected, suggestion)) = missing_name_diagnostic(trimmed, scope_label)
+    {
         return RecoveryClassification::MissingMemberName {
             code: code.to_string(),
             message,
@@ -1089,6 +1262,19 @@ fn classify_recovery(
             expected,
             suggestion,
         };
+    }
+
+    if scope_label.contains("part definition body") {
+        if let Some((code, message, expected, suggestion)) =
+            bare_feature_declaration_in_part_def_diagnostic(trimmed)
+        {
+            return RecoveryClassification::BareFeatureDeclarationInPartDef {
+                code: code.to_string(),
+                message,
+                expected,
+                suggestion,
+            };
+        }
     }
 
     if let Some((code, message, expected, suggestion)) =
@@ -1203,6 +1389,12 @@ pub(crate) fn build_recovery_error_node_from_span(
             expected,
             suggestion,
         }
+        | RecoveryClassification::BareFeatureDeclarationInPartDef {
+            code,
+            message,
+            expected,
+            suggestion,
+        }
         | RecoveryClassification::MissingExpressionAfterOperator {
             code,
             message,
@@ -1306,6 +1498,8 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
         | Some("missing_expression_after_operator")
         | Some("invalid_unit_reference")
         | Some("missing_body_or_semicolon")
+        | Some("invalid_requirement_short_name_syntax")
+        | Some("bare_feature_declaration_in_part_def")
         | Some("missing_semicolon")
         | Some("unexpected_closing_brace")
         | Some("missing_closing_brace")
@@ -1319,6 +1513,37 @@ fn diagnostic_specificity(err: &ParseError) -> u8 {
         Some("expected_end_of_input") | Some("expected_keyword") => 1,
         _ => 3,
     }
+}
+
+/// Drop `unexpected_closing_brace` on a line that already has a parse error for an
+/// invalid statement block (e.g. `badstmt {} }` — the second `}` closes the package).
+fn suppress_redundant_closing_brace_errors(errors: Vec<ParseError>) -> Vec<ParseError> {
+    let lines_with_block_error: std::collections::HashSet<u32> = errors
+        .iter()
+        .filter(|e| e.code.as_deref() != Some("unexpected_closing_brace"))
+        .filter_map(|e| e.line)
+        .filter(|line| {
+            errors.iter().any(|other| {
+                other.line == Some(*line)
+                    && other
+                        .found
+                        .as_deref()
+                        .is_some_and(|f| f.contains('{') && f.contains('}'))
+            })
+        })
+        .collect();
+
+    errors
+        .into_iter()
+        .filter(|e| {
+            if e.code.as_deref() != Some("unexpected_closing_brace") {
+                return true;
+            }
+            e.line
+                .map(|line| !lines_with_block_error.contains(&line))
+                .unwrap_or(true)
+        })
+        .collect()
 }
 
 fn dedup_errors(mut errors: Vec<ParseError>) -> Vec<ParseError> {
@@ -1354,30 +1579,29 @@ fn dedup_errors(mut errors: Vec<ParseError>) -> Vec<ParseError> {
 }
 
 fn is_cascade_candidate(err: &ParseError) -> bool {
-    matches!(err.code.as_deref(), Some("missing_semicolon"))
-        || err
-            .code
-            .as_deref()
-            .is_some_and(|code| code.starts_with("recovered_"))
-}
-
-fn cascade_family(err: &ParseError) -> Option<&str> {
-    if matches!(err.code.as_deref(), Some("missing_semicolon")) {
-        Some("missing_semicolon")
-    } else if err
+    matches!(
+        err.code.as_deref(),
+        Some("missing_semicolon") | Some("missing_body_or_semicolon")
+    ) || err
         .code
         .as_deref()
         .is_some_and(|code| code.starts_with("recovered_"))
-    {
-        Some("recovered")
-    } else {
-        None
+}
+
+fn cascade_family(err: &ParseError) -> Option<&str> {
+    match err.code.as_deref() {
+        Some("missing_semicolon") => Some("missing_semicolon"),
+        Some("missing_body_or_semicolon") => Some("missing_body_or_semicolon"),
+        Some(code) if code.starts_with("recovered_") => Some("recovered"),
+        _ => None,
     }
 }
 
+const MAX_CASCADE_LINE_DISTANCE: u32 = 50;
+
 fn make_cascade_summary(run: &[ParseError]) -> Option<ParseError> {
     let summary_anchor = run.first()?;
-    let suppressed = run.len().saturating_sub(3);
+    let suppressed = run.len().saturating_sub(1);
     let family = cascade_family(summary_anchor).unwrap_or("recovery");
     let mut err = ParseError::new(format!(
         "suppressed {suppressed} cascading {family} diagnostic{} after earlier recovery errors",
@@ -1403,16 +1627,27 @@ fn make_cascade_summary(run: &[ParseError]) -> Option<ParseError> {
 }
 
 fn suppress_diagnostic_cascades(errors: Vec<ParseError>) -> Vec<ParseError> {
-    const MAX_UNSUMMARIZED_CASCADE: usize = 3;
+    const MAX_UNSUMMARIZED_CASCADE: usize = 1;
 
     let mut output = Vec::new();
     let mut run: Vec<ParseError> = Vec::new();
 
     let flush_run = |run: &mut Vec<ParseError>, output: &mut Vec<ParseError>| {
+        if run.is_empty() {
+            return;
+        }
         if run.len() <= MAX_UNSUMMARIZED_CASCADE {
             output.append(run);
         } else {
-            output.extend(run.drain(..MAX_UNSUMMARIZED_CASCADE));
+            let primary_offset = run.first().and_then(|e| e.offset);
+            if let Some(mut primary) = run.first().cloned() {
+                primary.is_cascade = Some(false);
+                output.push(primary);
+            }
+            for suppressed in run.iter().skip(MAX_UNSUMMARIZED_CASCADE) {
+                let _ = primary_offset;
+                let _ = suppressed;
+            }
             if let Some(summary) = make_cascade_summary(run) {
                 output.push(summary);
             }
@@ -1424,7 +1659,10 @@ fn suppress_diagnostic_cascades(errors: Vec<ParseError>) -> Vec<ParseError> {
         let continues_run = run.last().is_some_and(|previous| {
             is_cascade_candidate(&err)
                 && cascade_family(previous) == cascade_family(&err)
-                && previous.line.zip(err.line).is_some_and(|(a, b)| b <= a + 1)
+                && previous
+                    .line
+                    .zip(err.line)
+                    .is_some_and(|(a, b)| b <= a.saturating_add(MAX_CASCADE_LINE_DISTANCE))
         });
 
         if is_cascade_candidate(&err) && (run.is_empty() || continues_run) {
@@ -1699,6 +1937,126 @@ fn collect_package_body_errors(body: &PackageBody, errors: &mut Vec<ParseError>)
     }
 }
 
+fn collect_implicit_attribute_in_part_def_warnings(bytes: &[u8]) -> Vec<ParseError> {
+    let text = String::from_utf8_lossy(bytes);
+    let mut errors = Vec::new();
+    let mut in_part_def_body = false;
+    let mut brace_depth = 0i32;
+    let mut offset = 0usize;
+    for (line_idx, line) in text.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("part def") {
+            in_part_def_body = false;
+            brace_depth = 0;
+        }
+        if trimmed.contains('{') {
+            if in_part_def_body || trimmed.starts_with("part def") {
+                in_part_def_body = true;
+            }
+            brace_depth += trimmed.chars().filter(|&c| c == '{').count() as i32;
+        }
+        if trimmed.contains('}') {
+            brace_depth -= trimmed.chars().filter(|&c| c == '}').count() as i32;
+            if brace_depth <= 0 {
+                in_part_def_body = false;
+            }
+        }
+        if in_part_def_body && brace_depth > 0 {
+            let skip = trimmed.starts_with("attribute")
+                || trimmed.starts_with("part ")
+                || trimmed.starts_with("port ")
+                || trimmed.starts_with("interface")
+                || trimmed.starts_with("connect")
+                || trimmed.contains(":>")
+                || trimmed.contains("::>")
+                || trimmed.is_empty()
+                || trimmed.starts_with("//")
+                || trimmed.starts_with("/*")
+                || trimmed.starts_with("doc ");
+            if !skip {
+                if let Some((code, message, expected, suggestion)) =
+                    bare_feature_declaration_in_part_def_diagnostic(trimmed.as_bytes())
+                {
+                    let line_no = (line_idx + 1) as u32;
+                    let column = line.find(trimmed).unwrap_or(0) + 1;
+                    let line_offset = offset + line.find(trimmed).unwrap_or(0);
+                    errors.push(
+                        ParseError::new(message)
+                            .with_location(line_offset, line_no, column)
+                            .with_length(trimmed.len().max(1))
+                            .with_code(code)
+                            .with_expected(expected)
+                            .with_suggestion(suggestion)
+                            .with_severity(DiagnosticSeverity::Warning)
+                            .with_category(DiagnosticCategory::ParseError),
+                    );
+                }
+            }
+        }
+        offset += line.len() + 1;
+    }
+    errors
+}
+
+fn collect_requirement_id_dialect_diagnostics(bytes: &[u8]) -> Vec<ParseError> {
+    let pattern = b"requirement def id ";
+    let mut errors = Vec::new();
+    let mut search_from = 0usize;
+    while search_from < bytes.len() {
+        let Some(rel) = bytes[search_from..]
+            .windows(pattern.len())
+            .position(|window| window == pattern)
+        else {
+            break;
+        };
+        let offset = search_from + rel;
+        let after = trim_ascii_start(&bytes[offset + pattern.len()..]);
+        if after.first() != Some(&b'\'') && after.first() != Some(&b'"') {
+            search_from = offset + 1;
+            continue;
+        }
+        let quote = after[0];
+        let Some(close) = after[1..].iter().position(|&b| b == quote) else {
+            search_from = offset + 1;
+            continue;
+        };
+        let req_id = String::from_utf8_lossy(&after[1..1 + close]);
+        let (line, column) = offset_to_line_column(bytes, offset);
+        errors.push(
+            ParseError::new(format!(
+                "requirement definition uses non-standard `id '{req_id}'` syntax; use a short name in angle brackets"
+            ))
+            .with_location(offset, line, column)
+            .with_length(pattern.len().max(1))
+            .with_code("invalid_requirement_short_name_syntax")
+            .with_expected("short name in angle brackets after `requirement def`".to_string())
+            .with_suggestion(format!(
+                "Use `requirement def <'{req_id}'> ...` instead of `requirement def id '{req_id}' ...`."
+            ))
+            .with_category(DiagnosticCategory::ParseError),
+        );
+        search_from = offset + pattern.len();
+    }
+    errors
+}
+
+fn offset_to_line_column(bytes: &[u8], offset: usize) -> (u32, usize) {
+    let mut line = 1u32;
+    let mut column = 1usize;
+    for (idx, &b) in bytes.iter().enumerate() {
+        if idx >= offset {
+            break;
+        }
+        if b == b'\n' {
+            line += 1;
+            column = 1;
+        } else {
+            column += 1;
+        }
+    }
+    (line, column)
+}
+
 fn collect_recovery_errors(root: &RootNamespace) -> Vec<ParseError> {
     let mut errors = Vec::new();
     for element in &root.elements {
@@ -1898,12 +2256,18 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
     let (input, _) = lex::ws_and_comments(input).unwrap_or((input, ()));
 
     if input.fragment().is_empty()
-        && has_unclosed_brace(bytes)
-        && !errors
-            .iter()
-            .any(|e| e.code.as_deref() == Some("missing_closing_brace"))
+        && !errors.iter().any(|e| {
+            matches!(
+                e.code.as_deref(),
+                Some("missing_closing_brace") | Some("unexpected_closing_brace")
+            )
+        })
     {
-        errors.push(missing_closing_brace_error_at_eof(bytes));
+        if let Some(err) = extra_closing_brace_at_eof(bytes) {
+            errors.push(err);
+        } else if has_unclosed_brace(bytes) {
+            errors.push(missing_closing_brace_error_at_eof(bytes));
+        }
     }
 
     if !input.fragment().is_empty()
@@ -1935,6 +2299,9 @@ pub fn parse_with_diagnostics(input: &str) -> ParseResult {
     errors.extend(collect_recovery_errors(&RootNamespace {
         elements: elements.clone(),
     }));
+    errors.extend(collect_implicit_attribute_in_part_def_warnings(bytes));
+    errors.extend(collect_requirement_id_dialect_diagnostics(bytes));
+    errors = suppress_redundant_closing_brace_errors(errors);
     errors = dedup_errors(errors);
     errors = suppress_diagnostic_cascades(errors);
 

@@ -523,10 +523,33 @@ fn package_body_brace(input: Input<'_>) -> IResult<Input<'_>, PackageBody> {
                 input = next;
             }
             Err(_) => {
-                return Err(nom::Err::Failure(nom::error::Error::new(
+                if let Ok((next, element)) = package_body_element_fallback(input) {
+                    if next.location_offset() > input.location_offset() {
+                        elements.push(element);
+                        input = next;
+                        continue;
+                    }
+                }
+                let (next, _) = recover_body_element(input, PACKAGE_BODY_STARTERS)?;
+                if next.location_offset() == input.location_offset() {
+                    return Err(nom::Err::Failure(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Many0,
+                    )));
+                }
+                let recovery = build_recovery_error_node_from_span(
                     input,
-                    nom::error::ErrorKind::Tag,
-                )));
+                    next,
+                    PACKAGE_BODY_STARTERS,
+                    "package body",
+                    "recovered_package_body_element",
+                );
+                elements.push(node_from_to(
+                    input,
+                    next,
+                    PackageBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
+                ));
+                input = next;
             }
         }
     }

@@ -151,22 +151,18 @@ fn test_surveillance_drone_error_reports_error_on_line_333() {
         .unwrap_or_else(|e| panic!("read fixture {}: {}", path.display(), e));
     let input = input.replace("\r\n", "\n").replace('\r', "\n");
 
-    let err = match parse(&input) {
-        Ok(_) => panic!(
-            "SurveillanceDrone-error.sysml should not parse successfully (invalid 'test {{}}' on line 333)"
-        ),
-        Err(e) => e,
-    };
-
-    // Require that we get an error on line 333 (the invalid "test {}" statement).
-    assert_eq!(
-        err.line,
-        Some(333),
-        "expected parse error on line 333 (invalid 'test {{}}' statement); got line {:?}, message: {}, found: {:?}",
-        err.line,
-        err.message,
-        err.found
+    let result = parse_with_diagnostics(&input);
+    assert!(
+        !result.is_ok(),
+        "SurveillanceDrone-error.sysml should not parse successfully (invalid 'test {{}}' on line 333)"
     );
+
+    let err = result
+        .errors
+        .iter()
+        .find(|e| e.line == Some(333))
+        .expect("expected a diagnostic on line 333 (invalid 'test {{}}' statement)");
+
     assert!(
         err.found.as_deref().is_some_and(|f| f.contains("test")),
         "error at line 333 should have 'found' containing 'test', got: {:?}",
@@ -253,11 +249,20 @@ fn test_surveillance_drone_errors_reports_all_errors() {
             .collect::<Vec<_>>()
     );
 
-    // First valid package should be in partial AST
+    // All four packages are recovered as separate root elements (invalid members are skipped).
     assert_eq!(
         result.root.elements.len(),
-        1,
-        "partial AST should contain first valid package"
+        4,
+        "partial AST should contain all four packages"
+    );
+    let first = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected first root element to be a Package, got {:?}", other),
+    };
+    assert_eq!(
+        first.identification.name.as_deref(),
+        Some("SurveillanceDroneFirst"),
+        "first package should be SurveillanceDroneFirst"
     );
 
     // Each error should have correct line and found snippet (lines from parser output)

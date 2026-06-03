@@ -43,6 +43,8 @@ pub struct ParseError {
     pub suggestion: Option<String>,
     /// High-level diagnostic category used by clients to classify failures.
     pub category: Option<DiagnosticCategory>,
+    /// When true, this diagnostic is likely a consequence of an earlier error in the same body.
+    pub is_cascade: Option<bool>,
 }
 
 impl ParseError {
@@ -59,6 +61,7 @@ impl ParseError {
             found: None,
             suggestion: None,
             category: None,
+            is_cascade: None,
         }
     }
 
@@ -107,6 +110,11 @@ impl ParseError {
 
     pub fn with_category(mut self, category: DiagnosticCategory) -> Self {
         self.category = Some(category);
+        self
+    }
+
+    pub fn with_is_cascade(mut self, is_cascade: bool) -> Self {
+        self.is_cascade = Some(is_cascade);
         self
     }
 

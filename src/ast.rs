@@ -379,6 +379,8 @@ pub enum PartDefBodyElement {
     ExhibitState(Node<ExhibitState>),
     /// Calculation usage (`calc` keyword) inside a part definition body.
     CalcUsage(Node<CalcUsage>),
+    /// Enumeration usage (`enum` keyword) inside a part definition body.
+    EnumerationUsage(Node<EnumerationUsage>),
 }
 
 /// Library-tolerant part member preserved without forcing it into an unrelated node shape.
@@ -516,6 +518,7 @@ pub enum PartUsageBodyElement {
     Doc(Node<DocComment>),
     Annotation(Node<Annotation>),
     AttributeUsage(Node<AttributeUsage>),
+    EnumerationUsage(Node<EnumerationUsage>),
     PartUsage(Box<Node<PartUsage>>),
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
     PortUsage(Node<PortUsage>),
@@ -1192,6 +1195,7 @@ pub enum RequirementDefBodyElement {
     Annotation(Node<Annotation>),
     Import(Node<Import>),
     SubjectDecl(Node<SubjectDecl>),
+    RequirementActorDecl(Node<RequirementActorDecl>),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
     VerifyRequirement(Node<VerifyRequirementMember>),
@@ -1203,6 +1207,13 @@ pub enum RequirementDefBodyElement {
 /// Subject declaration: `subject` name `:` type `;`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubjectDecl {
+    pub name: String,
+    pub type_name: String,
+}
+
+/// Actor parameter in a requirement body: `actor` name? `:` type `;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequirementActorDecl {
     pub name: String,
     pub type_name: String,
 }
@@ -1254,6 +1265,15 @@ pub struct RequirementUsage {
 /// Item usage inside a part definition body: `item` name multiplicity? (`:` type)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub multiplicity: Option<String>,
+    pub body: AttributeBody,
+}
+
+/// Enumeration usage inside a definition body: `enum` name (`:` type)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnumerationUsage {
     pub name: String,
     pub type_name: Option<String>,
     pub multiplicity: Option<String>,
@@ -2110,8 +2130,20 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::CalcUsage(n) => {
             PartDefBodyElement::CalcUsage(dummy_node(n, n.value.clone()))
         }
+        PartDefBodyElement::EnumerationUsage(n) => {
+            PartDefBodyElement::EnumerationUsage(dummy_node(n, normalize_enumeration_usage(&n.value)))
+        }
     };
     dummy_node(el, value)
+}
+
+fn normalize_enumeration_usage(u: &EnumerationUsage) -> EnumerationUsage {
+    EnumerationUsage {
+        name: u.name.clone(),
+        type_name: u.type_name.clone(),
+        multiplicity: u.multiplicity.clone(),
+        body: u.body.clone(),
+    }
 }
 
 fn normalize_attribute_usage(a: &AttributeUsage) -> AttributeUsage {
@@ -2245,6 +2277,9 @@ fn normalize_part_usage_body_element_node(
         }
         PartUsageBodyElement::AttributeUsage(n) => {
             PartUsageBodyElement::AttributeUsage(dummy_node(n, normalize_attribute_usage(&n.value)))
+        }
+        PartUsageBodyElement::EnumerationUsage(n) => {
+            PartUsageBodyElement::EnumerationUsage(dummy_node(n, normalize_enumeration_usage(&n.value)))
         }
         PartUsageBodyElement::PartUsage(n) => {
             PartUsageBodyElement::PartUsage(Box::new(dummy_node(n, normalize_part_usage(&n.value))))
