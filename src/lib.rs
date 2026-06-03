@@ -18,7 +18,7 @@ pub use ast::{
     ConnectionDefBody, ConnectionDefBodyElement, DocComment, EndDecl, Expression, FilterMember,
     FilterPackageMember, FirstMergeBody, FirstStmt, Flow, FlowDef, FlowUsage, Identification,
     Import, InOut, InOutDecl, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
-    InterfaceUsage, InterfaceUsageBodyElement, MergeStmt, NamespaceDecl, Node,
+    InterfaceUsage, InterfaceUsageBodyElement, ItemUsage, MergeStmt, NamespaceDecl, Node,
     OccurrenceBodyElement, OccurrenceUsage, OccurrenceUsageBody, Package, PackageBody,
     PackageBodyElement, ParseErrorNode, PartDef, PartDefBody, PartDefBodyElement, PartUsage,
     PartUsageBody, PartUsageBodyElement, Perform, PerformBody, PerformBodyElement,

@@ -362,6 +362,7 @@ pub enum PartDefBodyElement {
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
     RequirementUsage(Node<RequirementUsage>),
+    ItemUsage(Node<ItemUsage>),
     Ref(Node<RefDecl>),
     PortUsage(Node<PortUsage>),
     PartUsage(Box<Node<PartUsage>>),
@@ -1248,6 +1249,15 @@ pub struct RequirementUsage {
     pub body: RequirementDefBody,
 }
 
+/// Item usage inside a part definition body: `item` name multiplicity? (`:` type)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ItemUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub multiplicity: Option<String>,
+    pub body: AttributeBody,
+}
+
 /// Dependency: `dependency` (Identification `from`)? client(s) `to` supplier(s) RelationshipBody.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Dependency {
@@ -2047,6 +2057,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         }
         PartDefBodyElement::RequirementUsage(n) => {
             PartDefBodyElement::RequirementUsage(dummy_node(n, n.value.clone()))
+        }
+        PartDefBodyElement::ItemUsage(n) => {
+            PartDefBodyElement::ItemUsage(dummy_node(n, n.value.clone()))
         }
         PartDefBodyElement::Ref(n) => {
             PartDefBodyElement::Ref(dummy_node(n, normalize_ref_decl(&n.value)))

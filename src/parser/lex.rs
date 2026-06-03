@@ -79,6 +79,7 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"exhibit",
     b"individual",
     b"interface",
+    b"item",
     b"occurrence",
     b"part",
     b"perform",

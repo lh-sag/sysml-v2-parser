@@ -14,6 +14,7 @@ use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connection::connection_member_body;
 use crate::parser::expr::{expression, path_expression};
 use crate::parser::interface::{connect_body, interface_def};
+use crate::parser::item::item_usage;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element,
     starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
@@ -241,6 +242,7 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
                 PartDefBodyElement::AttributeUsage,
             ),
             map(requirement_usage, PartDefBodyElement::RequirementUsage),
+            map(item_usage, PartDefBodyElement::ItemUsage),
             map(opaque_part_member_decl, PartDefBodyElement::OpaqueMember),
         )),
     ))
@@ -484,7 +486,7 @@ pub(crate) fn part_def_or_usage(input: Input<'_>) -> IResult<Input<'_>, PartDefO
     Ok((input, PartDefOrUsage::Usage(usage)))
 }
 
-/// Value part for usages: `= expr` | `:= expr` | `default = expr` | `default := expr`.
+/// Value part for usages: `= expr` | `:= expr` | `default = expr` | `default := expr` | `default expr`.
 fn usage_value_part(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Expression>> {
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = alt((
@@ -492,11 +494,20 @@ fn usage_value_part(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Exp
         preceded(tag(&b":="[..]), ws_and_comments),
         preceded(
             preceded(tag(&b"default"[..]), ws1),
-            preceded(alt((tag(&b"="[..]), tag(&b":="[..]))), ws_and_comments),
+            alt((
+                preceded(alt((tag(&b"="[..]), tag(&b":="[..]))), ws_and_comments),
+                ws_and_comments,
+            )),
         ),
     ))
     .parse(input)?;
     expression(input)
+}
+
+fn usage_ordered_modifier(input: Input<'_>) -> IResult<Input<'_>, bool> {
+    let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
+    let (input, _) = opt(preceded(ws_and_comments, tag(&b"nonunique"[..]))).parse(input)?;
+    Ok((input, ordered.is_some()))
 }
 
 /// Part usage redefines-only: ':>>' qualified_name multiplicity? ordered? value? body (no name/type).
@@ -508,7 +519,7 @@ fn part_usage_redefines_only<'a>(
     let (input, _) = ws_and_comments(input)?;
     let (input, redefines_qname) = qualified_name.parse(input)?;
     let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
-    let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
+    let (input, ordered) = usage_ordered_modifier(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
     Ok((
@@ -521,7 +532,7 @@ fn part_usage_redefines_only<'a>(
                 name: String::new(),
                 type_name: String::new(),
                 multiplicity: multiplicity_opt,
-                ordered: ordered.is_some(),
+                ordered,
                 subsets: None,
                 redefines: Some(redefines_qname),
                 value,
@@ -539,14 +550,15 @@ fn part_usage_named<'a>(start: Input<'a>, input: Input<'a>) -> IResult<Input<'a>
     let (input, _) = ws_and_comments(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
     let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
+    let (input, ordered_before_type) = usage_ordered_modifier(input)?;
     let (input, type_result) = optional_typings(input)?;
     let (type_ref_span, type_name) = type_result
         .map(|(s, t)| (Some(s), t))
         .unwrap_or((None, String::new()));
     let (input, trailing_multiplicity_opt) = opt(multiplicity).parse(input)?;
     let multiplicity_opt = multiplicity_opt.or(trailing_multiplicity_opt);
-    let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
-    let (input, _) = opt(preceded(ws_and_comments, tag(&b"nonunique"[..]))).parse(input)?;
+    let (input, ordered_after_type) = usage_ordered_modifier(input)?;
+    let ordered = ordered_before_type || ordered_after_type;
     let (input, leading_clauses) = specialization_clauses(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
@@ -575,7 +587,7 @@ fn part_usage_named<'a>(start: Input<'a>, input: Input<'a>) -> IResult<Input<'a>
                 name: name_str,
                 type_name,
                 multiplicity: multiplicity_opt,
-                ordered: ordered.is_some(),
+                ordered,
                 subsets,
                 redefines,
                 value,
@@ -621,9 +633,11 @@ fn anonymous_part_usage<'a>(
     start: Input<'a>,
     input: Input<'a>,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
-    let (input, (type_ref_span, type_name)) = typings(input)?;
     let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
-    let (input, ordered) = opt(preceded(ws_and_comments, tag(&b"ordered"[..]))).parse(input)?;
+    let (input, ordered_before_type) = usage_ordered_modifier(input)?;
+    let (input, (type_ref_span, type_name)) = typings(input)?;
+    let (input, ordered_after_type) = usage_ordered_modifier(input)?;
+    let ordered = ordered_before_type || ordered_after_type;
     let (input, clauses) = specialization_clauses(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
@@ -637,7 +651,7 @@ fn anonymous_part_usage<'a>(
                 name: String::new(),
                 type_name,
                 multiplicity: multiplicity_opt,
-                ordered: ordered.is_some(),
+                ordered,
                 subsets: clauses.subsets,
                 redefines: clauses.redefines,
                 value,

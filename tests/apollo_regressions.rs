@@ -825,3 +825,71 @@ fn part_def_attribute_redefinition_usage_keeps_redefines_and_value() {
         "dryMass should keep assigned value"
     );
 }
+
+#[test]
+fn part_usage_ordered_before_colon_parses_without_recovery() {
+    let input = "package P {\npart def RocketStage {\npart engines[1..*] ordered : RocketEngine;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+    let elements = package_elements(input);
+    let stage = match &elements[0].value {
+        PackageBodyElement::PartDef(def) => &def.value,
+        _ => panic!("expected part def"),
+    };
+    let PartDefBody::Brace { elements } = &stage.body else {
+        panic!("expected brace body");
+    };
+    let engines = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PartDefBodyElement::PartUsage(p) if p.value.name == "engines" => Some(&p.value),
+            _ => None,
+        })
+        .expect("engines part usage");
+    assert!(engines.ordered);
+    assert_eq!(engines.type_name, "RocketEngine");
+}
+
+#[test]
+fn part_usage_default_null_without_equals_parses() {
+    let input = "package P {\npart def MassedComponent { }\npart def X {\npart subcomponents : MassedComponent [*] default null;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+}
+
+#[test]
+fn part_def_body_item_usage_parses() {
+    let input = "package P {\npart def Stakeholder {\nitem concerns[*]: Concern;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected diagnostics: {:?}",
+        result.errors
+    );
+    let elements = package_elements(input);
+    let stakeholder = match &elements[0].value {
+        PackageBodyElement::PartDef(def) => &def.value,
+        _ => panic!("expected part def"),
+    };
+    let PartDefBody::Brace { elements } = &stakeholder.body else {
+        panic!("expected brace body");
+    };
+    let item = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PartDefBodyElement::ItemUsage(item) => Some(&item.value),
+            _ => None,
+        })
+        .expect("item usage in part def body");
+    assert_eq!(item.name, "concerns");
+    assert_eq!(item.multiplicity.as_deref(), Some("[*]"));
+    assert_eq!(item.type_name.as_deref(), Some("Concern"));
+}
