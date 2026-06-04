@@ -1,6 +1,7 @@
 use sysml_v2_parser::ast::{
-    PackageBody, PackageBodyElement, RequirementDefBody, RequirementDefBodyElement, RootElement,
-    StateDefBody, StateDefBodyElement, UseCaseDefBody, UseCaseDefBodyElement,
+    PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RequirementDefBody,
+    RequirementDefBodyElement, RootElement, StateDefBody, StateDefBodyElement, UseCaseDefBody,
+    UseCaseDefBodyElement,
 };
 use sysml_v2_parser::parse_with_diagnostics;
 
@@ -147,4 +148,39 @@ fn state_body_bare_identifier_reports_targeted_diagnostic_and_keeps_transition()
     assert!(elements
         .iter()
         .any(|e| matches!(e.value, StateDefBodyElement::Transition(_))));
+}
+
+#[test]
+fn part_def_recovery_keeps_later_members() {
+    let input = "package P {\npart def Vehicle {\nattribute mass: ;\nport p : Port;\n}\n}";
+    let result = parse_with_diagnostics(input);
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let part = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("part def should be present");
+    let PartDefBody::Brace { elements } = &part.body else {
+        panic!("expected part def body");
+    };
+    assert!(
+        elements
+            .iter()
+            .any(|e| matches!(e.value, PartDefBodyElement::Error(_))),
+        "malformed part def member should be preserved as an error node"
+    );
+    assert!(
+        elements
+            .iter()
+            .any(|e| matches!(e.value, PartDefBodyElement::PortUsage(_))),
+        "later part def members should still parse"
+    );
 }

@@ -499,6 +499,13 @@ fn logical_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
     .parse(input)
 }
 
+/// Implication: lower precedence than `or` / `and` (constraint and filter bodies).
+fn implies_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
+    preceded(ws_and_comments, tag(&b"implies"[..]))
+        .map(|_| "implies".to_string())
+        .parse(input)
+}
+
 fn equality_op_token(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = ws_and_comments(input)?;
     alt((
@@ -643,11 +650,17 @@ fn equality_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>>
     binary_chain_with(input, start, left, equality_op_token, comparison_expression)
 }
 
-/// Full expression with precedence-aware binary parsing.
-pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+fn logical_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, left) = equality_expression(input)?;
     binary_chain_with(input, start, left, logical_op_token, equality_expression)
+}
+
+/// Full expression with precedence-aware binary parsing.
+pub(crate) fn expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
+    let (input, left) = logical_expression(input)?;
+    binary_chain_with(input, start, left, implies_op_token, logical_expression)
 }
 
 /// Path expression: qualified name and/or member access (for bind/connect).
@@ -673,4 +686,31 @@ pub(crate) fn path_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expre
         rest = next;
     }
     Ok((rest, node_from_to(start, rest, expr)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nom_locate::LocatedSpan;
+
+    fn span_input(text: &str) -> Input<'_> {
+        LocatedSpan::new(text.as_bytes())
+    }
+
+    #[test]
+    fn expression_parses_implies_lower_than_or() {
+        let input = span_input("a or b implies c");
+        let (_, node) = expression(input).expect("expression");
+        match &node.value {
+            Expression::BinaryOp { op, left, right } => {
+                assert_eq!(op, "implies");
+                match &left.value {
+                    Expression::BinaryOp { op, .. } => assert_eq!(op, "||"),
+                    other => panic!("expected or on lhs, got {other:?}"),
+                }
+                assert!(matches!(&right.value, Expression::FeatureRef(s) if s == "c"));
+            }
+            other => panic!("expected implies, got {other:?}"),
+        }
+    }
 }

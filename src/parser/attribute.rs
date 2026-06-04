@@ -314,6 +314,14 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
         .redefines
         .or(leading_clauses.redefines)
         .or(redefines);
+    let subsets = trailing_clauses
+        .subsets
+        .or(leading_clauses.subsets)
+        .map(|(target, _)| target);
+    let references = trailing_clauses
+        .references
+        .or(leading_clauses.references);
+    let crosses = trailing_clauses.crosses.or(leading_clauses.crosses);
     let (input, body) = attribute_body(input)?;
     Ok((
         input,
@@ -323,7 +331,10 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             AttributeUsage {
                 name: name_str,
                 typing,
+                subsets,
                 redefines,
+                references,
+                crosses,
                 value,
                 body,
                 name_span,
@@ -367,7 +378,10 @@ pub(crate) fn attribute_usage_shorthand(
             AttributeUsage {
                 name: name_str,
                 typing: None,
+                subsets: None,
                 redefines: None,
+                references: None,
+                crosses: None,
                 value,
                 body: AttributeBody::Semicolon,
                 name_span: Some(name_span),

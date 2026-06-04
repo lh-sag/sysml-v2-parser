@@ -1,507 +1,5 @@
-//! Part definition and part usage parsing.
-#![allow(dead_code, unused_imports)]
-
-use crate::ast::{
-    Allocate, AttributeBody, AttributeUsage, Bind, CalcUsage, Connect, ConnectBody,
-    ConnectionUsageMember, DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage,
-    InterfaceUsageBodyElement, Node, OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement,
-    PartUsage, PartUsageBody, PartUsageBodyElement, Perform, PerformBody, PerformBodyElement,
-    PerformInOutBinding, RefBody, RefDecl,
-};
-use crate::parser::attribute::{attribute_def, attribute_usage, attribute_usage_shorthand};
-use crate::parser::body::advance_to_closing_brace;
-use crate::parser::build_recovery_error_node_from_span;
-use crate::parser::connection::connection_member_body;
-use crate::parser::constraint::calc_usage;
-use crate::parser::enumeration::enum_usage;
-use crate::parser::expr::{expression, path_expression};
-use crate::parser::interface::{connect_body, interface_def};
-use crate::parser::item::item_usage;
-use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, starts_with_any_keyword,
-    starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
-};
-use crate::parser::metadata_annotation::{annotation, metadata_annotation};
-use crate::parser::node_from_to;
-use crate::parser::occurrence::{
-    individual_usage, occurrence_usage, snapshot_usage, then_timeslice_usage, timeslice_usage,
-};
-use crate::parser::port::port_usage;
-use crate::parser::requirement::{comment_annotation, doc_comment, requirement_usage, satisfy};
-use crate::parser::specialization::parse_optional_definition_specialization;
-use crate::parser::usage::{
-    multiplicity, optional_typings, redefinition, specialization_clauses, subsetting, typings,
-};
-use crate::parser::with_span;
-use crate::parser::Input;
-use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::combinator::{map, opt, value};
-use nom::multi::many0;
-use nom::sequence::delimited;
-use nom::sequence::preceded;
-use nom::IResult;
-use nom::Parser;
-
-const MEMBER_HEADER_UNTIL_BODY: &[u8] = b";{";
-
-/// Result of parsing either a part definition or part usage (used for package body to avoid part_def consuming "part" before part_usage can run).
-#[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
-pub(crate) enum PartDefOrUsage {
-    Def(Node<PartDef>),
-    Usage(Node<PartUsage>),
-}
-
-/// Part def body: ';' or '{' PartDefBodyElement* '}'
-pub(crate) fn part_def_body(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
-    let (input, _) = ws_and_comments(input)?;
-    alt((
-        map(tag(&b";"[..]), |_| PartDefBody::Semicolon),
-        part_def_body_brace,
-    ))
-    .parse(input)
-}
-
-fn part_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartDefBody> {
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().is_empty() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Eof,
-            )));
-        }
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, PartDefBody::Brace { elements }));
-        }
-        match part_def_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) if starts_with_any_keyword(input.fragment(), PART_BODY_STARTERS) => {
-                if starts_with_keyword(input.fragment(), b"part") {
-                    if let Ok((next, usage)) = part_usage(input) {
-                        if next.location_offset() > input.location_offset() {
-                            elements.push(node_from_to(
-                                input,
-                                next,
-                                PartDefBodyElement::PartUsage(Box::new(usage)),
-                            ));
-                            input = next;
-                            continue;
-                        }
-                    }
-                }
-                let (next, _) = recover_body_element(input, PART_BODY_STARTERS)?;
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(node_from_to(
-                    input,
-                    next,
-                    PartDefBodyElement::Error(Node::new(
-                        crate::ast::Span::dummy(),
-                        build_recovery_error_node_from_span(
-                            input,
-                            next,
-                            PART_BODY_STARTERS,
-                            "part definition body",
-                            "recovered_part_def_body_element",
-                        ),
-                    )),
-                ));
-                input = next;
-            }
-            Err(_) => {
-                let start_unknown = input;
-                let (next, _) = recover_body_element(input, PART_BODY_STARTERS)?;
-                let recovery = build_recovery_error_node_from_span(
-                    start_unknown,
-                    next,
-                    PART_BODY_STARTERS,
-                    "part definition body",
-                    "recovered_part_def_body_element",
-                );
-                if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = advance_to_closing_brace(input)?;
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                    return Ok((input, PartDefBody::Brace { elements }));
-                }
-                if matches!(
-                    recovery.code.as_str(),
-                    "missing_member_name"
-                        | "missing_type_reference"
-                        | "invalid_bare_identifier_in_action_body"
-                        | "invalid_bare_identifier_in_state_body"
-                        | "unexpected_keyword_in_scope"
-                        | "missing_semicolon"
-                        | "missing_body_or_semicolon"
-                        | "bare_feature_declaration_in_part_def"
-                        | "invalid_requirement_short_name_syntax"
-                ) {
-                    elements.push(node_from_to(
-                        start_unknown,
-                        next,
-                        PartDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
-                    ));
-                } else {
-                    let frag = start_unknown.fragment();
-                    let take = frag.len().min(80);
-                    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-                    elements.push(node_from_to(
-                        start_unknown,
-                        next,
-                        PartDefBodyElement::Other(preview),
-                    ));
-                }
-                input = next;
-            }
-        }
-    }
-}
-
-/// Exhibit state usage: `exhibit state` name (`:` type)? (`;` or body)
-fn exhibit_state(input: Input<'_>) -> IResult<Input<'_>, Node<ExhibitState>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"exhibit"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"state"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, name_str) = name(input)?;
-    let (input, type_name) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, body) = crate::parser::state::state_def_body(input)?;
-    let (input, redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let input = if redefines.is_some() {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        input
-    } else {
-        input
-    };
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            ExhibitState {
-                name: name_str,
-                type_name,
-                redefines,
-                body,
-            },
-        ),
-    ))
-}
-
-fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBodyElement>> {
-    let (input, _) = ws_and_comments(input)?;
-    let start = input;
-    let (input, elem) = alt((
-        alt((
-            map(doc_comment, PartDefBodyElement::Doc),
-            map(comment_annotation, PartDefBodyElement::Comment),
-            map(annotation, PartDefBodyElement::Annotation),
-            map(exhibit_state, PartDefBodyElement::ExhibitState),
-            map(calc_usage, PartDefBodyElement::CalcUsage),
-            map(perform_action_decl, PartDefBodyElement::Perform),
-            map(perform_usage, PartDefBodyElement::Perform),
-            map(allocate_, PartDefBodyElement::Allocate),
-            map(connection_usage_member, PartDefBodyElement::Connection),
-            map(connect_, PartDefBodyElement::Connect),
-            map(part_usage, |p| PartDefBodyElement::PartUsage(Box::new(p))),
-            map(individual_usage, |n| {
-                PartDefBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(snapshot_usage, |n| {
-                PartDefBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-        )),
-        alt((
-            map(timeslice_usage, |n| {
-                PartDefBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(then_timeslice_usage, |n| {
-                PartDefBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(occurrence_usage, |n| {
-                PartDefBodyElement::OccurrenceUsage(Box::new(n))
-            }),
-            map(interface_usage, PartDefBodyElement::InterfaceUsage),
-            map(interface_def, PartDefBodyElement::InterfaceDef),
-            map(port_usage, PartDefBodyElement::PortUsage),
-            map(part_ref_usage, PartDefBodyElement::Ref),
-            map(|i| attribute_def(i, true), PartDefBodyElement::AttributeDef),
-            map(attribute_usage, PartDefBodyElement::AttributeUsage),
-            map(
-                attribute_usage_shorthand,
-                PartDefBodyElement::AttributeUsage,
-            ),
-            map(enum_usage, PartDefBodyElement::EnumerationUsage),
-            map(requirement_usage, PartDefBodyElement::RequirementUsage),
-            map(item_usage, PartDefBodyElement::ItemUsage),
-            map(opaque_part_member_decl, PartDefBodyElement::OpaqueMember),
-        )),
-    ))
-    .parse(input)?;
-    Ok((input, node_from_to(start, input, elem)))
-}
-
-fn connection_usage_member(input: Input<'_>) -> IResult<Input<'_>, Node<ConnectionUsageMember>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"connection"[..]).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, name) = if input.fragment().starts_with(b":")
-        || input.fragment().starts_with(b"{")
-        || input.fragment().starts_with(b";")
-    {
-        (input, None)
-    } else {
-        let (input, parsed_name) = name(input)?;
-        (input, Some(parsed_name))
-    };
-    let (input, type_name) = {
-        let (peek, _) = ws_and_comments(input)?;
-        if peek.fragment().starts_with(b":")
-            && !peek.fragment().starts_with(b":>")
-            && !peek.fragment().starts_with(b":>>")
-        {
-            let (input, _) = preceded(ws_and_comments, tag(&b":"[..])).parse(input)?;
-            let (input, parsed_type) = preceded(ws_and_comments, qualified_name).parse(input)?;
-            (input, Some(parsed_type))
-        } else {
-            (input, None)
-        }
-    };
-    let (input, body) = connection_member_body(input)?;
-    let (input, trailing_subsets) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, trailing_redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let input = if trailing_subsets.is_some() || trailing_redefines.is_some() {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        input
-    } else {
-        input
-    };
-
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            ConnectionUsageMember {
-                name,
-                type_name,
-                body,
-                subsets: trailing_subsets,
-                redefines: trailing_redefines,
-            },
-        ),
-    ))
-}
-
-/// Permissive parser for library-style part members not yet modeled with dedicated AST nodes.
-/// Examples: `abstract ref action ... { ... }`, `state monitor: StateKind { ... }`.
-fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMemberDecl>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
-    if !starts_with_any_keyword(
-        input.fragment(),
-        &[b"ref", b"action", b"state", b"port", b"connection"],
-    ) {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
-    let (input, header_text) =
-        crate::parser::lex::take_until_terminator(input, MEMBER_HEADER_UNTIL_BODY)?;
-    let keyword = if starts_with_any_keyword(input.fragment(), &[b"ref"]) {
-        "ref"
-    } else if starts_with_any_keyword(input.fragment(), &[b"action"]) {
-        "action"
-    } else if starts_with_any_keyword(input.fragment(), &[b"state"]) {
-        "state"
-    } else if starts_with_any_keyword(input.fragment(), &[b"connection"]) {
-        "connection"
-    } else {
-        "port"
-    }
-    .to_string();
-    let name_str = header_text
-        .split(|c: char| {
-            c.is_whitespace() || c == ':' || c == '[' || c == ',' || c == '(' || c == ')'
-        })
-        .filter(|s| !s.is_empty())
-        .find(|token| {
-            !matches!(
-                *token,
-                "ref"
-                    | "action"
-                    | "state"
-                    | "port"
-                    | "connection"
-                    | "part"
-                    | "private"
-                    | "protected"
-                    | "public"
-            )
-        })
-        .unwrap_or("member")
-        .to_string();
-    let (input, _) = ws_and_comments(input)?;
-    let (input, body) = crate::parser::attribute::attribute_body(input)?;
-    let (input, trailing_subsets) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let (input, trailing_redefines) = opt(preceded(
-        preceded(ws_and_comments, tag(&b":>>"[..])),
-        preceded(ws_and_comments, qualified_name),
-    ))
-    .parse(input)?;
-    let input = if trailing_subsets.is_some() || trailing_redefines.is_some() {
-        let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-        input
-    } else {
-        input
-    };
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            OpaqueMemberDecl {
-                keyword,
-                name: name_str,
-                text: header_text.trim().to_string(),
-                body,
-            },
-        ),
-    ))
-}
-
-/// Part definition: ( 'abstract' | 'variation' )? 'part' 'def' Identification ( (':>' | 'specializes') qualified_name )? body
-pub(crate) fn part_def(input: Input<'_>) -> IResult<Input<'_>, Node<PartDef>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, definition_prefix) = opt(alt((
-        map(preceded(tag(&b"abstract"[..]), ws1), |_| {
-            DefinitionPrefix::Abstract
-        }),
-        map(preceded(tag(&b"variation"[..]), ws1), |_| {
-            DefinitionPrefix::Variation
-        }),
-    )))
-    .parse(input)?;
-    let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
-    let (input, _) = tag(&b"part"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, _) = tag(&b"def"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) = parse_optional_definition_specialization(input)?;
-    let (input, body) = part_def_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            PartDef {
-                definition_prefix,
-                is_individual,
-                identification,
-                specializes,
-                specializes_span,
-                body,
-            },
-        ),
-    ))
-}
-
-/// Parses "part" then dispatches: if "def" follows, part_def; else part_usage. Used in package body so "part name" is not consumed by part_def.
-pub(crate) fn part_def_or_usage(input: Input<'_>) -> IResult<Input<'_>, PartDefOrUsage> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, definition_prefix) = opt(alt((
-        map(preceded(tag(&b"abstract"[..]), ws1), |_| {
-            DefinitionPrefix::Abstract
-        }),
-        map(preceded(tag(&b"variation"[..]), ws1), |_| {
-            DefinitionPrefix::Variation
-        }),
-    )))
-    .parse(input)?;
-    let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
-    let (input, _) = tag(&b"part"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    if let Ok((input, _)) = tag::<_, _, nom::error::Error<Input>>(&b"def"[..]).parse(input) {
-        let (input, _) = ws1(input)?;
-        let (input, identification) = identification(input)?;
-        let (input, (specializes, specializes_span)) =
-            parse_optional_definition_specialization(input)?;
-        let (input, body) = part_def_body(input)?;
-        return Ok((
-            input,
-            PartDefOrUsage::Def(node_from_to(
-                start,
-                input,
-                PartDef {
-                    definition_prefix,
-                    is_individual,
-                    identification,
-                    specializes,
-                    specializes_span,
-                    body,
-                },
-            )),
-        ));
-    }
-    if let Ok((input, usage)) = part_usage_redefines_only(start, input) {
-        let mut usage = usage;
-        usage.value.is_individual = is_individual;
-        return Ok((input, PartDefOrUsage::Usage(usage)));
-    }
-    let (input, mut usage) = part_usage_named(start, input)?;
-    usage.value.is_individual = is_individual;
-    Ok((input, PartDefOrUsage::Usage(usage)))
-}
+﻿use super::body::exhibit_state;
+use super::prelude::*;
 
 /// Value part for usages: `= expr` | `:= expr` | `default = expr` | `default := expr` | `default expr`.
 fn usage_value_part(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::Expression>> {
@@ -528,7 +26,7 @@ fn usage_ordered_modifier(input: Input<'_>) -> IResult<Input<'_>, bool> {
 }
 
 /// Part usage redefines-only: ':>>' qualified_name multiplicity? ordered? value? body (no name/type).
-fn part_usage_redefines_only<'a>(
+pub(crate) fn part_usage_redefines_only<'a>(
     start: Input<'a>,
     input: Input<'a>,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
@@ -562,7 +60,10 @@ fn part_usage_redefines_only<'a>(
 }
 
 /// Part usage with name (and optional type, redefines, etc.): (':>>')? name ':' type_name? ...
-fn part_usage_named<'a>(start: Input<'a>, input: Input<'a>) -> IResult<Input<'a>, Node<PartUsage>> {
+pub(crate) fn part_usage_named<'a>(
+    start: Input<'a>,
+    input: Input<'a>,
+) -> IResult<Input<'a>, Node<PartUsage>> {
     let (input, _) = opt(preceded(ws_and_comments, tag(&b":>>"[..]))).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, (name_span, name_str)) = with_span(name).parse(input)?;
@@ -837,7 +338,7 @@ fn perform_body(input: Input<'_>) -> IResult<Input<'_>, PerformBody> {
 }
 
 /// Perform usage: `perform` action_path body (with optional `{ }` body).
-fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
+pub(crate) fn perform_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Perform>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"perform"[..]).parse(input)?;
@@ -895,7 +396,7 @@ pub(crate) fn perform_action_decl(input: Input<'_>) -> IResult<Input<'_>, Node<P
 }
 
 /// Allocate: `allocate` source `to` target body.
-fn allocate_(input: Input<'_>) -> IResult<Input<'_>, Node<Allocate>> {
+pub(crate) fn allocate_(input: Input<'_>) -> IResult<Input<'_>, Node<Allocate>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"allocate"[..]).parse(input)?;
@@ -948,7 +449,7 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
 }
 
 /// Connect (part usage level): `connect` path `to` path body
-fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
+pub(crate) fn connect_(input: Input<'_>) -> IResult<Input<'_>, Node<Connect>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"connect"[..]).parse(input)?;
@@ -1069,7 +570,7 @@ fn connector_end_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Express
 
 /// Interface usage: `interface` ( name `:` )? ( `:Type` )? `connect` path `to` path body
 /// or `interface` path `to` path body. The optional interface member name is currently ignored.
-fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsage>> {
+pub(crate) fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"interface"[..]).parse(input)?;
@@ -1137,7 +638,7 @@ fn interface_usage(input: Input<'_>) -> IResult<Input<'_>, Node<InterfaceUsage>>
 }
 
 /// Ref in part usage body: `ref` (`part`)? name (`:` type)? (`=` value)? body.
-fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
+pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
     let start = input;
     let (input, _) = tag(&b"ref"[..]).parse(input)?;
     let (input, _) = ws1(input)?;

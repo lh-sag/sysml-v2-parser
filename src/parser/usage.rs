@@ -378,4 +378,13 @@ mod tests {
         assert!(header.subsets.is_none());
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
+
+    #[test]
+    fn specialization_clauses_multi_target_references() {
+        let input = span_input("references a, b crosses c, d ;");
+        let (rest, clauses) = specialization_clauses(input).expect("clauses");
+        assert_eq!(clauses.references.as_deref(), Some("a, b"));
+        assert_eq!(clauses.crosses.as_deref(), Some("c, d"));
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
 }

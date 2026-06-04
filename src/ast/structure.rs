@@ -258,8 +258,14 @@ pub struct AttributeUsage {
     pub name: String,
     /// Type after `:` or `:>`, e.g. Some("MassValue").
     pub typing: Option<String>,
+    /// Subsets target after `:>` / `subsets`.
+    pub subsets: Option<String>,
     /// Redefines target, e.g. Some("Vehicle::mass").
     pub redefines: Option<String>,
+    /// References target after `::>` / `references`.
+    pub references: Option<String>,
+    /// Crosses target after `=>` / `crosses`.
+    pub crosses: Option<String>,
     /// Value expression.
     pub value: Option<Node<Expression>>,
     pub body: AttributeBody,
@@ -314,6 +320,10 @@ pub struct PortUsage {
     /// Subsets feature and optional value expression.
     pub subsets: Option<(String, Option<Node<Expression>>)>,
     pub redefines: Option<String>,
+    /// References target after `::>` / `references`.
+    pub references: Option<String>,
+    /// Crosses target after `=>` / `crosses`.
+    pub crosses: Option<String>,
     pub body: PortBody,
     /// Span of the usage name (for semantic tokens).
     pub name_span: Option<Span>,
@@ -332,6 +342,7 @@ pub enum PortBody {
 
 /// Element inside a port usage body.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum PortBodyElement {
     Error(Node<ParseErrorNode>),
     InOutDecl(Node<InOutDecl>),
@@ -518,6 +529,7 @@ pub struct AssertConstraintMember {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum OccurrenceBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
@@ -543,6 +555,7 @@ pub enum DefinitionBody {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum DefinitionBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),

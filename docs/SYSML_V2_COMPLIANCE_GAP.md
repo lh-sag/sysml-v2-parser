@@ -94,7 +94,7 @@ The strongest areas today are still packages/imports, parts, requirements, and t
 
 Remaining opaque or partial body consumption:
 
-- [`src/parser/body.rs`](src/parser/body.rs) — structured-loop escape paths (migrating to `advance_to_closing_brace` in P3)
+- [`src/parser/body.rs`](src/parser/body.rs) — structured-loop escape uses `advance_to_closing_brace` (P3); legacy `semicolon_or_opaque_brace_body` still uses `skip_until_brace_end`
 - [`src/parser/lex.rs`](src/parser/lex.rs) — `skip_until_brace_end` definition and internal callers
 - alias, import, interface, connection, enumeration, use case, constraint, view, part — mostly `advance_to_closing_brace` for unmodeled inner regions, not full member grammars
 

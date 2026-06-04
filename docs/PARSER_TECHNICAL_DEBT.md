@@ -100,9 +100,13 @@ Duplication in code and “partial grammar” in the spec sense overlap: the sam
 
 ## Implementation plan (P3)
 
-**Status: in progress (June 2026).** Checklist: [`PARSER_DEBT_P3_PLAN.md`](./PARSER_DEBT_P3_PLAN.md).
+**Status: complete (June 2026).** Checklist: [`PARSER_DEBT_P3_PLAN.md`](./PARSER_DEBT_P3_PLAN.md).
 
-P3 focus: AST family modules, requirement/action-usage structured bodies, `body.rs` recovery fallback, usage-header AST fidelity, LSP error-node coverage.
+## Implementation plan (P4)
+
+**Status: in progress (June 2026).** Checklist: [`PARSER_DEBT_P4_PLAN.md`](./PARSER_DEBT_P4_PLAN.md).
+
+P4 focus: internal definition headers, view/part structured bodies, usage AST fidelity, expression tranches, LSP recovery tests, `part.rs` split.
 
 ## Prioritized improvements
 
@@ -135,7 +139,7 @@ P3 focus: AST family modules, requirement/action-usage structured bodies, `body.
 |----------|--------|
 | Is there a lot of duplication? | **Yes** — especially definition prefixes, body terminators, and recovery loops. |
 | Is the codebase unmaintainable? | **No** — modules and tests are coherent; debt is known and gated. |
-| Best next step? | **P3 streams** in [`PARSER_DEBT_P3_PLAN.md`](./PARSER_DEBT_P3_PLAN.md): AST split, requirement body, opaque fallback, usage AST, LSP scopes. |
+| Best next step? | **P4** in [`PARSER_DEBT_P4_PLAN.md`](./PARSER_DEBT_P4_PLAN.md): headers, view/part bodies, usage AST, expr, LSP tests. |
 | Largest long-term gap? | **Unified definition/usage/specialization grammar** plus deeper body parsing, not more top-level `*_def` files. |
 
 The validation CI regression fixed in 2026 (typed library headers after `identification`) illustrates the preferred direction: **extract shared grammar fragments** as they are discovered, keep construct modules, and let library node-shape gates enforce that dedicated parsers stay on the happy path.

@@ -1,0 +1,49 @@
+//! Shared imports for part submodules.
+
+pub(crate) use crate::ast::{
+    Allocate, AttributeBody, AttributeUsage, Bind, CalcUsage, Connect, ConnectBody,
+    ConnectionUsageMember, DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage,
+    InterfaceUsageBodyElement, Node, OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement,
+    PartUsage, PartUsageBody, PartUsageBodyElement, Perform, PerformBody, PerformBodyElement,
+    PerformInOutBinding, RefBody, RefDecl,
+};
+pub(crate) use crate::parser::attribute::{attribute_def, attribute_usage, attribute_usage_shorthand};
+pub(crate) use crate::parser::body::{
+    advance_to_closing_brace, parse_structured_brace_members_with_skip, BraceMemberSkip,
+};
+pub(crate) use crate::parser::build_recovery_error_node_from_span;
+pub(crate) use crate::parser::connection::connection_member_body;
+pub(crate) use crate::parser::constraint::calc_usage;
+pub(crate) use crate::parser::enumeration::enum_usage;
+pub(crate) use crate::parser::expr::{expression, path_expression};
+pub(crate) use crate::parser::interface::{connect_body, interface_def};
+pub(crate) use crate::parser::item::item_usage;
+pub(crate) use crate::parser::lex::{
+    identification, name, qualified_name, recover_body_element, starts_with_any_keyword,
+    starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
+};
+pub(crate) use crate::parser::metadata_annotation::{annotation, metadata_annotation};
+pub(crate) use crate::parser::node_from_to;
+pub(crate) use crate::parser::occurrence::{
+    individual_usage, occurrence_usage, snapshot_usage, then_timeslice_usage, timeslice_usage,
+};
+pub(crate) use crate::parser::port::port_usage;
+pub(crate) use crate::parser::requirement::{comment_annotation, doc_comment, requirement_usage, satisfy};
+pub(crate) use crate::parser::specialization::parse_optional_definition_specialization;
+pub(crate) use crate::parser::usage::{
+    multiplicity, optional_typings, redefinition, specialization_clauses, subsetting, typings,
+};
+pub(crate) use crate::parser::with_span;
+pub(crate) use crate::parser::Input;
+pub(crate) use nom::branch::alt;
+pub(crate) use nom::bytes::complete::tag;
+pub(crate) use nom::combinator::{map, opt, value};
+pub(crate) use nom::multi::many0;
+pub(crate) use nom::sequence::delimited;
+pub(crate) use nom::sequence::preceded;
+pub(crate) use nom::IResult;
+pub(crate) use nom::Parser;
+
+pub(crate) const MEMBER_HEADER_UNTIL_BODY: &[u8] = b";{";
+
+pub(crate) use super::PartDefOrUsage;

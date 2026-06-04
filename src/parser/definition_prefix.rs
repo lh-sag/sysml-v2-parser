@@ -2,7 +2,7 @@
 
 use crate::ast::{Identification, Span};
 use crate::parser::lex::{identification, ws1, ws_and_comments};
-use crate::parser::specialization::parse_optional_definition_header_after_identification;
+use crate::parser::definition_header::parse_definition_header_after_ident;
 use crate::parser::Input;
 use nom::bytes::complete::{tag, take_while1};
 use nom::combinator::opt;
@@ -145,8 +145,9 @@ pub(crate) fn parse_definition_prefix(
     };
 
     let (input, identification) = identification(input)?;
-    let (input, (specializes, specializes_span)) =
-        parse_optional_definition_header_after_identification(input)?;
+    let (input, header) = parse_definition_header_after_ident(input)?;
+    let specializes = header.specializes;
+    let specializes_span = header.specializes_span;
 
     Ok((
         input,

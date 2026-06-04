@@ -9,11 +9,11 @@ use crate::ast::{
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    starts_with_any_keyword, ws1, ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
+    identification, name, qualified_name, starts_with_any_keyword, ws1, ws_and_comments,
+    VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
-use crate::parser::usage::{feature_usage_header, usage_header};
+use crate::parser::definition_header::{parse_feature_usage_header, parse_usage_header};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::branch::alt;
@@ -44,7 +44,7 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
     let (input, _) = preceded(ws_and_comments, tag(&b"render"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, header) = feature_usage_header(input)?;
+    let (input, header) = parse_feature_usage_header(input)?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,
@@ -258,6 +258,13 @@ fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
         map(success(()), |_| first.clone()),
     ))
     .parse(input)?;
+    let (peek, _) = ws_and_comments(input)?;
+    if peek.fragment().first() == Some(&b'.') {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            peek,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
     // Optional filter [ expr ] - skip content to reach body
     let (input, _) = nom::combinator::opt(nom::sequence::delimited(
         preceded(ws_and_comments, tag(&b"["[..])),
@@ -292,80 +299,40 @@ fn satisfy_view_member(input: Input<'_>) -> IResult<Input<'_>, Node<SatisfyViewM
     ))
 }
 
+fn view_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<ViewBodyElement> {
+    if starts_with_any_keyword(start.fragment(), VIEW_BODY_STARTERS) {
+        let recovery = build_recovery_error_node_from_span(
+            start,
+            end,
+            VIEW_BODY_STARTERS,
+            "view body",
+            "recovered_view_body_element",
+        );
+        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+        return node_from_to(start, end, ViewBodyElement::Error(node));
+    }
+    let preview = String::from_utf8_lossy(&start.fragment()[..start.fragment().len().min(60)])
+        .trim()
+        .to_string();
+    node_from_to(start, end, ViewBodyElement::Other(preview))
+}
+
 fn view_body(input: Input<'_>) -> IResult<Input<'_>, ViewBody> {
-    let (mut input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
         let (input, _) = tag(&b";"[..]).parse(input)?;
         return Ok((input, ViewBody::Semicolon));
     }
-    let (next, _) = tag(&b"{"[..]).parse(input)?;
-    input = next;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, ViewBody::Brace { elements }));
-        }
-        match view_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) if starts_with_any_keyword(input.fragment(), VIEW_BODY_STARTERS) => {
-                let start_unknown = input;
-                let (next, _) = recover_body_element(input, VIEW_BODY_STARTERS)?;
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                let recovery = build_recovery_error_node_from_span(
-                    start_unknown,
-                    next,
-                    VIEW_BODY_STARTERS,
-                    "view body",
-                    "recovered_view_body_element",
-                );
-                let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
-                elements.push(node_from_to(
-                    start_unknown,
-                    next,
-                    ViewBodyElement::Error(node),
-                ));
-                input = next;
-            }
-            Err(_) => {
-                let start_unknown = input;
-                let (next, _) = skip_statement_or_block(input)?;
-                if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = crate::parser::body::advance_to_closing_brace(input)?;
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                    return Ok((input, ViewBody::Brace { elements }));
-                }
-                elements.push(node_from_to(
-                    start_unknown,
-                    next,
-                    ViewBodyElement::Other(
-                        String::from_utf8_lossy(
-                            &start_unknown.fragment()[..start_unknown.fragment().len().min(60)],
-                        )
-                        .trim()
-                        .to_string(),
-                    ),
-                ));
-                input = next;
-            }
-        }
-    }
+    let (input, elements) = crate::parser::body::parse_structured_brace_members_with_skip(
+        input,
+        VIEW_BODY_STARTERS,
+        "view body",
+        "recovered_view_body_element",
+        view_body_element,
+        view_body_recovery,
+        crate::parser::body::BraceMemberSkip::BodyElementRecover,
+    )?;
+    Ok((input, ViewBody::Brace { elements }))
 }
 
 pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>> {
@@ -375,7 +342,7 @@ pub(crate) fn view_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewUsage>
     let (input, _) = tag(&b"view"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, header) = feature_usage_header(input)?;
+    let (input, header) = parse_feature_usage_header(input)?;
     let (input, body) = view_body(input)?;
     Ok((
         input,
@@ -398,7 +365,7 @@ pub(crate) fn viewpoint_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Viewp
     let (input, _) = tag(&b"viewpoint"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, header) = feature_usage_header(input)?;
+    let (input, header) = parse_feature_usage_header(input)?;
     let (input, body) = requirement_def_body(input)?;
     Ok((
         input,
@@ -421,7 +388,7 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
     let (input, _) = tag(&b"rendering"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, name_str) = name(input)?;
-    let (input, header) = feature_usage_header(input)?;
+    let (input, header) = parse_feature_usage_header(input)?;
     let (input, body) = connect_body(input)?;
     Ok((
         input,
@@ -435,4 +402,27 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
             },
         ),
     ))
+}
+
+#[cfg(test)]
+mod expose_diagnostic_tests {
+    use crate::parse_with_diagnostics;
+
+    #[test]
+    fn invalid_expose_dot_produces_separator_diagnostic() {
+        let input = "package Views { view structure: GeneralView { expose SurveillanceDrone.SurveillanceQuadrotorDrone; } }";
+        let result = parse_with_diagnostics(input);
+        assert!(
+            !result.is_ok(),
+            "expected diagnostics, got {:?}",
+            result.errors
+        );
+        assert!(
+            result.errors.iter().any(|e| {
+                e.code.as_deref() == Some("invalid_qualified_name_separator")
+            }),
+            "codes: {:?}",
+            result.errors.iter().map(|e| &e.code).collect::<Vec<_>>()
+        );
+    }
 }

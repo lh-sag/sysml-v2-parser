@@ -107,6 +107,8 @@ pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>
                 multiplicity,
                 subsets: clauses.subsets,
                 redefines,
+                references: clauses.references,
+                crosses: clauses.crosses,
                 body,
                 name_span: Some(name_span),
                 type_ref_span,

@@ -70,7 +70,9 @@ fn nom_error_kind_to_message(code: &nom::error::ErrorKind) -> &'static str {
         ErrorKind::Alt => {
             "expected a package member (e.g. part, port, attribute, action, requirement, import)"
         }
-        ErrorKind::Many0 | ErrorKind::Many1 => "expected list of elements",
+        ErrorKind::Many0 | ErrorKind::Many1 => {
+            "expected a complete body member; check for a missing name, type, or terminator"
+        }
         _ => "syntax did not match any known grammar rule here",
     }
 }

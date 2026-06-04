@@ -21,6 +21,7 @@ mod case;
 mod collect_errors;
 mod connection;
 mod constraint;
+mod definition_header;
 mod definition_prefix;
 mod dependency;
 mod diagnostics;
