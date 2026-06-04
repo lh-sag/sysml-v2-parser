@@ -828,7 +828,8 @@ fn part_def_attribute_redefinition_usage_keeps_redefines_and_value() {
 
 #[test]
 fn part_usage_ordered_before_colon_parses_without_recovery() {
-    let input = "package P {\npart def RocketStage {\npart engines[1..*] ordered : RocketEngine;\n}\n}";
+    let input =
+        "package P {\npart def RocketStage {\npart engines[1..*] ordered : RocketEngine;\n}\n}";
     let result = parse_with_diagnostics(input);
     assert!(
         result.errors.is_empty(),

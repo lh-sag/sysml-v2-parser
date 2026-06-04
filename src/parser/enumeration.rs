@@ -2,8 +2,8 @@
 
 use crate::ast::{EnumDef, EnumerationBody, EnumerationUsage, Node};
 use crate::parser::attribute::attribute_body;
-use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::body::advance_to_closing_brace;
+use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{name, take_until_terminator, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::requirement::{comment_annotation, doc_comment};

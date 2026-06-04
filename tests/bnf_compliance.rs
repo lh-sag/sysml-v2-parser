@@ -191,11 +191,17 @@ fn classify<'a>(
     Ok(first)
 }
 
+type ClassifyAllResult = (
+    BTreeMap<CoverageStatus, usize>,
+    BTreeMap<CoverageStatus, Vec<String>>,
+    Vec<String>,
+);
+
 fn classify_all(
     grammar: Grammar,
     productions: &[String],
     rules: &[CoverageRule],
-) -> (BTreeMap<CoverageStatus, usize>, BTreeMap<CoverageStatus, Vec<String>>, Vec<String>) {
+) -> ClassifyAllResult {
     let mut counts = BTreeMap::<CoverageStatus, usize>::new();
     let mut productions_by_status = BTreeMap::<CoverageStatus, Vec<String>>::new();
     let mut errors = Vec::new();
@@ -335,14 +341,20 @@ fn all_textual_bnf_productions_are_implemented() {
             &kerml
         };
         let (counts, _, errors) = classify_all(grammar, productions, &rules);
-        assert!(errors.is_empty(), "{grammar:?} classification errors: {errors:?}");
+        assert!(
+            errors.is_empty(),
+            "{grammar:?} classification errors: {errors:?}"
+        );
         assert_eq!(
             counts.get(&CoverageStatus::Partial).copied().unwrap_or(0),
             0,
             "{grammar:?} still has partial productions"
         );
         assert_eq!(
-            counts.get(&CoverageStatus::Implemented).copied().unwrap_or(0),
+            counts
+                .get(&CoverageStatus::Implemented)
+                .copied()
+                .unwrap_or(0),
             productions.len(),
             "{grammar:?} implemented count must equal production count"
         );

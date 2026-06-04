@@ -1,12 +1,12 @@
 //! Attribute definition and usage parsing.
 
-use crate::ast::{
-    AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Node,
-};
+use crate::ast::{AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Node};
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::expr::expression;
-use crate::parser::lex::{identification, name, qualified_name, starts_with_keyword, ws1, ws_and_comments};
+use crate::parser::lex::{
+    identification, name, qualified_name, starts_with_keyword, ws1, ws_and_comments,
+};
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{multiplicity, optional_typings, specialization_clauses, typings};
@@ -20,13 +20,7 @@ use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[
-    b"doc",
-    b"attribute",
-    b"comment",
-    b"@",
-    b"#",
-];
+const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[b"doc", b"attribute", b"comment", b"@", b"#"];
 
 fn local_name_from_qualified_name(qname: &str) -> String {
     qname.rsplit("::").next().unwrap_or(qname).to_string()

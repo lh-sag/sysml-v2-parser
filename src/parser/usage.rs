@@ -247,10 +247,7 @@ pub(crate) fn feature_usage_header(input: Input<'_>) -> IResult<Input<'_>, Usage
     let (input, _) = skip_usage_feature_modifiers(input)?;
     let (input, trailing) = specialization_clauses(input)?;
     let (input, _) = skip_intersects_clause(input)?;
-    Ok((
-        input,
-        merge_usage_header(leading, trailing, type_result),
-    ))
+    Ok((input, merge_usage_header(leading, trailing, type_result)))
 }
 
 /// Parse optional usage typing and specialization in either order:
@@ -261,10 +258,7 @@ pub(crate) fn usage_header(input: Input<'_>) -> IResult<Input<'_>, UsageHeader> 
     let (input, type_result) = optional_typings(input)?;
     let (input, trailing) = specialization_clauses(input)?;
 
-    Ok((
-        input,
-        merge_usage_header(leading, trailing, type_result),
-    ))
+    Ok((input, merge_usage_header(leading, trailing, type_result)))
 }
 
 #[cfg(test)]

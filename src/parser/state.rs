@@ -4,8 +4,8 @@ use crate::ast::{
     EntryAction, Node, RefBody, RefDecl, StateDef, StateDefBody, StateDefBodyElement, StateUsage,
     ThenStmt, Transition,
 };
-use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::body::advance_to_closing_brace;
+use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{

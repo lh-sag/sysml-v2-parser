@@ -51,11 +51,7 @@ fn definition_body(input: Input<'_>) -> IResult<Input<'_>, DefinitionBody> {
             let (input, node) = occurrence_body_element(input)?;
             Ok((
                 input,
-                node_from_to(
-                    start,
-                    input,
-                    DefinitionBodyElement::OccurrenceMember(node),
-                ),
+                node_from_to(start, input, DefinitionBodyElement::OccurrenceMember(node)),
             ))
         },
         |start, end| {

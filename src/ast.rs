@@ -2130,9 +2130,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::CalcUsage(n) => {
             PartDefBodyElement::CalcUsage(dummy_node(n, n.value.clone()))
         }
-        PartDefBodyElement::EnumerationUsage(n) => {
-            PartDefBodyElement::EnumerationUsage(dummy_node(n, normalize_enumeration_usage(&n.value)))
-        }
+        PartDefBodyElement::EnumerationUsage(n) => PartDefBodyElement::EnumerationUsage(
+            dummy_node(n, normalize_enumeration_usage(&n.value)),
+        ),
     };
     dummy_node(el, value)
 }
@@ -2278,9 +2278,9 @@ fn normalize_part_usage_body_element_node(
         PartUsageBodyElement::AttributeUsage(n) => {
             PartUsageBodyElement::AttributeUsage(dummy_node(n, normalize_attribute_usage(&n.value)))
         }
-        PartUsageBodyElement::EnumerationUsage(n) => {
-            PartUsageBodyElement::EnumerationUsage(dummy_node(n, normalize_enumeration_usage(&n.value)))
-        }
+        PartUsageBodyElement::EnumerationUsage(n) => PartUsageBodyElement::EnumerationUsage(
+            dummy_node(n, normalize_enumeration_usage(&n.value)),
+        ),
         PartUsageBodyElement::PartUsage(n) => {
             PartUsageBodyElement::PartUsage(Box::new(dummy_node(n, normalize_part_usage(&n.value))))
         }
@@ -2347,9 +2347,7 @@ fn normalize_port_body(b: &PortBody) -> PortBody {
 fn normalize_port_body_element_node(el: &Node<PortBodyElement>) -> Node<PortBodyElement> {
     let value = match &el.value {
         PortBodyElement::Error(n) => PortBodyElement::Error(dummy_node(n, n.value.clone())),
-        PortBodyElement::InOutDecl(n) => {
-            PortBodyElement::InOutDecl(dummy_node(n, n.value.clone()))
-        }
+        PortBodyElement::InOutDecl(n) => PortBodyElement::InOutDecl(dummy_node(n, n.value.clone())),
         PortBodyElement::PortUsage(n) => {
             PortBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
         }

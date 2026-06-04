@@ -96,22 +96,10 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"timeslice",
 ];
 
-pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] = &[
-    b"doc",
-    b"attribute",
-    b"port",
-    b"in",
-    b"out",
-    b"inout",
-];
+pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] =
+    &[b"doc", b"attribute", b"port", b"in", b"out", b"inout"];
 
-pub(crate) const PORT_BODY_STARTERS: &[&[u8]] = &[
-    b"doc",
-    b"port",
-    b"in",
-    b"out",
-    b"inout",
-];
+pub(crate) const PORT_BODY_STARTERS: &[&[u8]] = &[b"doc", b"port", b"in", b"out", b"inout"];
 
 pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
     b"#",
@@ -769,10 +757,7 @@ pub(crate) fn decimal_value_text(input: Input<'_>) -> IResult<Input<'_>, String>
         c.is_ascii_digit() || c == b'.' || c == b'e' || c == b'E' || c == b'+' || c == b'-'
     })
     .parse(input)?;
-    Ok((
-        input,
-        String::from_utf8_lossy(raw.fragment()).into_owned(),
-    ))
+    Ok((input, String::from_utf8_lossy(raw.fragment()).into_owned()))
 }
 
 /// STRING_VALUE: single-quoted unrestricted name content.

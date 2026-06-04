@@ -257,7 +257,10 @@ fn test_surveillance_drone_errors_reports_all_errors() {
     );
     let first = match &result.root.elements[0].value {
         RootElement::Package(p) => &p.value,
-        other => panic!("expected first root element to be a Package, got {:?}", other),
+        other => panic!(
+            "expected first root element to be a Package, got {:?}",
+            other
+        ),
     };
     assert_eq!(
         first.identification.name.as_deref(),

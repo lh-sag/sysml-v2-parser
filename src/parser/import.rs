@@ -1,8 +1,8 @@
 //! Import and relationship body parsing.
 
 use crate::ast::{FilterPackageMember, Import, Node, Visibility};
-use crate::parser::expr::expression;
 use crate::parser::body::advance_to_closing_brace;
+use crate::parser::expr::expression;
 use crate::parser::lex::{qualified_name, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::Input;

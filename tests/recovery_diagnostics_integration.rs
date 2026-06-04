@@ -633,10 +633,7 @@ fn fixture_requirement_def_id_keyword_reports_short_name_hint() {
         .expect("expected requirement header diagnostic");
     assert!(
         err.message.contains("short name")
-            || err
-                .suggestion
-                .as_deref()
-                .is_some_and(|s| s.contains('<')),
+            || err.suggestion.as_deref().is_some_and(|s| s.contains('<')),
         "expected short-name guidance: {:?}",
         err
     );
@@ -703,8 +700,7 @@ fn fixture_enum_usage_in_part_def_has_no_unexpected_keyword() {
     let result = parse_with_diagnostics(&input);
     assert!(
         !result.errors.iter().any(|e| {
-            e.code.as_deref() == Some("unexpected_keyword_in_scope")
-                && e.message.contains("enum")
+            e.code.as_deref() == Some("unexpected_keyword_in_scope") && e.message.contains("enum")
         }),
         "enumeration usage in part def is allowed; errors: {:?}",
         result.errors

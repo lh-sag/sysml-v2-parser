@@ -2,17 +2,16 @@
 
 use crate::ast::{
     CommentAnnotation, ConcernUsage, ConstraintBody, DocComment, FrameMember, Node, ParseErrorNode,
-    RequireConstraint, RequireConstraintBody, RequirementDef, RequirementDefBody,
-    RequirementActorDecl, RequirementDefBodyElement, RequirementUsage, Satisfy, SubjectDecl,
-    TextualRepresentation,
-    VerifyRequirementMember,
+    RequireConstraint, RequireConstraintBody, RequirementActorDecl, RequirementDef,
+    RequirementDefBody, RequirementDefBodyElement, RequirementUsage, Satisfy, SubjectDecl,
+    TextualRepresentation, VerifyRequirementMember,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage};
+use crate::parser::body::advance_to_closing_brace;
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
-use crate::parser::body::advance_to_closing_brace;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
     specialization_operator, starts_with_any_keyword, subset_operator, ws, ws1, ws_and_comments,
@@ -20,9 +19,11 @@ use crate::parser::lex::{
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
+use crate::parser::usage::{
+    feature_usage_header, multiplicity, specialization_clauses, usage_header,
+};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_span, span_from_to};
-use crate::parser::usage::{feature_usage_header, multiplicity, specialization_clauses, usage_header};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};

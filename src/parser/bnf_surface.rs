@@ -23,7 +23,9 @@ pub(crate) fn optional_empty_prefix(input: Input<'_>) -> IResult<Input<'_>, ()> 
 }
 
 /// OwnedExpression delegates to the full expression parser.
-pub(crate) fn owned_expression(input: Input<'_>) -> IResult<Input<'_>, crate::ast::Node<crate::ast::Expression>> {
+pub(crate) fn owned_expression(
+    input: Input<'_>,
+) -> IResult<Input<'_>, crate::ast::Node<crate::ast::Expression>> {
     expression(input)
 }
 
@@ -60,18 +62,23 @@ mod tests {
     #[test]
     fn owned_expression_parses_binary() {
         let (_, node) = owned_expression(span_input("1 + 2")).expect("OwnedExpression");
-        assert!(matches!(node.value, crate::ast::Expression::BinaryOp { .. }));
+        assert!(matches!(
+            node.value,
+            crate::ast::Expression::BinaryOp { .. }
+        ));
     }
 
     #[test]
     fn usage_declaration_surface_parses_header() {
-        let (_, name) = usage_declaration_surface(span_input("wheel : Wheel ;")).expect("UsageDeclaration");
+        let (_, name) =
+            usage_declaration_surface(span_input("wheel : Wheel ;")).expect("UsageDeclaration");
         assert_eq!(name, "wheel");
     }
 
     #[test]
     fn definition_declaration_surface_parses_identification() {
-        let (_, id) = definition_declaration_surface(span_input("MyPart ;")).expect("DefinitionDeclaration");
+        let (_, id) =
+            definition_declaration_surface(span_input("MyPart ;")).expect("DefinitionDeclaration");
         assert_eq!(id.name.as_deref(), Some("MyPart"));
     }
 
@@ -79,7 +86,7 @@ mod tests {
     fn bnf_specialization_operators() {
         use crate::parser::lex::typed_by_operator;
         use crate::parser::usage::{
-            cross_subsetting, reference_subsetting, redefinition, subsetting,
+            cross_subsetting, redefinition, reference_subsetting, subsetting,
         };
         let _ = typed_by_operator(span_input(": ")).expect("TypedBy");
         let _ = subsetting(span_input(":> Base ;")).expect("Subsets");

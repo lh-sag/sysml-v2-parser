@@ -5,11 +5,11 @@ use crate::ast::{
     ActionUsageBodyElement, AssignStmt, FirstMergeBody, FirstStmt, Flow, ForLoop, InOut, InOutDecl,
     MergeStmt, Node, ParseErrorNode, ThenAction,
 };
+use crate::parser::body::advance_to_closing_brace;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
 use crate::parser::interface::connect_body;
-use crate::parser::body::advance_to_closing_brace;
 use crate::parser::lex::{
     name, qualified_name, skip_statement_or_block, starts_with_any_keyword, take_until_terminator,
     ws1, ws_and_comments,

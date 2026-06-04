@@ -651,7 +651,9 @@ fn bare_feature_declaration_in_part_def_diagnostic(
     if !rest.starts_with(b":") {
         return None;
     }
-    if fragment.windows(3).any(|w| w == b":>>" || w == b":> " || w == b"::>")
+    if fragment
+        .windows(3)
+        .any(|w| w == b":>>" || w == b":> " || w == b"::>")
         || fragment.windows(8).any(|w| w == b" connect")
         || fragment.windows(4).any(|w| w == b" to ")
     {
@@ -665,13 +667,17 @@ fn bare_feature_declaration_in_part_def_diagnostic(
     if type_end == 0 {
         return None;
     }
-    let type_name = String::from_utf8_lossy(&rest[..type_end]).trim().to_string();
+    let type_name = String::from_utf8_lossy(&rest[..type_end])
+        .trim()
+        .to_string();
     let sample_ident = ident.to_lowercase();
     Some((
         "bare_feature_declaration_in_part_def",
         format!("bare feature `{ident} : {type_name}` is not valid in a part definition body"),
         "feature kind keyword such as `attribute`, `part`, or `port`".to_string(),
-        format!("Use `attribute {sample_ident} : {type_name};` (or `item` / `port` as appropriate)."),
+        format!(
+            "Use `attribute {sample_ident} : {type_name};` (or `item` / `port` as appropriate)."
+        ),
     ))
 }
 
@@ -1074,7 +1080,9 @@ fn extra_closing_brace_at_eof(bytes: &[u8]) -> Option<ParseError> {
             .with_code("unexpected_closing_brace")
             .with_expected("end of file or valid declaration")
             .with_found("}")
-            .with_suggestion("Remove this extra '}' or add the missing opening '{' earlier in the file.")
+            .with_suggestion(
+                "Remove this extra '}' or add the missing opening '{' earlier in the file.",
+            )
             .with_category(DiagnosticCategory::ParseError),
     )
 }
@@ -1203,7 +1211,8 @@ fn classify_recovery(
 ) -> RecoveryClassification {
     let trimmed = trim_ascii_start(input.fragment());
 
-    if let Some((code, message, expected, suggestion)) = missing_name_diagnostic(trimmed, scope_label)
+    if let Some((code, message, expected, suggestion)) =
+        missing_name_diagnostic(trimmed, scope_label)
     {
         return RecoveryClassification::MissingMemberName {
             code: code.to_string(),

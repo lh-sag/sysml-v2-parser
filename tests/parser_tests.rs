@@ -2711,7 +2711,10 @@ case analyze typed by Mission::CaseType subsets BaseCase;
         PackageBodyElement::CaseUsage(c) => c,
         other => panic!("expected case usage, got {:?}", other),
     };
-    assert_eq!(case_usage.value.type_name.as_deref(), Some("Mission::CaseType"));
+    assert_eq!(
+        case_usage.value.type_name.as_deref(),
+        Some("Mission::CaseType")
+    );
 }
 
 #[test]
@@ -2732,7 +2735,10 @@ use case mission typed by Mission::CaseType subsets BaseCase;
         PackageBodyElement::UseCaseUsage(u) => u,
         other => panic!("expected use case usage, got {:?}", other),
     };
-    assert_eq!(use_case.value.type_name.as_deref(), Some("Mission::CaseType"));
+    assert_eq!(
+        use_case.value.type_name.as_deref(),
+        Some("Mission::CaseType")
+    );
 }
 
 #[test]
@@ -2766,12 +2772,7 @@ then use case step typed by Mission::StepCase;
         })
         .expect("then use case usage should be present");
     assert_eq!(
-        then_use_case
-            .value
-            .use_case
-            .value
-            .type_name
-            .as_deref(),
+        then_use_case.value.use_case.value.type_name.as_deref(),
         Some("Mission::StepCase")
     );
 }
@@ -2988,13 +2989,19 @@ view dashboard typed by Mission::DashboardView;
         PackageBodyElement::StateUsage(s) => s,
         other => panic!("expected state usage, got {:?}", other),
     };
-    assert_eq!(state_usage.value.type_name.as_deref(), Some("Mission::Mode"));
+    assert_eq!(
+        state_usage.value.type_name.as_deref(),
+        Some("Mission::Mode")
+    );
 
     let view_usage = match &elements[2].value {
         PackageBodyElement::ViewUsage(v) => v,
         other => panic!("expected view usage, got {:?}", other),
     };
-    assert_eq!(view_usage.value.type_name.as_deref(), Some("Mission::DashboardView"));
+    assert_eq!(
+        view_usage.value.type_name.as_deref(),
+        Some("Mission::DashboardView")
+    );
 }
 
 #[test]

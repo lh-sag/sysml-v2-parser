@@ -2,9 +2,7 @@
 
 use crate::ast::{DefinitionBody, DefinitionBodyElement, Node};
 use crate::parser::build_recovery_error_node_from_span;
-use crate::parser::lex::{
-    skip_statement_or_block, skip_until_brace_end, ws_and_comments,
-};
+use crate::parser::lex::{skip_statement_or_block, skip_until_brace_end, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
 use crate::parser::Input;
@@ -138,7 +136,12 @@ pub(crate) fn semicolon_or_structured_definition_body(
         "recovered_definition_body_element",
         generic_definition_body_element,
         |start, end| {
-            generic_definition_body_recovery(start, end, "definition body", "recovered_definition_body_element")
+            generic_definition_body_recovery(
+                start,
+                end,
+                "definition body",
+                "recovered_definition_body_element",
+            )
         },
     )?;
     Ok((input, DefinitionBody::Brace { elements }))

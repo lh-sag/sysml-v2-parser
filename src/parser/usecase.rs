@@ -11,8 +11,7 @@ use crate::parser::body::advance_to_closing_brace;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
-    USE_CASE_BODY_STARTERS,
+    starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments, USE_CASE_BODY_STARTERS,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::{doc_comment, parse_requirement_usage_payload, subject_decl};
@@ -120,10 +119,7 @@ fn then_include_use_case(input: Input<'_>) -> IResult<Input<'_>, Node<ThenInclud
     ))
 }
 
-fn use_case_usage_tail(
-    input: Input<'_>,
-    ident: String,
-) -> IResult<Input<'_>, UseCaseUsage> {
+fn use_case_usage_tail(input: Input<'_>, ident: String) -> IResult<Input<'_>, UseCaseUsage> {
     let (input, header) = usage_header(input)?;
     let (input, _) = take_until_terminator(input, b";{")?;
     let (input, body) = use_case_def_body(input)?;

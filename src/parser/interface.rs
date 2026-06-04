@@ -5,9 +5,9 @@ use crate::ast::{
     ConnectBody, ConnectStmt, EndDecl, InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement,
     Node, RefBody, RefDecl,
 };
+use crate::parser::body::advance_to_closing_brace;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
-use crate::parser::body::advance_to_closing_brace;
 use crate::parser::lex::{
     identification, name, qualified_name, take_until_terminator, ws1, ws_and_comments,
 };

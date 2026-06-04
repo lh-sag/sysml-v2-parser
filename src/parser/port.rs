@@ -10,9 +10,7 @@ use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
-use crate::parser::lex::{
-    name, ws1, ws_and_comments, PORT_BODY_STARTERS, PORT_DEF_BODY_STARTERS,
-};
+use crate::parser::lex::{name, ws1, ws_and_comments, PORT_BODY_STARTERS, PORT_DEF_BODY_STARTERS};
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{multiplicity, optional_typings, specialization_clauses};

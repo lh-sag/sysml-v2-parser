@@ -10,8 +10,7 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    starts_with_any_keyword, ws1, ws_and_comments, VIEW_BODY_STARTERS,
-    VIEW_DEF_BODY_STARTERS,
+    starts_with_any_keyword, ws1, ws_and_comments, VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
 use crate::parser::usage::{feature_usage_header, usage_header};
@@ -193,10 +192,7 @@ fn rendering_def_body_element(
     Ok((input, node_from_to(start, input, elem)))
 }
 
-fn rendering_def_body_recovery(
-    start: Input<'_>,
-    end: Input<'_>,
-) -> Node<RenderingDefBodyElement> {
+fn rendering_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<RenderingDefBodyElement> {
     let recovery = build_recovery_error_node_from_span(
         start,
         end,

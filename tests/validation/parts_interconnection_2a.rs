@@ -5,8 +5,8 @@ use sysml_v2_parser::ast::{
     InterfaceDef, InterfaceDefBody, InterfaceDefBodyElement, InterfaceUsage,
     InterfaceUsageBodyElement, Node, Package, PackageBody, PackageBodyElement, PartDef,
     PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody, PartUsageBodyElement, PortBody,
-    PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl, RootElement,
-    RootNamespace, Span, Visibility,
+    PortBodyElement, PortDef, PortDefBody, PortDefBodyElement, PortUsage, RefBody, RefDecl,
+    RootElement, RootNamespace, Span, Visibility,
 };
 use sysml_v2_parser::parse;
 

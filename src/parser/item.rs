@@ -9,8 +9,8 @@ use crate::parser::usage::{feature_usage_header, multiplicity};
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
-use nom::Parser;
 use nom::IResult;
+use nom::Parser;
 
 /// Item definition: `item def` Identification body
 pub(crate) fn item_def(input: Input<'_>) -> IResult<Input<'_>, Node<ItemDef>> {

@@ -2,25 +2,24 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    Allocate, AttributeBody, AttributeUsage, Bind, Connect, ConnectBody, ConnectionUsageMember,
-    CalcUsage, DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage,
-    InterfaceUsageBodyElement,
-    Node, OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement, PartUsage, PartUsageBody,
-    PartUsageBodyElement, Perform, PerformBody, PerformBodyElement, PerformInOutBinding, RefBody,
-    RefDecl,
+    Allocate, AttributeBody, AttributeUsage, Bind, CalcUsage, Connect, ConnectBody,
+    ConnectionUsageMember, DefinitionPrefix, ExhibitState, Expression, InOut, InterfaceUsage,
+    InterfaceUsageBodyElement, Node, OpaqueMemberDecl, PartDef, PartDefBody, PartDefBodyElement,
+    PartUsage, PartUsageBody, PartUsageBodyElement, Perform, PerformBody, PerformBodyElement,
+    PerformInOutBinding, RefBody, RefDecl,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage, attribute_usage_shorthand};
 use crate::parser::body::advance_to_closing_brace;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::connection::connection_member_body;
 use crate::parser::constraint::calc_usage;
+use crate::parser::enumeration::enum_usage;
 use crate::parser::expr::{expression, path_expression};
 use crate::parser::interface::{connect_body, interface_def};
-use crate::parser::enumeration::enum_usage;
 use crate::parser::item::item_usage;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element,
-    starts_with_any_keyword, starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
+    identification, name, qualified_name, recover_body_element, starts_with_any_keyword,
+    starts_with_keyword, ws1, ws_and_comments, PART_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 use crate::parser::node_from_to;
@@ -346,10 +345,8 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMe
             nom::error::ErrorKind::Tag,
         )));
     }
-    let (input, header_text) = crate::parser::lex::take_until_terminator(
-        input,
-        MEMBER_HEADER_UNTIL_BODY,
-    )?;
+    let (input, header_text) =
+        crate::parser::lex::take_until_terminator(input, MEMBER_HEADER_UNTIL_BODY)?;
     let keyword = if starts_with_any_keyword(input.fragment(), &[b"ref"]) {
         "ref"
     } else if starts_with_any_keyword(input.fragment(), &[b"action"]) {

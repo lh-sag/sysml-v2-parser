@@ -10,8 +10,8 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::expr::expression;
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1,
-    ws_and_comments, CALC_DEF_BODY_STARTERS, CONSTRAINT_DEF_BODY_STARTERS,
+    starts_with_any_keyword, starts_with_keyword, take_until_terminator, ws1, ws_and_comments,
+    CALC_DEF_BODY_STARTERS, CONSTRAINT_DEF_BODY_STARTERS,
 };
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
@@ -211,10 +211,8 @@ pub(crate) fn calc_usage(input: Input<'_>) -> IResult<Input<'_>, Node<CalcUsage>
 
 pub(crate) fn calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
     let start = input;
-    let (input, prefix) = parse_definition_prefix(
-        input,
-        DefinitionPrefixOptions::new(b"calc").with_private(),
-    )?;
+    let (input, prefix) =
+        parse_definition_prefix(input, DefinitionPrefixOptions::new(b"calc").with_private())?;
     let (input, body) = calc_def_body(input)?;
     Ok((
         input,
