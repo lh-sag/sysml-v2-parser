@@ -2,10 +2,10 @@
 
 use crate::ast::{ItemDef, ItemUsage, Node};
 use crate::parser::attribute::attribute_body;
+use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{name, ws1, ws_and_comments};
 use crate::parser::node_from_to;
-use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::usage::multiplicity;
 use crate::parser::Input;
 use nom::bytes::complete::tag;

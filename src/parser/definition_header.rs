@@ -34,7 +34,9 @@ pub(crate) fn parse_definition_header_after_ident(
 pub(crate) type FeatureHeaderParts = UsageHeader;
 
 /// Library-style feature usage header (multiplicity, typing, specialization, intersects).
-pub(crate) fn parse_feature_usage_header(input: Input<'_>) -> IResult<Input<'_>, FeatureHeaderParts> {
+pub(crate) fn parse_feature_usage_header(
+    input: Input<'_>,
+) -> IResult<Input<'_>, FeatureHeaderParts> {
     feature_usage_header(input)
 }
 

@@ -1,4 +1,4 @@
-﻿use super::prelude::*;
+use super::prelude::*;
 use super::usage::{
     allocate_, connect_, interface_usage, part_ref_usage, part_usage, perform_action_decl,
     perform_usage,
@@ -24,11 +24,7 @@ fn try_part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDe
                 if next.location_offset() > input.location_offset() {
                     return Ok((
                         next,
-                        node_from_to(
-                            input,
-                            next,
-                            PartDefBodyElement::PartUsage(Box::new(usage)),
-                        ),
+                        node_from_to(input, next, PartDefBodyElement::PartUsage(Box::new(usage))),
                     ));
                 }
             }

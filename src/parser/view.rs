@@ -6,6 +6,7 @@ use crate::ast::{
     RenderingDefBodyElement, RenderingUsage, SatisfyViewMember, ViewBody, ViewBodyElement, ViewDef,
     ViewDefBody, ViewDefBodyElement, ViewRenderingUsage, ViewUsage, ViewpointDef, ViewpointUsage,
 };
+use crate::parser::definition_header::{parse_feature_usage_header, parse_usage_header};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
@@ -13,7 +14,6 @@ use crate::parser::lex::{
     VIEW_BODY_STARTERS, VIEW_DEF_BODY_STARTERS,
 };
 use crate::parser::requirement::{doc_comment, requirement_def_body};
-use crate::parser::definition_header::{parse_feature_usage_header, parse_usage_header};
 use crate::parser::Input;
 use crate::parser::{build_recovery_error_node_from_span, node_from_to};
 use nom::branch::alt;
@@ -418,9 +418,10 @@ mod expose_diagnostic_tests {
             result.errors
         );
         assert!(
-            result.errors.iter().any(|e| {
-                e.code.as_deref() == Some("invalid_qualified_name_separator")
-            }),
+            result
+                .errors
+                .iter()
+                .any(|e| { e.code.as_deref() == Some("invalid_qualified_name_separator") }),
             "codes: {:?}",
             result.errors.iter().map(|e| &e.code).collect::<Vec<_>>()
         );

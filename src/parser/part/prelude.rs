@@ -7,7 +7,9 @@ pub(crate) use crate::ast::{
     PartUsage, PartUsageBody, PartUsageBodyElement, Perform, PerformBody, PerformBodyElement,
     PerformInOutBinding, RefBody, RefDecl,
 };
-pub(crate) use crate::parser::attribute::{attribute_def, attribute_usage, attribute_usage_shorthand};
+pub(crate) use crate::parser::attribute::{
+    attribute_def, attribute_usage, attribute_usage_shorthand,
+};
 pub(crate) use crate::parser::body::{
     advance_to_closing_brace, parse_structured_brace_members_with_skip, BraceMemberSkip,
 };
@@ -28,7 +30,9 @@ pub(crate) use crate::parser::occurrence::{
     individual_usage, occurrence_usage, snapshot_usage, then_timeslice_usage, timeslice_usage,
 };
 pub(crate) use crate::parser::port::port_usage;
-pub(crate) use crate::parser::requirement::{comment_annotation, doc_comment, requirement_usage, satisfy};
+pub(crate) use crate::parser::requirement::{
+    comment_annotation, doc_comment, requirement_usage, satisfy,
+};
 pub(crate) use crate::parser::specialization::parse_optional_definition_specialization;
 pub(crate) use crate::parser::usage::{
     multiplicity, optional_typings, redefinition, specialization_clauses, subsetting, typings,

@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-06-04
+
+### Breaking
+
+- **`AttributeUsage`**: added `subsets`, `references`, and `crosses` (`Option<String>`) for `:>` / `::>` / `=>` clauses on attribute usages. Manual struct literals and destructuring must include the new fields (`None` when absent).
+- **`PortUsage`**: added `references` and `crosses` for the same operators on port usages.
+
+### Added
+
+- **P2–P4 parser debt (complete)**: plans and status in [`docs/PARSER_DEBT_P2_PLAN.md`](docs/PARSER_DEBT_P2_PLAN.md), [`docs/PARSER_DEBT_P3_PLAN.md`](docs/PARSER_DEBT_P3_PLAN.md), [`docs/PARSER_DEBT_P4_PLAN.md`](docs/PARSER_DEBT_P4_PLAN.md); P4 checklist marked done in [`docs/PARSER_TECHNICAL_DEBT.md`](docs/PARSER_TECHNICAL_DEBT.md).
+- **Structured view and part definition bodies**: `view_body` and `part_def_body_brace` use `parse_structured_brace_members_with_skip` with scoped recovery (`BodyElementRecover`, `view_body_recovery`); recovery nodes are retained when recovery ends at `}` (fixes empty view bodies and missing expose diagnostics).
+- **Definition headers** ([`src/parser/definition_header.rs`](src/parser/definition_header.rs)): shared header parsing; pilot use in item and view definition paths.
+- **Expression surface**: `implies` below `or` / `and` in [`src/parser/expr.rs`](src/parser/expr.rs) with unit coverage.
+- **Recovery and LSP**: clearer `Many0` / `Many1` messages in [`src/parser/diagnostics.rs`](src/parser/diagnostics.rs); `expose_member` rejects `.` after a qualified expose name; `tests/recovery_body_scopes.rs` adds `part_def_recovery_keeps_later_members`.
+- **Module layout (internal, public API unchanged)**: `src/ast.rs` split into `src/ast/`; parser helpers split into `diagnostics.rs`, `recovery.rs`, `collect_errors.rs`, `parse.rs`; `part.rs` split into `src/parser/part/` (`mod`, `prelude`, `body`, `def`, `usage`); integration tests split under `tests/parser/`.
+
+### Changed
+
+- **Port and attribute usages**: wire `references` / `crosses` (and attribute `subsets`) from shared `usage_header` parsing; AST normalization updated in [`src/ast/mod.rs`](src/ast/mod.rs).
+- **Validation snapshots**: `parts_tree_1a` and `functional_allocation_4a` AST snapshots refreshed for structured-body and usage-header shapes.
+- **BNF compliance test paths**: part grammar references `part/def.rs` and `part/usage.rs` after the part module split.
+
+### Fixed
+
+- **View body recovery**: structured brace loop no longer drops the final recovery `Error` node when the skip ends at `}` (regression that hid invalid `expose` separator diagnostics).
+- **Clippy**: `#[allow(clippy::large_enum_variant)]` on affected enums in [`src/ast/structure.rs`](src/ast/structure.rs) after usage AST growth.
+
+### Migration (Spec42 and similar hosts)
+
+1. Bump to `sysml-v2-parser` `0.17.0` (crates.io or tag `v0.17.0`).
+2. Extend `AttributeUsage` / `PortUsage` construction and matches with `subsets` / `references` / `crosses` as needed (`None` when not used).
+3. Re-run `cargo test`, `cargo test --test validation -- --include-ignored`, and `cargo test --test bnf_compliance` with `SYSML_V2_RELEASE_DIR` set.
+4. If you snapshot AST text, refresh fixtures after bumping.
+
+[0.17.0]: https://github.com/elan8/sysml-v2-parser/compare/v0.16.0...v0.17.0
+
 ## [0.16.0] - 2026-06-03
 
 ### Added

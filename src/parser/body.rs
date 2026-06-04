@@ -109,7 +109,8 @@ where
                     BraceMemberSkip::StatementOrBlock => {
                         let Ok((next, _)) = skip_statement_or_block(input) else {
                             let (input, _) = advance_to_closing_brace(input)?;
-                            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                            let (input, _) =
+                                preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                             return Ok((input, elements));
                         };
                         next
@@ -117,7 +118,8 @@ where
                     BraceMemberSkip::BodyElementRecover => {
                         let Ok((next, _)) = recover_body_element(input, starters) else {
                             let (input, _) = advance_to_closing_brace(input)?;
-                            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
+                            let (input, _) =
+                                preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                             return Ok((input, elements));
                         };
                         next

@@ -1,8 +1,8 @@
 //! Shared definition prelude: modifiers, keyword, `def`, identification, header.
 
 use crate::ast::{Identification, Span};
-use crate::parser::lex::{identification, ws1, ws_and_comments};
 use crate::parser::definition_header::parse_definition_header_after_ident;
+use crate::parser::lex::{identification, ws1, ws_and_comments};
 use crate::parser::Input;
 use nom::bytes::complete::{tag, take_while1};
 use nom::combinator::opt;
