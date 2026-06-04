@@ -4,7 +4,7 @@ use crate::ast::{
     EntryAction, Node, RefBody, RefDecl, StateDef, StateDefBody, StateDefBodyElement, StateUsage,
     ThenStmt, Transition,
 };
-use crate::parser::body::advance_to_closing_brace;
+use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
@@ -58,98 +58,42 @@ pub(crate) fn state_def_body(input: Input<'_>) -> IResult<Input<'_>, StateDefBod
 }
 
 fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
-    let (mut input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().is_empty() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Eof,
-            )));
-        }
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, StateDefBody::Brace { elements }));
-        }
-        match state_def_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        STATE_BODY_STARTERS,
+        "state body",
+        "recovered_state_body_element",
+        state_def_body_element,
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                STATE_BODY_STARTERS,
+                "state body",
+                "recovered_state_body_element",
+            );
+            if matches!(
+                recovery.code.as_str(),
+                "missing_member_name"
+                    | "missing_type_reference"
+                    | "invalid_bare_identifier_in_state_body"
+                    | "missing_semicolon"
+                    | "missing_body_or_semicolon"
+            ) {
+                node_from_to(
+                    start,
+                    end,
+                    StateDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
+                )
+            } else {
+                let frag = start.fragment();
+                let take = frag.len().min(80);
+                let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+                node_from_to(start, end, StateDefBodyElement::Other(preview))
             }
-            Err(_) if starts_with_any_keyword(input.fragment(), STATE_BODY_STARTERS) => {
-                let (next, _) = recover_body_element(input, STATE_BODY_STARTERS)?;
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(node_from_to(
-                    input,
-                    next,
-                    StateDefBodyElement::Error(Node::new(
-                        crate::ast::Span::dummy(),
-                        build_recovery_error_node_from_span(
-                            input,
-                            next,
-                            STATE_BODY_STARTERS,
-                            "state body",
-                            "recovered_state_body_element",
-                        ),
-                    )),
-                ));
-                input = next;
-            }
-            Err(_) => {
-                let start_unknown = input;
-                let (next, _) = recover_body_element(input, STATE_BODY_STARTERS)?;
-                let recovery = build_recovery_error_node_from_span(
-                    start_unknown,
-                    next,
-                    STATE_BODY_STARTERS,
-                    "state body",
-                    "recovered_state_body_element",
-                );
-                if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = advance_to_closing_brace(input)?;
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                    return Ok((input, StateDefBody::Brace { elements }));
-                }
-                if matches!(
-                    recovery.code.as_str(),
-                    "missing_member_name"
-                        | "missing_type_reference"
-                        | "invalid_bare_identifier_in_state_body"
-                        | "missing_semicolon"
-                        | "missing_body_or_semicolon"
-                ) {
-                    elements.push(node_from_to(
-                        start_unknown,
-                        next,
-                        StateDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
-                    ));
-                } else {
-                    let frag = start_unknown.fragment();
-                    let take = frag.len().min(80);
-                    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-                    elements.push(node_from_to(
-                        start_unknown,
-                        next,
-                        StateDefBodyElement::Other(preview),
-                    ));
-                }
-                input = next;
-            }
-        }
-    }
+        },
+    )?;
+    Ok((input, StateDefBody::Brace { elements }))
 }
 
 /// Entry action: `entry` (`;` or body)  or  `entry action` name body

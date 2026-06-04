@@ -102,7 +102,7 @@ fn relationship_body_connect(input: Input<'_>) -> IResult<Input<'_>, ConnectBody
         map(
             nom::sequence::delimited(
                 tag(&b"{"[..]),
-                crate::parser::lex::skip_until_brace_end,
+                crate::parser::body::advance_to_closing_brace,
                 preceded(ws_and_comments, tag(&b"}"[..])),
             ),
             |_| ConnectBody::Brace,

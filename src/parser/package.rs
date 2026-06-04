@@ -584,225 +584,306 @@ pub(crate) fn filter_member(input: Input<'_>) -> IResult<Input<'_>, Node<FilterM
     ))
 }
 
+macro_rules! try_package_body_dispatch {
+    ($input:expr, $start:expr, $parser:expr, $wrap:expr) => {
+        if let Ok((input, elem)) = map($parser, $wrap).parse($input) {
+            return Ok((input, node_from_to($start, input, elem)));
+        }
+    };
+}
+
+fn try_package_body_annotations<'a>(
+    input: Input<'a>,
+    start: Input<'a>,
+) -> IResult<Input<'a>, Node<PackageBodyElement>> {
+    try_package_body_dispatch!(input, start, doc_comment, PackageBodyElement::Doc);
+    try_package_body_dispatch!(
+        input,
+        start,
+        comment_annotation,
+        PackageBodyElement::Comment
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        textual_representation,
+        PackageBodyElement::TextualRep
+    );
+    try_package_body_dispatch!(input, start, filter_member, PackageBodyElement::Filter);
+    try_package_body_dispatch!(
+        input,
+        start,
+        |i| attribute_def(i, false),
+        PackageBodyElement::AttributeDef
+    );
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Alt,
+    )))
+}
+
+fn try_package_body_packages<'a>(
+    input: Input<'a>,
+    start: Input<'a>,
+) -> IResult<Input<'a>, Node<PackageBodyElement>> {
+    try_package_body_dispatch!(
+        input,
+        start,
+        library_package_,
+        PackageBodyElement::LibraryPackage
+    );
+    try_package_body_dispatch!(input, start, package_, PackageBodyElement::Package);
+    try_package_body_dispatch!(input, start, import_, PackageBodyElement::Import);
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Alt,
+    )))
+}
+
+fn try_package_body_structure<'a>(
+    input: Input<'a>,
+    start: Input<'a>,
+) -> IResult<Input<'a>, Node<PackageBodyElement>> {
+    try_package_body_dispatch!(input, start, part_def_or_usage, |p| match p {
+        PartDefOrUsage::Def(n) => PackageBodyElement::PartDef(n),
+        PartDefOrUsage::Usage(n) => PackageBodyElement::PartUsage(n),
+    });
+    try_package_body_dispatch!(input, start, port_def, PackageBodyElement::PortDef);
+    try_package_body_dispatch!(
+        input,
+        start,
+        interface_def,
+        PackageBodyElement::InterfaceDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        connection_def,
+        PackageBodyElement::ConnectionDef
+    );
+    try_package_body_dispatch!(input, start, dependency, PackageBodyElement::Dependency);
+    try_package_body_dispatch!(input, start, metadata_def, PackageBodyElement::MetadataDef);
+    try_package_body_dispatch!(input, start, enum_def, PackageBodyElement::EnumDef);
+    try_package_body_dispatch!(
+        input,
+        start,
+        occurrence_def,
+        PackageBodyElement::OccurrenceDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        occurrence_usage,
+        PackageBodyElement::OccurrenceUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        individual_usage,
+        PackageBodyElement::OccurrenceUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        snapshot_usage,
+        PackageBodyElement::OccurrenceUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        timeslice_usage,
+        PackageBodyElement::OccurrenceUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        allocation_def,
+        PackageBodyElement::AllocationDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        allocation_usage,
+        PackageBodyElement::AllocationUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        allocate_usage,
+        PackageBodyElement::AllocationUsage
+    );
+    try_package_body_dispatch!(input, start, flow_def, PackageBodyElement::FlowDef);
+    try_package_body_dispatch!(input, start, flow_usage, PackageBodyElement::FlowUsage);
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Alt,
+    )))
+}
+
+fn try_package_body_behavior<'a>(
+    input: Input<'a>,
+    start: Input<'a>,
+) -> IResult<Input<'a>, Node<PackageBodyElement>> {
+    try_package_body_dispatch!(input, start, alias_def, PackageBodyElement::AliasDef);
+    try_package_body_dispatch!(input, start, action_def, PackageBodyElement::ActionDef);
+    try_package_body_dispatch!(input, start, action_usage, PackageBodyElement::ActionUsage);
+    try_package_body_dispatch!(input, start, state_def, PackageBodyElement::StateDef);
+    try_package_body_dispatch!(input, start, state_usage, PackageBodyElement::StateUsage);
+    try_package_body_dispatch!(input, start, item_def, PackageBodyElement::ItemDef);
+    try_package_body_dispatch!(
+        input,
+        start,
+        individual_def,
+        PackageBodyElement::IndividualDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        constraint_def,
+        PackageBodyElement::ConstraintDef
+    );
+    try_package_body_dispatch!(input, start, calc_def, PackageBodyElement::CalcDef);
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Alt,
+    )))
+}
+
+fn try_package_body_requirement<'a>(
+    input: Input<'a>,
+    start: Input<'a>,
+) -> IResult<Input<'a>, Node<PackageBodyElement>> {
+    try_package_body_dispatch!(
+        input,
+        start,
+        requirement_def,
+        PackageBodyElement::RequirementDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        requirement_usage,
+        PackageBodyElement::RequirementUsage
+    );
+    try_package_body_dispatch!(input, start, satisfy, PackageBodyElement::Satisfy);
+    try_package_body_dispatch!(input, start, use_case_def, PackageBodyElement::UseCaseDef);
+    try_package_body_dispatch!(
+        input,
+        start,
+        use_case_usage,
+        PackageBodyElement::UseCaseUsage
+    );
+    try_package_body_dispatch!(input, start, case_def, PackageBodyElement::CaseDef);
+    try_package_body_dispatch!(input, start, case_usage, PackageBodyElement::CaseUsage);
+    try_package_body_dispatch!(
+        input,
+        start,
+        analysis_case_def,
+        PackageBodyElement::AnalysisCaseDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        analysis_case_usage,
+        PackageBodyElement::AnalysisCaseUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        verification_case_def,
+        PackageBodyElement::VerificationCaseDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        verification_case_usage,
+        PackageBodyElement::VerificationCaseUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        concern_usage,
+        PackageBodyElement::ConcernUsage
+    );
+    try_package_body_dispatch!(input, start, actor_decl, PackageBodyElement::Actor);
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Alt,
+    )))
+}
+
+fn try_package_body_view<'a>(
+    input: Input<'a>,
+    start: Input<'a>,
+) -> IResult<Input<'a>, Node<PackageBodyElement>> {
+    try_package_body_dispatch!(input, start, view_def, PackageBodyElement::ViewDef);
+    try_package_body_dispatch!(
+        input,
+        start,
+        viewpoint_def,
+        PackageBodyElement::ViewpointDef
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        rendering_def,
+        PackageBodyElement::RenderingDef
+    );
+    try_package_body_dispatch!(input, start, view_usage, PackageBodyElement::ViewUsage);
+    try_package_body_dispatch!(
+        input,
+        start,
+        viewpoint_usage,
+        PackageBodyElement::ViewpointUsage
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        rendering_usage,
+        PackageBodyElement::RenderingUsage
+    );
+    try_package_body_dispatch!(input, start, feature_decl, PackageBodyElement::FeatureDecl);
+    try_package_body_dispatch!(
+        input,
+        start,
+        classifier_decl,
+        PackageBodyElement::ClassifierDecl
+    );
+    try_package_body_dispatch!(
+        input,
+        start,
+        kerml_semantic_decl,
+        PackageBodyElement::KermlSemanticDecl
+    );
+    Err(nom::Err::Error(nom::error::Error::new(
+        input,
+        nom::error::ErrorKind::Alt,
+    )))
+}
+
 /// PackageBodyElement: Package | Import | PartDef | PartUsage | PortDef | InterfaceDef | AliasDef | ActionDef | ActionUsage
 pub(crate) fn package_body_element(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<PackageBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
-    if let Ok((input, elem)) = map(doc_comment, PackageBodyElement::Doc).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
+    if let Ok(r) = try_package_body_annotations(input, start) {
+        return Ok(r);
     }
-    if let Ok((input, elem)) = map(comment_annotation, PackageBodyElement::Comment).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
+    if let Ok(r) = try_package_body_packages(input, start) {
+        return Ok(r);
     }
-    if let Ok((input, elem)) =
-        map(textual_representation, PackageBodyElement::TextualRep).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
+    if let Ok(r) = try_package_body_structure(input, start) {
+        return Ok(r);
     }
-    if let Ok((input, elem)) = map(filter_member, PackageBodyElement::Filter).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
+    if let Ok(r) = try_package_body_behavior(input, start) {
+        return Ok(r);
     }
-    if let Ok((input, elem)) = map(
-        |i| attribute_def(i, false),
-        PackageBodyElement::AttributeDef,
-    )
-    .parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
+    if let Ok(r) = try_package_body_requirement(input, start) {
+        return Ok(r);
     }
-    if let Ok((input, elem)) =
-        map(library_package_, PackageBodyElement::LibraryPackage).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(package_, PackageBodyElement::Package).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(import_, PackageBodyElement::Import).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(part_def_or_usage, |p| match p {
-        PartDefOrUsage::Def(n) => PackageBodyElement::PartDef(n),
-        PartDefOrUsage::Usage(n) => PackageBodyElement::PartUsage(n),
-    })
-    .parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(port_def, PackageBodyElement::PortDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(interface_def, PackageBodyElement::InterfaceDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(connection_def, PackageBodyElement::ConnectionDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(dependency, PackageBodyElement::Dependency).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(metadata_def, PackageBodyElement::MetadataDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(enum_def, PackageBodyElement::EnumDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(occurrence_def, PackageBodyElement::OccurrenceDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) =
-        map(occurrence_usage, PackageBodyElement::OccurrenceUsage).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) =
-        map(individual_usage, PackageBodyElement::OccurrenceUsage).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(snapshot_usage, PackageBodyElement::OccurrenceUsage).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) =
-        map(timeslice_usage, PackageBodyElement::OccurrenceUsage).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(allocation_def, PackageBodyElement::AllocationDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) =
-        map(allocation_usage, PackageBodyElement::AllocationUsage).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(allocate_usage, PackageBodyElement::AllocationUsage).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(flow_def, PackageBodyElement::FlowDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(flow_usage, PackageBodyElement::FlowUsage).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(alias_def, PackageBodyElement::AliasDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(action_def, PackageBodyElement::ActionDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(action_usage, PackageBodyElement::ActionUsage).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(requirement_def, PackageBodyElement::RequirementDef).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) =
-        map(requirement_usage, PackageBodyElement::RequirementUsage).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(satisfy, PackageBodyElement::Satisfy).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(use_case_def, PackageBodyElement::UseCaseDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(use_case_usage, PackageBodyElement::UseCaseUsage).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(case_def, PackageBodyElement::CaseDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(case_usage, PackageBodyElement::CaseUsage).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) =
-        map(analysis_case_def, PackageBodyElement::AnalysisCaseDef).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) =
-        map(analysis_case_usage, PackageBodyElement::AnalysisCaseUsage).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(
-        verification_case_def,
-        PackageBodyElement::VerificationCaseDef,
-    )
-    .parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(
-        verification_case_usage,
-        PackageBodyElement::VerificationCaseUsage,
-    )
-    .parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(concern_usage, PackageBodyElement::ConcernUsage).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(actor_decl, PackageBodyElement::Actor).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(state_def, PackageBodyElement::StateDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(state_usage, PackageBodyElement::StateUsage).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(item_def, PackageBodyElement::ItemDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(individual_def, PackageBodyElement::IndividualDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(constraint_def, PackageBodyElement::ConstraintDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(calc_def, PackageBodyElement::CalcDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(view_def, PackageBodyElement::ViewDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(viewpoint_def, PackageBodyElement::ViewpointDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(rendering_def, PackageBodyElement::RenderingDef).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(view_usage, PackageBodyElement::ViewUsage).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(viewpoint_usage, PackageBodyElement::ViewpointUsage).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(rendering_usage, PackageBodyElement::RenderingUsage).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(feature_decl, PackageBodyElement::FeatureDecl).parse(input) {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) = map(classifier_decl, PackageBodyElement::ClassifierDecl).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
-    }
-    if let Ok((input, elem)) =
-        map(kerml_semantic_decl, PackageBodyElement::KermlSemanticDecl).parse(input)
-    {
-        return Ok((input, node_from_to(start, input, elem)));
+    if let Ok(r) = try_package_body_view(input, start) {
+        return Ok(r);
     }
     if starts_with_keyword(input.fragment(), b"occurrence") {
         if let Ok((next, _)) = recover_body_element(input, PACKAGE_BODY_STARTERS) {

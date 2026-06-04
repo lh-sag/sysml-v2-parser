@@ -442,11 +442,10 @@ package Later {
 }"#;
     let result = parse_with_diagnostics(input);
     assert!(
-        result
-            .errors
-            .iter()
-            .any(|e| e.code.as_deref() == Some("recovered_root_body")),
-        "root body recovery should be summarized: {:?}",
+        result.errors.iter().any(|e| {
+            e.code.as_deref() == Some("invalid_bare_identifier_in_state_body")
+        }),
+        "malformed state body members should surface scoped recovery diagnostics: {:?}",
         result.errors
     );
     assert!(

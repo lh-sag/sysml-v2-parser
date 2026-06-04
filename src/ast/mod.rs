@@ -1,131 +1,10 @@
 //! Abstract syntax tree types for SysML v2 textual notation.
 
-/// Source location: byte offset, line, column, and length in the source file.
-/// Line and column are **1-based**. Use [`Span::to_lsp_range`] for 0-based LSP ranges.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Span {
-    pub offset: usize,
-    pub line: u32,
-    pub column: usize,
-    pub len: usize,
-}
+mod core;
+mod kerml_fallback;
 
-impl Span {
-    /// Dummy span for tests or synthetic nodes (offset 0, line 1, column 1, len 0).
-    pub fn dummy() -> Self {
-        Self {
-            offset: 0,
-            line: 1,
-            column: 1,
-            len: 0,
-        }
-    }
-
-    /// LSP uses 0-based line and 0-based character. Returns (start_line, start_character, end_line, end_character).
-    pub fn to_lsp_range(&self) -> (u32, u32, u32, u32) {
-        let start_line = self.line.saturating_sub(1);
-        let start_char = self.column.saturating_sub(1);
-        let end_char = start_char.saturating_add(self.len);
-        (start_line, start_char as u32, start_line, end_char as u32)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Span;
-
-    #[test]
-    fn span_dummy() {
-        let s = Span::dummy();
-        assert_eq!(s.offset, 0);
-        assert_eq!(s.line, 1);
-        assert_eq!(s.column, 1);
-        assert_eq!(s.len, 0);
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Node<T> {
-    pub span: Span,
-    pub value: T,
-}
-
-impl<T: PartialEq> PartialEq for Node<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.value == other.value
-    }
-}
-
-impl<T: Eq> Eq for Node<T> {}
-
-impl<T> Node<T> {
-    pub fn new(span: Span, value: T) -> Self {
-        Self { span, value }
-    }
-}
-
-impl<T> std::ops::Deref for Node<T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        &self.value
-    }
-}
-
-/// Trait for generic access to node source span (e.g. visitors).
-pub trait AstNode {
-    fn span(&self) -> Span;
-}
-
-impl<T> AstNode for Node<T> {
-    fn span(&self) -> Span {
-        self.span.clone()
-    }
-}
-
-/// Expression: literals, feature refs, member access, index, bracket/unit, etc.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Expression {
-    LiteralInteger(i64),
-    LiteralReal(String),
-    LiteralString(String),
-    LiteralBoolean(bool),
-    /// Single name or qualified name.
-    FeatureRef(String),
-    /// base.member (e.g. engine.fuelCmdPort).
-    MemberAccess(Box<Node<Expression>>, String),
-    /// base#(index) e.g. frontWheel#(1).
-    Index {
-        base: Box<Node<Expression>>,
-        index: Box<Node<Expression>>,
-    },
-    /// [unit] e.g. [kg].
-    Bracket(Box<Node<Expression>>),
-    /// value [unit] e.g. 1750 [kg].
-    LiteralWithUnit {
-        value: Box<Node<Expression>>,
-        unit: Box<Node<Expression>>,
-    },
-    /// Binary infix operation e.g. `a >= b * c`, `x / y`.
-    BinaryOp {
-        op: String,
-        left: Box<Node<Expression>>,
-        right: Box<Node<Expression>>,
-    },
-    /// Unary prefix: + - ~ not
-    UnaryOp {
-        op: String,
-        operand: Box<Node<Expression>>,
-    },
-    /// Function-like invocation, e.g. `ComputeMargin(a, b)`.
-    Invocation {
-        callee: Box<Node<Expression>>,
-        args: Vec<Node<Expression>>,
-    },
-    /// Comma-separated sequence in parentheses, e.g. `(engine1, engine2)` for ordered composition values.
-    Tuple(Vec<Node<Expression>>),
-    /// KerML null or empty sequence ().
-    Null,
-}
+pub use core::*;
+pub use kerml_fallback::*;
 
 /// KerML top-level element: package, namespace, import, or library package (BNF RootNamespace = PackageBodyElement*).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -165,42 +44,6 @@ pub struct ParseErrorNode {
     pub found: Option<String>,
     pub suggestion: Option<String>,
     pub category: Option<crate::error::DiagnosticCategory>,
-}
-
-/// Modeled KerML semantic declaration captured as package-level syntax.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KermlSemanticDecl {
-    pub bnf_production: String,
-    pub text: String,
-}
-
-/// Modeled KerML feature declaration family (occurrence/expr/predicate/succession).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KermlFeatureDecl {
-    pub bnf_production: String,
-    pub text: String,
-}
-
-/// Package-level KerML feature declaration captured as an explicit dedicated node.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FeatureDecl {
-    pub keyword: String,
-    pub text: String,
-}
-
-/// Package-level KerML classifier declaration captured as an explicit dedicated node.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ClassifierDecl {
-    pub keyword: String,
-    pub text: String,
-}
-
-/// Modeled extended SysML/KerML declaration family not yet represented by
-/// dedicated concrete nodes (e.g. concern/message style library declarations).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExtendedLibraryDecl {
-    pub bnf_production: String,
-    pub text: String,
 }
 
 /// Top-level element inside a namespace or package body.
@@ -1520,7 +1363,7 @@ pub enum StateDefBodyElement {
     Entry(Node<EntryAction>),
     /// `then` name `;` - initial state.
     Then(Node<ThenStmt>),
-    /// `ref` name `:` type body – reference binding in state.
+    /// `ref` name `:` type body ÔÇô reference binding in state.
     Ref(Node<RefDecl>),
     RequirementUsage(Node<RequirementUsage>),
     StateUsage(Node<StateUsage>),
