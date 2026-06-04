@@ -23,13 +23,9 @@ After each PR:
 - `cargo test -- --include-ignored` (validation + library gates)
 - `cargo test --test bnf_compliance` after body-parser changes
 
-## Remaining P2+ (not in this pass)
+## Follow-up (P3)
 
-- Further `ast/` modules (`structure.rs`, `root.rs`, …) once `PackageBodyElement` ordering is refactored
-- Requirement def body → shared structured loop while preserving library `Other` vs `Error` policy
-- Remaining `skip_until_brace_end` in `body.rs` generic fallback paths
-- Unified definition/usage header (P3)
-- Full `OwnedExpression` subset
+See [`PARSER_DEBT_P3_PLAN.md`](./PARSER_DEBT_P3_PLAN.md).
 
 ## Notes
 

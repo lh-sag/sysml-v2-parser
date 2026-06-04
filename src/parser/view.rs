@@ -60,80 +60,39 @@ fn view_rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ViewRenderi
     ))
 }
 
+fn view_def_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<ViewDefBodyElement> {
+    if starts_with_any_keyword(start.fragment(), VIEW_DEF_BODY_STARTERS) {
+        let recovery = build_recovery_error_node_from_span(
+            start,
+            end,
+            VIEW_DEF_BODY_STARTERS,
+            "view definition body",
+            "recovered_view_def_body_element",
+        );
+        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+        return node_from_to(start, end, ViewDefBodyElement::Error(node));
+    }
+    let preview = String::from_utf8_lossy(&start.fragment()[..start.fragment().len().min(60)])
+        .trim()
+        .to_string();
+    node_from_to(start, end, ViewDefBodyElement::Other(preview))
+}
+
 fn view_def_body(input: Input<'_>) -> IResult<Input<'_>, ViewDefBody> {
-    let (mut input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
         let (input, _) = tag(&b";"[..]).parse(input)?;
         return Ok((input, ViewDefBody::Semicolon));
     }
-    let (next, _) = tag(&b"{"[..]).parse(input)?;
-    input = next;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, ViewDefBody::Brace { elements }));
-        }
-        match view_def_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) if starts_with_any_keyword(input.fragment(), VIEW_DEF_BODY_STARTERS) => {
-                let start_unknown = input;
-                let (next, _) = recover_body_element(input, VIEW_DEF_BODY_STARTERS)?;
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                let recovery = build_recovery_error_node_from_span(
-                    start_unknown,
-                    next,
-                    VIEW_DEF_BODY_STARTERS,
-                    "view definition body",
-                    "recovered_view_def_body_element",
-                );
-                let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
-                elements.push(node_from_to(
-                    start_unknown,
-                    next,
-                    ViewDefBodyElement::Error(node),
-                ));
-                input = next;
-            }
-            Err(_) => {
-                let start_unknown = input;
-                let (next, _) = skip_statement_or_block(input)?;
-                if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = crate::parser::body::advance_to_closing_brace(input)?;
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                    return Ok((input, ViewDefBody::Brace { elements }));
-                }
-                elements.push(node_from_to(
-                    start_unknown,
-                    next,
-                    ViewDefBodyElement::Other(
-                        String::from_utf8_lossy(
-                            &start_unknown.fragment()[..start_unknown.fragment().len().min(60)],
-                        )
-                        .trim()
-                        .to_string(),
-                    ),
-                ));
-                input = next;
-            }
-        }
-    }
+    let (input, elements) = crate::parser::body::parse_structured_brace_members(
+        input,
+        VIEW_DEF_BODY_STARTERS,
+        "view definition body",
+        "recovered_view_def_body_element",
+        view_def_body_element,
+        view_def_body_recovery,
+    )?;
+    Ok((input, ViewDefBody::Brace { elements }))
 }
 
 pub(crate) fn view_def(input: Input<'_>) -> IResult<Input<'_>, Node<ViewDef>> {

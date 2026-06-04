@@ -11,8 +11,7 @@ use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefix
 use crate::parser::expr::path_expression;
 use crate::parser::interface::connect_body;
 use crate::parser::lex::{
-    name, qualified_name, skip_statement_or_block, starts_with_any_keyword, take_until_terminator,
-    ws1, ws_and_comments,
+    name, qualified_name, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
@@ -568,58 +567,25 @@ fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
 }
 
 fn action_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
-    let (mut input, _) = tag(&b"{"[..]).parse(input)?;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().is_empty() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Eof,
-            )));
-        }
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, ActionUsageBody::Brace { elements }));
-        }
-        match action_usage_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) => {
-                let start_unknown = input;
-                let (next, _) = skip_statement_or_block(input)?;
-                if next.location_offset() == start_unknown.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                let recovery = build_recovery_error_node_from_span(
-                    start_unknown,
-                    next,
-                    ACTION_BODY_STARTERS,
-                    "action body",
-                    "recovered_action_body_element",
-                );
-                let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
-                elements.push(node_from_to(
-                    start_unknown,
-                    next,
-                    ActionUsageBodyElement::Error(node),
-                ));
-                input = next;
-            }
-        }
-    }
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        ACTION_BODY_STARTERS,
+        "action body",
+        "recovered_action_body_element",
+        action_usage_body_element,
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                ACTION_BODY_STARTERS,
+                "action body",
+                "recovered_action_body_element",
+            );
+            let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+            node_from_to(start, end, ActionUsageBodyElement::Error(node))
+        },
+    )?;
+    Ok((input, ActionUsageBody::Brace { elements }))
 }
 
 /// Action usage body element: InOutDecl | Bind | Flow | FirstStmt | MergeStmt | ActionUsage

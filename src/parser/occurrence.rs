@@ -159,6 +159,14 @@ fn occurrence_usage_tail(
         .redefines
         .or(trailing_clauses.redefines)
         .or(leading_clauses.redefines);
+    let references = post_body_clauses
+        .references
+        .or(trailing_clauses.references)
+        .or(leading_clauses.references);
+    let crosses = post_body_clauses
+        .crosses
+        .or(trailing_clauses.crosses)
+        .or(leading_clauses.crosses);
     let input = if post_body_clauses.had_any {
         let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
         input
@@ -178,6 +186,8 @@ fn occurrence_usage_tail(
                 type_name,
                 subsets,
                 redefines,
+                references,
+                crosses,
                 body,
             },
         ),

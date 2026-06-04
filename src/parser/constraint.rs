@@ -5,7 +5,7 @@ use crate::ast::{
     ConstraintDefBodyElement, Expression, Node, ParseErrorNode, ReturnDecl,
 };
 use crate::parser::action::in_out_decl;
-use crate::parser::body::advance_to_closing_brace;
+use crate::parser::body::parse_structured_brace_members;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::lex::{
@@ -60,82 +60,44 @@ pub(crate) enum StructuredConstraintBody {
     },
 }
 
+fn constraint_body_recovery_element(
+    start: Input<'_>,
+    end: Input<'_>,
+) -> Node<ConstraintDefBodyElement> {
+    if starts_with_any_keyword(start.fragment(), CONSTRAINT_DEF_BODY_STARTERS) {
+        let recovery = build_recovery_error_node_from_span(
+            start,
+            end,
+            CONSTRAINT_DEF_BODY_STARTERS,
+            "constraint body",
+            "recovered_constraint_body_element",
+        );
+        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+        return node_from_to(start, end, ConstraintDefBodyElement::Error(node));
+    }
+    let preview = String::from_utf8_lossy(&start.fragment()[..start.fragment().len().min(120)])
+        .trim()
+        .to_string();
+    node_from_to(start, end, ConstraintDefBodyElement::Other(preview))
+}
+
 pub(crate) fn structured_constraint_body(
     input: Input<'_>,
 ) -> IResult<Input<'_>, StructuredConstraintBody> {
-    let (mut input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
         let (input, _) = tag(&b";"[..]).parse(input)?;
         return Ok((input, StructuredConstraintBody::Semicolon));
     }
-    let (next, _) = tag(&b"{"[..]).parse(input)?;
-    input = next;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, StructuredConstraintBody::Brace { elements }));
-        }
-        match constraint_def_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) if starts_with_any_keyword(input.fragment(), CONSTRAINT_DEF_BODY_STARTERS) => {
-                let start_unknown = input;
-                let (next, _) = recover_body_element(input, CONSTRAINT_DEF_BODY_STARTERS)?;
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                let recovery = build_recovery_error_node_from_span(
-                    start_unknown,
-                    next,
-                    CONSTRAINT_DEF_BODY_STARTERS,
-                    "constraint body",
-                    "recovered_constraint_body_element",
-                );
-                let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
-                elements.push(node_from_to(
-                    start_unknown,
-                    next,
-                    ConstraintDefBodyElement::Error(node),
-                ));
-                input = next;
-            }
-            Err(_) => {
-                let start_unknown = input;
-                let (next, _) = skip_statement_or_block(input)?;
-                if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = advance_to_closing_brace(input)?;
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                    return Ok((input, StructuredConstraintBody::Brace { elements }));
-                }
-                elements.push(node_from_to(
-                    start_unknown,
-                    next,
-                    ConstraintDefBodyElement::Other(
-                        String::from_utf8_lossy(
-                            &start_unknown.fragment()[..start_unknown.fragment().len().min(120)],
-                        )
-                        .trim()
-                        .to_string(),
-                    ),
-                ));
-                input = next;
-            }
-        }
-    }
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        CONSTRAINT_DEF_BODY_STARTERS,
+        "constraint body",
+        "recovered_constraint_body_element",
+        constraint_def_body_element,
+        constraint_body_recovery_element,
+    )?;
+    Ok((input, StructuredConstraintBody::Brace { elements }))
 }
 
 pub(crate) fn constraint_def_body_element(
@@ -227,80 +189,39 @@ pub(crate) fn calc_def(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDef>> {
     ))
 }
 
+fn calc_body_recovery_element(start: Input<'_>, end: Input<'_>) -> Node<CalcDefBodyElement> {
+    if starts_with_any_keyword(start.fragment(), CALC_DEF_BODY_STARTERS) {
+        let recovery = build_recovery_error_node_from_span(
+            start,
+            end,
+            CALC_DEF_BODY_STARTERS,
+            "calc body",
+            "recovered_calc_body_element",
+        );
+        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+        return node_from_to(start, end, CalcDefBodyElement::Error(node));
+    }
+    let frag = start.fragment();
+    let take = frag.len().min(120);
+    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+    node_from_to(start, end, CalcDefBodyElement::Other(preview))
+}
+
 fn calc_def_body(input: Input<'_>) -> IResult<Input<'_>, CalcDefBody> {
-    let (mut input, _) = ws_and_comments(input)?;
+    let (input, _) = ws_and_comments(input)?;
     if input.fragment().starts_with(b";") {
         let (input, _) = tag(&b";"[..]).parse(input)?;
         return Ok((input, CalcDefBody::Semicolon));
     }
-    let (next, _) = tag(&b"{"[..]).parse(input)?;
-    input = next;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, CalcDefBody::Brace { elements }));
-        }
-        match calc_def_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) if starts_with_any_keyword(input.fragment(), CALC_DEF_BODY_STARTERS) => {
-                let start_unknown = input;
-                let (next, _) = recover_body_element(input, CALC_DEF_BODY_STARTERS)?;
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                let recovery = build_recovery_error_node_from_span(
-                    start_unknown,
-                    next,
-                    CALC_DEF_BODY_STARTERS,
-                    "calc body",
-                    "recovered_calc_body_element",
-                );
-                let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
-                elements.push(node_from_to(
-                    start_unknown,
-                    next,
-                    CalcDefBodyElement::Error(node),
-                ));
-                input = next;
-            }
-            Err(_) => {
-                // Calc bodies in the standard library can contain additional constructs (e.g. `objective ... { ... }`)
-                // that we don't model yet. Skip one statement/block and keep parsing later siblings.
-                let start_unknown = input;
-                let (next, _) = skip_statement_or_block(input)?;
-                if next.location_offset() == start_unknown.location_offset() {
-                    // Fallback: avoid infinite loop by bailing out to end of calc body.
-                    let (input, _) = advance_to_closing_brace(input)?;
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                    return Ok((input, CalcDefBody::Brace { elements }));
-                }
-                let frag = start_unknown.fragment();
-                let take = frag.len().min(120);
-                let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-                elements.push(node_from_to(
-                    start_unknown,
-                    next,
-                    CalcDefBodyElement::Other(preview),
-                ));
-                input = next;
-            }
-        }
-    }
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        CALC_DEF_BODY_STARTERS,
+        "calc body",
+        "recovered_calc_body_element",
+        calc_def_body_element,
+        calc_body_recovery_element,
+    )?;
+    Ok((input, CalcDefBody::Brace { elements }))
 }
 
 fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBodyElement>> {

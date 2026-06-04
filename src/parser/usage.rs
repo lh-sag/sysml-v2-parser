@@ -18,6 +18,8 @@ use nom::Parser;
 pub(crate) struct SpecializationClauses {
     pub subsets: Option<(String, Option<Node<Expression>>)>,
     pub redefines: Option<String>,
+    pub references: Option<String>,
+    pub crosses: Option<String>,
     pub had_any: bool,
 }
 
@@ -26,6 +28,8 @@ pub(crate) struct UsageHeader {
     pub type_name: Option<String>,
     pub subsets: Option<String>,
     pub redefines: Option<String>,
+    pub references: Option<String>,
+    pub crosses: Option<String>,
     pub had_specialization: bool,
 }
 
@@ -185,12 +189,8 @@ pub(crate) fn specialization_clauses(
         match clause {
             SpecializationClause::Subsets(value) => out.subsets = Some(value),
             SpecializationClause::Redefines(value) => out.redefines = Some(value),
-            SpecializationClause::References(value) => {
-                out.subsets = Some((value, None));
-            }
-            SpecializationClause::Crosses(value) => {
-                out.subsets = Some((value, None));
-            }
+            SpecializationClause::References(value) => out.references = Some(value),
+            SpecializationClause::Crosses(value) => out.crosses = Some(value),
         }
     }
     out.had_any = had_any;
@@ -228,10 +228,14 @@ fn merge_usage_header(
         .or(leading.subsets)
         .map(|(target, _value)| target);
     let redefines = trailing.redefines.or(leading.redefines);
+    let references = trailing.references.or(leading.references);
+    let crosses = trailing.crosses.or(leading.crosses);
     UsageHeader {
         type_name: type_result.map(|(_, name)| name),
         subsets,
         redefines,
+        references,
+        crosses,
         had_specialization: leading.had_any || trailing.had_any,
     }
 }
@@ -361,6 +365,17 @@ mod tests {
         let input = span_input("=> other ;");
         let (rest, target) = cross_subsetting(input).expect("crosses");
         assert_eq!(target, "other");
+        assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
+    }
+
+    #[test]
+    fn usage_header_preserves_references_and_crosses() {
+        let input = span_input(": T references a crosses b ;");
+        let (rest, header) = usage_header(input).expect("usage header");
+        assert_eq!(header.type_name.as_deref(), Some("T"));
+        assert_eq!(header.references.as_deref(), Some("a"));
+        assert_eq!(header.crosses.as_deref(), Some("b"));
+        assert!(header.subsets.is_none());
         assert!(rest.fragment().trim_ascii_start().starts_with(b";"));
     }
 }

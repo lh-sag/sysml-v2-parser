@@ -1,0 +1,88 @@
+use crate::ast::core::{Expression, Node};
+
+/// KerML ElementFilterMember: MemberPrefix? 'filter' condition ';'
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FilterMember {
+    pub visibility: Option<Visibility>,
+    pub condition: Node<Expression>,
+}
+
+/// Placeholder node inserted when resilient parsing skips malformed input.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseErrorNode {
+    pub message: String,
+    pub code: String,
+    pub expected: Option<String>,
+    pub found: Option<String>,
+    pub suggestion: Option<String>,
+    pub category: Option<crate::error::DiagnosticCategory>,
+}
+/// Identification: optional short name in `< >`, optional name.
+/// BNF: ( '<' declaredShortName = NAME '>' )? ( declaredName = NAME )?
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Identification {
+    /// Short name inside `< ... >`, if present.
+    pub short_name: Option<String>,
+    /// Main declared name (may be quoted, e.g. '1a-Parts Tree').
+    pub name: Option<String>,
+}
+
+/// Visibility for imports and members.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Visibility {
+    Public,
+    Private,
+    Protected,
+}
+
+/// KerML FilterPackageMember: `[` OwnedExpression `]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FilterPackageMember {
+    pub expression: Node<Expression>,
+}
+
+/// Import: `private`? `import` `all`? QualifiedName (`::` `*`)? or FilterPackage form.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Import {
+    pub visibility: Option<Visibility>,
+    /// Whether this is a namespace import (QualifiedName::* or FilterPackage) or membership import (single QualifiedName).
+    pub is_import_all: bool,
+    /// Import target, e.g. "SI::kg" or "Definitions::*".
+    pub target: String,
+    /// KerML: optional recursive import after :: (e.g. QualifiedName::** or QualifiedName::*::**).
+    pub is_recursive: bool,
+    /// KerML FilterPackage form: one or more `[ expr ]` members. When present, this is a namespace import of a filter package.
+    pub filter_members: Option<Vec<Node<FilterPackageMember>>>,
+}
+/// KerML Documentation: 'doc' Identification? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocComment {
+    /// Optional identification after 'doc'.
+    pub identification: Option<Identification>,
+    /// Optional locale string (e.g. "en").
+    pub locale: Option<String>,
+    /// Body text (content between /* and */).
+    pub text: String,
+}
+
+/// KerML Comment: ( 'comment' Identification? )? ( 'locale' STRING_VALUE )? body = REGULAR_COMMENT.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommentAnnotation {
+    pub identification: Option<Identification>,
+    pub locale: Option<String>,
+    pub text: String,
+}
+
+/// KerML TextualRepresentation: ( 'rep' Identification )? 'language' STRING_VALUE body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextualRepresentation {
+    pub rep_identification: Option<Identification>,
+    pub language: String,
+    pub text: String,
+}
+/// Body of a connect statement: `;` or `{` ... `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConnectBody {
+    Semicolon,
+    Brace,
+}

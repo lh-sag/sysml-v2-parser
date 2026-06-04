@@ -1,0 +1,331 @@
+use super::behavior::{AssignStmt, ForLoop, ThenAction};
+use super::common::{ConnectBody, DocComment, Identification, Import, ParseErrorNode, Visibility};
+use super::structure::{Annotation, AttributeBody, AttributeDef, AttributeUsage};
+use super::view::ConstraintDefBodyElement;
+use crate::ast::core::{Expression, Node, Span};
+
+/// Requirement definition: `requirement def` Identification (`:>` specializes)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequirementDef {
+    pub identification: Identification,
+    /// Supertype after `:>`, e.g. Some("UserRequirement") for `requirement def Need :> UserRequirement`.
+    pub specializes: Option<String>,
+    /// Span of the `:> <type>` fragment (for semantic tokens), when present.
+    pub specializes_span: Option<Span>,
+    pub body: RequirementDefBody,
+}
+
+/// Body of an requirement definition: `;` or `{` RequirementDefBodyElement* `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RequirementDefBody {
+    Semicolon,
+    Brace {
+        elements: Vec<Node<RequirementDefBodyElement>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RequirementDefBodyElement {
+    Error(Node<ParseErrorNode>),
+    /// Unmodeled requirement-body element captured as raw text (used for library parsing).
+    Other(String),
+    Annotation(Node<Annotation>),
+    Import(Node<Import>),
+    SubjectDecl(Node<SubjectDecl>),
+    RequirementActorDecl(Node<RequirementActorDecl>),
+    AttributeDef(Node<AttributeDef>),
+    AttributeUsage(Node<AttributeUsage>),
+    VerifyRequirement(Node<VerifyRequirementMember>),
+    RequireConstraint(Node<RequireConstraint>),
+    Frame(Node<FrameMember>),
+    Doc(Node<DocComment>),
+}
+
+/// Subject declaration: `subject` name `:` type `;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubjectDecl {
+    pub name: String,
+    pub type_name: String,
+}
+
+/// Actor parameter in a requirement body: `actor` name? `:` type `;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequirementActorDecl {
+    pub name: String,
+    pub type_name: String,
+}
+
+/// Require constraint: `require constraint { ... }`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequireConstraint {
+    pub body: RequireConstraintBody,
+}
+
+/// Requirement verification usage in requirement/objective bodies:
+/// `verify requirement <...>` or shorthand `verify <qualified_name>;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifyRequirementMember {
+    /// True for `verify requirement ...`; false for shorthand `verify ...;`.
+    pub explicit_requirement_keyword: bool,
+    /// Parsed requirement usage when explicit form is used.
+    pub requirement: Option<Node<RequirementUsage>>,
+    /// Shorthand verified requirement reference (`verify QualifiedName;`).
+    pub target: Option<String>,
+}
+
+/// Require constraint body: `;` or `{` ConstraintDefBodyElement* `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RequireConstraintBody {
+    Semicolon,
+    Brace {
+        elements: Vec<Node<ConstraintDefBodyElement>>,
+    },
+}
+
+/// Requirement usage / Satisfy. Example: `satisfy EnduranceReq by droneInstance;`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Satisfy {
+    pub source: Node<Expression>,
+    pub target: Node<Expression>,
+    pub body: ConnectBody,
+}
+
+/// Bare requirement Usage.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequirementUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub subsets: Option<String>,
+    pub body: RequirementDefBody,
+}
+
+/// Item usage inside a part definition body: `item` name multiplicity? (`:` type)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ItemUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub multiplicity: Option<String>,
+    pub body: AttributeBody,
+}
+
+/// Enumeration usage inside a definition body: `enum` name (`:` type)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnumerationUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub multiplicity: Option<String>,
+    pub body: AttributeBody,
+}
+
+/// Dependency: `dependency` (Identification `from`)? client(s) `to` supplier(s) RelationshipBody.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Dependency {
+    pub identification: Option<Identification>,
+    pub clients: Vec<String>,
+    pub suppliers: Vec<String>,
+    pub body: ConnectBody,
+}
+
+/// Framed concern member in requirement body: `frame` name (`;` or body).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FrameMember {
+    pub name: String,
+    pub body: RequirementDefBody,
+}
+
+/// Concern usage at package level: `concern` name (`:` type)? RequirementBody.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConcernUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub body: RequirementDefBody,
+}
+
+/// Case definition: `case def` Identification body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CaseDef {
+    pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
+    pub body: UseCaseDefBody,
+}
+
+/// Case usage: `case` name (`:` type)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CaseUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub body: UseCaseDefBody,
+}
+
+/// Analysis case definition: `analysis def` Identification body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnalysisCaseDef {
+    pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
+    pub body: UseCaseDefBody,
+}
+
+/// Analysis case usage: `analysis` name (`:` type)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnalysisCaseUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub body: UseCaseDefBody,
+}
+
+/// Verification case definition: `verification def` Identification body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationCaseDef {
+    pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
+    pub body: UseCaseDefBody,
+}
+
+/// Verification case usage: `verification` name (`:` type)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationCaseUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub body: UseCaseDefBody,
+}
+
+/// Use case usage at package level: `use case` name (`:` type)? CaseBody.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UseCaseUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub body: UseCaseDefBody,
+}
+
+// ---------------------------------------------------------------------------
+// Use Cases
+// ---------------------------------------------------------------------------
+
+/// Actor declaration: `actor` Identification `;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorDecl {
+    pub identification: Identification,
+}
+
+/// Use Case definition: `use case def` Identification body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UseCaseDef {
+    pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
+    pub body: UseCaseDefBody,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UseCaseDefBody {
+    Semicolon,
+    Brace {
+        elements: Vec<Node<UseCaseDefBodyElement>>,
+    },
+}
+
+/// `first <name>;` inside a case/use-case body (used in SysML v2 release fixtures).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FirstSuccession {
+    pub target: String,
+}
+
+/// `then done;` inside a case/use-case body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThenDone {}
+
+/// `include <usecase> ...` inside a case/use-case body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IncludeUseCase {
+    pub name: String,
+    /// Optional multiplicity suffix like `[0..*]` captured as raw text including brackets.
+    pub multiplicity: Option<String>,
+    pub body: UseCaseDefBody,
+}
+
+/// `then include <usecase> ...` inside a case/use-case body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThenIncludeUseCase {
+    pub include: Node<IncludeUseCase>,
+}
+
+/// `then use case <name> ...` inside a case/use-case body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThenUseCaseUsage {
+    pub use_case: Node<UseCaseUsage>,
+}
+
+/// `subject;` shorthand used in SysML v2 release fixtures (subject of an enclosing case/use case).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubjectRef {}
+
+/// `actor :>> <name> = <expr>;` redefinition/assignment used in SysML v2 release fixtures.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorRedefinitionAssignment {
+    pub name: String,
+    /// Raw RHS expression text up to `;` (we don't model the expression grammar here yet).
+    pub rhs: String,
+}
+
+/// `ref :>> <name> { ... }` redefinition used in SysML v2 release fixtures.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefRedefinition {
+    pub name: String,
+    /// Raw body text for now (balanced `{ ... }` including nested braces).
+    pub body: String,
+}
+
+/// `return ref <name><multiplicity?> { ... }` used in SysML v2 release libraries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReturnRef {
+    pub name: String,
+    pub multiplicity: Option<String>,
+    /// Raw body text for now (balanced `{ ... }` including nested braces).
+    pub body: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UseCaseDefBodyElement {
+    Error(Node<ParseErrorNode>),
+    /// Unmodeled use-case / analysis-case body element captured as raw text (used for library parsing).
+    Other(String),
+    AttributeDef(Node<AttributeDef>),
+    Doc(Node<DocComment>),
+    SubjectDecl(Node<SubjectDecl>),
+    /// `subject;` shorthand.
+    SubjectRef(Node<SubjectRef>),
+    ActorUsage(Node<ActorUsage>),
+    ActorRedefinitionAssignment(Node<ActorRedefinitionAssignment>),
+    Objective(Node<Objective>),
+    FirstSuccession(Node<FirstSuccession>),
+    ThenIncludeUseCase(Node<ThenIncludeUseCase>),
+    ThenUseCaseUsage(Node<ThenUseCaseUsage>),
+    ThenDone(Node<ThenDone>),
+    IncludeUseCase(Node<IncludeUseCase>),
+    RefRedefinition(Node<RefRedefinition>),
+    ReturnRef(Node<ReturnRef>),
+    Assign(Node<AssignStmt>),
+    ForLoop(Node<ForLoop>),
+    ThenAction(Node<ThenAction>),
+}
+
+/// actor usage `actor pilot : Operator;`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorUsage {
+    pub name: String,
+    pub type_name: String,
+}
+
+/// Objective `objective { doc ... }`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Objective {
+    pub visibility: Option<Visibility>,
+    pub requirement: Node<RequirementUsage>,
+}
+
+// ---------------------------------------------------------------------------
+// State Machine
+// ---------------------------------------------------------------------------

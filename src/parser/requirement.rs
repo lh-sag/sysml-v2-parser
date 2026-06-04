@@ -7,15 +7,14 @@ use crate::ast::{
     TextualRepresentation, VerifyRequirementMember,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage};
-use crate::parser::body::advance_to_closing_brace;
+use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
 use crate::parser::import::import_;
 use crate::parser::lex::{
-    identification, name, qualified_name, recover_body_element, skip_statement_or_block,
-    specialization_operator, starts_with_any_keyword, subset_operator, ws, ws1, ws_and_comments,
-    REQUIREMENT_BODY_STARTERS,
+    identification, name, qualified_name, skip_statement_or_block, specialization_operator,
+    starts_with_any_keyword, subset_operator, ws, ws1, ws_and_comments, REQUIREMENT_BODY_STARTERS,
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
@@ -108,90 +107,53 @@ pub(crate) fn requirement_def_body(input: Input<'_>) -> IResult<Input<'_>, Requi
 }
 
 fn requirement_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, RequirementDefBody> {
-    let (mut input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().is_empty() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Eof,
-            )));
-        }
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, RequirementDefBody::Brace { elements }));
-        }
-        match requirement_def_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) => {
-                // Library requirement bodies contain constructs we don't model yet (e.g. `attribute :>> ...`).
-                // Emit diagnostics only for likely-user mistakes. Valid-but-unmodeled library syntax should be
-                // captured as `Other` so strict library suites can remain diagnostic-free.
-                let start_unknown = input;
-                let (next, _) = recover_body_element(input, REQUIREMENT_BODY_STARTERS)?;
-                if next.location_offset() == start_unknown.location_offset() {
-                    // Fallback: abort this body to avoid infinite loops.
-                    let (input, _) = advance_to_closing_brace(input)?;
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                    return Ok((input, RequirementDefBody::Brace { elements }));
-                }
-                let trimmed = start_unknown.fragment();
-                let is_redefinition = trimmed.windows(3).any(|w| w == b":>>");
-                let is_libraryish = is_redefinition
-                    || trimmed.starts_with(b"ref ")
-                    || trimmed.starts_with(b"abstract ")
-                    || trimmed.starts_with(b"return ")
-                    || trimmed.starts_with(b"objective ");
-                let recovery = build_recovery_error_node_from_span(
-                    start_unknown,
-                    next,
-                    REQUIREMENT_BODY_STARTERS,
-                    "requirement body",
-                    "recovered_requirement_body_element",
-                );
-                // For local parsing we still want a recoverable error for unsupported-but-common members like
-                // `attribute massActual: MassValue;` in requirement bodies. For release library constructs
-                // (redefinitions, refs, etc) keep it as `Other` to avoid diagnostics in strict suites.
-                let should_error = if is_libraryish {
-                    matches!(
-                        recovery.code.as_str(),
-                        "missing_member_name" | "missing_type_reference"
-                    )
-                } else {
-                    true
-                };
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        REQUIREMENT_BODY_STARTERS,
+        "requirement body",
+        "recovered_requirement_body_element",
+        requirement_def_body_element,
+        requirement_body_recovery_element,
+    )?;
+    Ok((input, RequirementDefBody::Brace { elements }))
+}
 
-                if should_error {
-                    let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
-                    elements.push(node_from_to(
-                        start_unknown,
-                        next,
-                        RequirementDefBodyElement::Error(node),
-                    ));
-                } else {
-                    let frag = start_unknown.fragment();
-                    let take = frag.len().min(80);
-                    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-                    elements.push(node_from_to(
-                        start_unknown,
-                        next,
-                        RequirementDefBodyElement::Other(preview),
-                    ));
-                }
-                input = next;
-            }
-        }
+fn requirement_body_recovery_element(
+    start: Input<'_>,
+    end: Input<'_>,
+) -> Node<RequirementDefBodyElement> {
+    let trimmed = start.fragment();
+    let is_libraryish = trimmed.windows(3).any(|w| w == b":>>")
+        || trimmed.starts_with(b"ref ")
+        || trimmed.starts_with(b"abstract ")
+        || trimmed.starts_with(b"return ")
+        || trimmed.starts_with(b"objective ");
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        REQUIREMENT_BODY_STARTERS,
+        "requirement body",
+        "recovered_requirement_body_element",
+    );
+    let should_error = if is_libraryish {
+        matches!(
+            recovery.code.as_str(),
+            "missing_member_name" | "missing_type_reference"
+        )
+    } else {
+        true
+    };
+    if should_error {
+        node_from_to(
+            start,
+            end,
+            RequirementDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
+        )
+    } else {
+        let frag = start.fragment();
+        let take = frag.len().min(80);
+        let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+        node_from_to(start, end, RequirementDefBodyElement::Other(preview))
     }
 }
 

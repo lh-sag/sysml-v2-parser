@@ -96,15 +96,13 @@ Duplication in code and “partial grammar” in the spec sense overlap: the sam
 
 ## Implementation plan (P2)
 
-**Status: in progress (June 2026).** Checklist: [`PARSER_DEBT_P2_PLAN.md`](./PARSER_DEBT_P2_PLAN.md).
+**Status: complete (June 2026).** Checklist: [`PARSER_DEBT_P2_PLAN.md`](./PARSER_DEBT_P2_PLAN.md).
 
-Completed in P2 so far:
+## Implementation plan (P3)
 
-- Parser god-file split: [`recovery.rs`](../src/parser/recovery.rs), [`diagnostics.rs`](../src/parser/diagnostics.rs), [`collect_errors.rs`](../src/parser/collect_errors.rs), [`parse.rs`](../src/parser/parse.rs); thin [`mod.rs`](../src/parser/mod.rs)
-- TDD tests split under [`tests/parser/`](../tests/parser/)
-- AST directory started: [`ast/core.rs`](../src/ast/core.rs), [`ast/kerml_fallback.rs`](../src/ast/kerml_fallback.rs)
-- Package dispatch grouped in [`package.rs`](../src/parser/package.rs) (`try_package_body_*`)
-- Action/state def brace bodies use [`parse_structured_brace_members`](./src/parser/body.rs)
+**Status: in progress (June 2026).** Checklist: [`PARSER_DEBT_P3_PLAN.md`](./PARSER_DEBT_P3_PLAN.md).
+
+P3 focus: AST family modules, requirement/action-usage structured bodies, `body.rs` recovery fallback, usage-header AST fidelity, LSP error-node coverage.
 
 ## Prioritized improvements
 
@@ -137,7 +135,7 @@ Completed in P2 so far:
 |----------|--------|
 | Is there a lot of duplication? | **Yes** — especially definition prefixes, body terminators, and recovery loops. |
 | Is the codebase unmaintainable? | **No** — modules and tests are coherent; debt is known and gated. |
-| Best next step? | **AST family modules** + requirement structured body; continue opaque-body migration. |
+| Best next step? | **P3 streams** in [`PARSER_DEBT_P3_PLAN.md`](./PARSER_DEBT_P3_PLAN.md): AST split, requirement body, opaque fallback, usage AST, LSP scopes. |
 | Largest long-term gap? | **Unified definition/usage/specialization grammar** plus deeper body parsing, not more top-level `*_def` files. |
 
 The validation CI regression fixed in 2026 (typed library headers after `identification`) illustrates the preferred direction: **extract shared grammar fragments** as they are discovered, keep construct modules, and let library node-shape gates enforce that dedicated parsers stay on the happy path.

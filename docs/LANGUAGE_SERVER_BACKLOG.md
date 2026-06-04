@@ -26,7 +26,7 @@ The remaining backlog below is the still-actionable work after those completed s
 
 ### 1. Tighten diagnostics emitted from current recovery paths
 
-The current recovery architecture is in place, but many diagnostics are still generic or derived from `nom` defaults in [`src/parser/mod.rs`](C:\Git\sysml-v2-parser\src\parser\mod.rs).
+The current recovery architecture is in place, but many diagnostics are still generic or derived from `nom` defaults in [`src/parser/diagnostics.rs`](src/parser/diagnostics.rs).
 
 Expected outcome:
 
@@ -61,7 +61,7 @@ Expected outcome:
 
 ### 4. Add recovery-focused tests per construct
 
-Expand tests beyond end-to-end fixtures in [`tests/parser_tests.rs`](C:\Git\sysml-v2-parser\tests\parser_tests.rs) and validation tests.
+Expand tests beyond end-to-end fixtures in [`tests/parser/`](tests/parser/) and validation tests.
 
 Add dedicated malformed-input cases for:
 

@@ -1,0 +1,290 @@
+use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
+use super::requirement::RequirementUsage;
+use super::structure::{Annotation, Bind, DefinitionBody, Perform, RefDecl};
+use crate::ast::core::{Expression, Node, Span};
+
+/// Action definition: `action def` Identification body (in/out params).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionDef {
+    pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
+    pub body: ActionDefBody,
+}
+
+/// Body of an action definition: `;` or `{` ActionDefBodyElement* `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionDefBody {
+    Semicolon,
+    Brace {
+        elements: Vec<Node<ActionDefBodyElement>>,
+    },
+}
+
+/// Element inside an action definition body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionDefBodyElement {
+    Error(Node<ParseErrorNode>),
+    InOutDecl(Node<InOutDecl>),
+    Doc(Node<DocComment>),
+    Annotation(Node<Annotation>),
+    RefDecl(Node<RefDecl>),
+    Perform(Node<Perform>),
+    Bind(Node<Bind>),
+    Flow(Node<Flow>),
+    FirstStmt(Node<FirstStmt>),
+    MergeStmt(Node<MergeStmt>),
+    StateUsage(Node<StateUsage>),
+    ActionUsage(Box<Node<ActionUsage>>),
+    Assign(Node<AssignStmt>),
+    ForLoop(Node<ForLoop>),
+    ThenAction(Node<ThenAction>),
+    Decl(Node<ActionBodyDecl>),
+}
+
+/// Assignment statement (SysML v2 AssignmentNode/AssignmentActionUsage).
+///
+/// Examples:
+/// - `assign x := y;`
+/// - `then assign position := dynamics.x_out;`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AssignStmt {
+    pub is_then: bool,
+    pub lhs: String,
+    pub rhs: String,
+}
+
+/// For-loop node (SysML v2 ForLoopNode) - modeled minimally.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ForLoop {
+    pub var: String,
+    pub range: String,
+    pub body: ActionDefBody,
+}
+
+/// Succession to an action usage: `then action ...`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThenAction {
+    pub action: Node<ActionUsage>,
+}
+
+/// In/out parameter in action def: `in` name `:` type `;` or `out` name `:` type `;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InOutDecl {
+    pub direction: InOut,
+    pub name: String,
+    pub type_name: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InOut {
+    In,
+    Out,
+    InOut,
+}
+
+/// Action usage: `action` name `:` type_name (`accept` param_name `:` param_type)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionUsage {
+    pub name: String,
+    pub type_name: String,
+    /// For accept form: (param_name, param_type).
+    pub accept: Option<(String, String)>,
+    pub body: ActionUsageBody,
+    /// Span of the usage name (for semantic tokens).
+    pub name_span: Option<Span>,
+    /// Span of the type reference after `:` (for semantic tokens).
+    pub type_ref_span: Option<Span>,
+}
+
+/// Body of an action usage: `;` or `{` ActionUsageBodyElement* `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionUsageBody {
+    Semicolon,
+    Brace {
+        elements: Vec<Node<ActionUsageBodyElement>>,
+    },
+}
+
+/// Element inside an action usage body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionUsageBodyElement {
+    Error(Node<ParseErrorNode>),
+    Doc(Node<DocComment>),
+    Annotation(Node<Annotation>),
+    InOutDecl(Node<InOutDecl>),
+    RefDecl(Node<RefDecl>),
+    Bind(Node<Bind>),
+    Flow(Node<Flow>),
+    FirstStmt(Node<FirstStmt>),
+    MergeStmt(Node<MergeStmt>),
+    StateUsage(Node<StateUsage>),
+    ActionUsage(Box<Node<ActionUsage>>),
+    Assign(Node<AssignStmt>),
+    ForLoop(Node<ForLoop>),
+    ThenAction(Node<ThenAction>),
+    Decl(Node<ActionBodyDecl>),
+}
+
+/// A minimally-modeled declaration inside an action/behavior body (e.g. `attribute ...;`, `calc ...;`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActionBodyDecl {
+    pub keyword: String,
+    pub text: String,
+}
+
+/// Flow: `flow` from `to` to body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Flow {
+    pub from: Node<Expression>,
+    pub to: Node<Expression>,
+    pub body: ConnectBody,
+}
+
+/// Flow definition: `flow def` Identification body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlowDef {
+    pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
+    pub body: DefinitionBody,
+}
+
+/// Flow usage: `flow` name (`:` type)? [`from` expr `to` expr]? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlowUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub from: Option<Node<Expression>>,
+    pub to: Option<Node<Expression>>,
+    pub body: DefinitionBody,
+}
+
+/// First/then control flow: `first` expr `then` expr body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FirstStmt {
+    pub first: Node<Expression>,
+    pub then: Node<Expression>,
+    pub body: FirstMergeBody,
+}
+
+/// Merge: `merge` expr body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MergeStmt {
+    pub merge: Node<Expression>,
+    pub body: FirstMergeBody,
+}
+
+/// Body of first/merge: `;` or `{` ... `}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FirstMergeBody {
+    Semicolon,
+    Brace,
+}
+
+// ---------------------------------------------------------------------------
+// Allocation
+// ---------------------------------------------------------------------------
+
+/// Allocate statement at part usage level: `allocate` from `to` to body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Allocate {
+    pub source: Node<Expression>,
+    pub target: Node<Expression>,
+    pub body: ConnectBody,
+}
+
+/// Allocation definition: `allocation def` Identification body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AllocationDef {
+    pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
+    pub body: DefinitionBody,
+}
+
+/// Allocation usage: `allocation` name (`:` type)? [`allocate` source `to` target]? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AllocationUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub source: Option<Node<Expression>>,
+    pub target: Option<Node<Expression>>,
+    pub body: DefinitionBody,
+}
+
+// ---------------------------------------------------------------------------
+// Requirements
+// ---------------------------------------------------------------------------
+
+/// State definition: `state def` Identification body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StateDef {
+    pub identification: Identification,
+    pub specializes: Option<String>,
+    pub specializes_span: Option<Span>,
+    pub body: StateDefBody,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StateDefBody {
+    Semicolon,
+    Brace {
+        elements: Vec<Node<StateDefBodyElement>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StateDefBodyElement {
+    Error(Node<ParseErrorNode>),
+    Doc(Node<DocComment>),
+    Annotation(Node<Annotation>),
+    Other(String),
+    /// `entry` (`;` or body) - entry action.
+    Entry(Node<EntryAction>),
+    /// `then` name `;` - initial state.
+    Then(Node<ThenStmt>),
+    /// `ref` name `:` type body ÔÇô reference binding in state.
+    Ref(Node<RefDecl>),
+    RequirementUsage(Node<RequirementUsage>),
+    StateUsage(Node<StateUsage>),
+    Transition(Node<Transition>),
+}
+
+/// Entry action: `entry` (`;` or body).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EntryAction {
+    /// For `entry action name body` form; None for plain `entry` body.
+    pub action_name: Option<String>,
+    pub body: StateDefBody,
+}
+
+/// Then (initial state): `then` name `;`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThenStmt {
+    pub state_name: String,
+}
+
+/// State usage: `state` name (`:` type)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StateUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub body: StateDefBody,
+}
+
+/// Transition: `transition` name [`first` source] [`if` guard] [`do` effect] `then` target body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Transition {
+    pub name: Option<String>,
+    /// If omitted, form is `transition name then target;`.
+    pub source: Option<Node<Expression>>,
+    pub guard: Option<Node<Expression>>,
+    pub effect: Option<Node<Expression>>,
+    pub target: Node<Expression>,
+    pub body: ConnectBody,
+}
+
+// ---------------------------------------------------------------------------
+// Constraints & Calculations
+// ---------------------------------------------------------------------------

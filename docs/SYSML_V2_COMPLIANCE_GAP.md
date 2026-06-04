@@ -90,15 +90,13 @@ The strongest areas today are still packages/imports, parts, requirements, and t
 
 ### Some bodies are still accepted permissively
 
-Several modules still use `skip_until_brace_end()` or related helpers from [`src/parser/lex.rs`](C:\Git\sysml-v2-parser\src\parser\lex.rs) to consume bodies without fully parsing their internal grammar.
+`skip_until_brace_end()` in [`src/parser/lex.rs`](src/parser/lex.rs) remains for lex-level helpers and the legacy `semicolon_or_opaque_brace_body` stub in [`src/parser/body.rs`](src/parser/body.rs). Most construct modules now use `advance_to_closing_brace` or `parse_structured_brace_members` for brace bodies.
 
-This still appears in or influences:
+Remaining opaque or partial body consumption:
 
-- [`src/parser/metadata.rs`](C:\Git\sysml-v2-parser\src\parser\metadata.rs)
-- [`src/parser/occurrence.rs`](C:\Git\sysml-v2-parser\src\parser\occurrence.rs)
-- [`src/parser/alias.rs`](C:\Git\sysml-v2-parser\src\parser\alias.rs)
-- [`src/parser/import.rs`](C:\Git\sysml-v2-parser\src\parser\import.rs)
-- parts of connection, view, action, state, requirement, interface, port, and enumeration parsing
+- [`src/parser/body.rs`](src/parser/body.rs) — structured-loop escape paths (migrating to `advance_to_closing_brace` in P3)
+- [`src/parser/lex.rs`](src/parser/lex.rs) — `skip_until_brace_end` definition and internal callers
+- alias, import, interface, connection, enumeration, use case, constraint, view, part — mostly `advance_to_closing_brace` for unmodeled inner regions, not full member grammars
 
 Impact:
 

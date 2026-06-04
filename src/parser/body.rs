@@ -70,12 +70,12 @@ where
                     continue;
                 }
                 let Ok((next, _)) = skip_statement_or_block(input) else {
-                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = advance_to_closing_brace(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                     return Ok((input, elements));
                 };
                 if next.location_offset() == start_unknown.location_offset() {
-                    let (input, _) = skip_until_brace_end(input)?;
+                    let (input, _) = advance_to_closing_brace(input)?;
                     let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
                     return Ok((input, elements));
                 }
