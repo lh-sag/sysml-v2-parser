@@ -78,4 +78,3 @@ SYSML_V2_RELEASE_DIR=/path/to/SysML-v2-Release
 - [SysML v2 compliance gap](docs/SYSML_V2_COMPLIANCE_GAP.md)
 - [Parser technical debt](docs/PARSER_TECHNICAL_DEBT.md)
 - [P1 technical debt plan](docs/PARSER_DEBT_P1_PLAN.md)
-- [Real-world corpus feedback (Spec42 / parser)](docs/CORPUS_MBSE_VACUUM_PARSER_SPEC42_FEEDBACK.md)
