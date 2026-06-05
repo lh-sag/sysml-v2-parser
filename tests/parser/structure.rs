@@ -137,7 +137,7 @@ fn test_metadata_def_brace_body_parse() {
         PackageBodyElement::MetadataDef(metadata) => {
             assert!(matches!(
                 metadata.body,
-                sysml_v2_parser::ast::DefinitionBody::Brace { .. }
+                sysml_v2_parser::ast::AttributeBody::Brace { .. }
             ));
         }
         _ => panic!("expected MetadataDef"),
@@ -882,7 +882,7 @@ doc /* tag doc */
         other => panic!("expected brace body, got {:?}", other),
     };
     let members = match &metadata_def.value.body {
-        sysml_v2_parser::ast::DefinitionBody::Brace { elements } => elements,
+        sysml_v2_parser::ast::AttributeBody::Brace { elements } => elements,
         other => panic!("expected structured metadata body, got {:?}", other),
     };
     assert!(

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-06-05
+
+### Breaking
+
+- **`MetadataDef.body`**: now `AttributeBody` (was `DefinitionBody`) so `attribute` members in metadata definitions parse structurally like item definitions.
+- **`PackageBodyElement`**: added `MetadataUsage` for package-level `metadata name : Type` declarations.
+
+### Added
+
+- **`MetadataUsage`** AST and `metadata_usage` parser (BNF MetadataUsageDeclaration).
+- **Expose feature chains**: `expose` targets accept dot-separated usage segments after the initial qualified name (SysML §7.6.6).
+
+### Removed
+
+- **`invalid_qualified_name_separator`** diagnostic for valid expose feature-chain notation (dots between usage segments).
+
 ## [0.17.0] - 2026-06-04
 
 ### Breaking

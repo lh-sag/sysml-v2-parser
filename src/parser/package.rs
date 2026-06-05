@@ -28,7 +28,7 @@ use crate::parser::lex::{
     name, qualified_name, recover_body_element, skip_statement_or_block, starts_with_any_keyword,
     starts_with_keyword, ws1, ws_and_comments, PACKAGE_BODY_STARTERS,
 };
-use crate::parser::metadata::metadata_def;
+use crate::parser::metadata::{metadata_def, metadata_usage};
 use crate::parser::node_from_to;
 use crate::parser::occurrence::{
     individual_usage, occurrence_def, occurrence_usage, snapshot_usage, timeslice_usage,
@@ -662,6 +662,12 @@ fn try_package_body_structure<'a>(
         PackageBodyElement::ConnectionDef
     );
     try_package_body_dispatch!(input, start, dependency, PackageBodyElement::Dependency);
+    try_package_body_dispatch!(
+        input,
+        start,
+        metadata_usage,
+        PackageBodyElement::MetadataUsage
+    );
     try_package_body_dispatch!(input, start, metadata_def, PackageBodyElement::MetadataDef);
     try_package_body_dispatch!(input, start, enum_def, PackageBodyElement::EnumDef);
     try_package_body_dispatch!(

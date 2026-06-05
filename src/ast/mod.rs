@@ -127,6 +127,9 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
         PackageBodyElement::MetadataDef(n) => {
             PackageBodyElement::MetadataDef(dummy_node(n, normalize_metadata_def(&n.value)))
         }
+        PackageBodyElement::MetadataUsage(n) => {
+            PackageBodyElement::MetadataUsage(dummy_node(n, n.value.clone()))
+        }
         PackageBodyElement::EnumDef(n) => {
             PackageBodyElement::EnumDef(dummy_node(n, normalize_enum_def(&n.value)))
         }

@@ -16,7 +16,7 @@ use super::requirement::{
 };
 use super::structure::{
     AliasDef, AttributeDef, ConnectionDef, EnumDef, IndividualDef, InterfaceDef, ItemDef,
-    MetadataDef, OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, PortDef,
+    MetadataDef, MetadataUsage, OccurrenceDef, OccurrenceUsage, PartDef, PartUsage, PortDef,
 };
 use super::view::{
     CalcDef, ConstraintDef, RenderingDef, RenderingUsage, ViewDef, ViewUsage, ViewpointDef,
@@ -85,6 +85,7 @@ pub enum PackageBodyElement {
     RenderingUsage(Node<RenderingUsage>),
     ConnectionDef(Node<ConnectionDef>),
     MetadataDef(Node<MetadataDef>),
+    MetadataUsage(Node<MetadataUsage>),
     EnumDef(Node<EnumDef>),
     OccurrenceDef(Node<OccurrenceDef>),
     OccurrenceUsage(Node<OccurrenceUsage>),

@@ -463,7 +463,15 @@ pub struct MetadataDef {
     pub identification: Identification,
     pub specializes: Option<String>,
     pub specializes_span: Option<Span>,
-    pub body: DefinitionBody,
+    pub body: AttributeBody,
+}
+
+/// Metadata usage: `metadata` name (`:` type)? body (BNF MetadataUsage).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MetadataUsage {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub body: AttributeBody,
 }
 
 // ---------------------------------------------------------------------------

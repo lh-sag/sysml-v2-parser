@@ -3,7 +3,8 @@ use std::path::PathBuf;
 
 use sysml_v2_parser::ast::{
     PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RequirementDefBody,
-    RequirementDefBodyElement, RootElement, UseCaseDefBody, UseCaseDefBodyElement,
+    RequirementDefBodyElement, RootElement, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
+    ViewBodyElement,
 };
 use sysml_v2_parser::{parse_with_diagnostics, DiagnosticCategory};
 
@@ -251,33 +252,36 @@ fn fixture_unmatched_brace_reports_local_eof_error_without_extra_recovery_noise(
 }
 
 #[test]
-fn fixture_invalid_qualified_name_separator_reports_specific_fix() {
+fn fixture_expose_feature_chain_parses_without_separator_diagnostic() {
     let input = fixture("invalid-qualified-name-separator.sysml");
     let (result, elements) = package_elements(&input);
 
-    assert_eq!(
-        result.errors.len(),
-        1,
-        "unexpected diagnostics: {:?}",
+    assert!(
+        result.errors.is_empty(),
+        "expose feature chains should parse without invalid_qualified_name_separator: {:?}",
         result.errors
     );
-    let err = &result.errors[0];
-    assert_eq!(err.line, Some(3));
-    assert_eq!(
-        err.code.as_deref(),
-        Some("invalid_qualified_name_separator")
-    );
-    assert_eq!(
-        err.expected.as_deref(),
-        Some("qualified name segments separated by '::'")
-    );
-    assert!(err
-        .suggestion
-        .as_deref()
-        .is_some_and(|s| s.contains("expose A::B;")));
-    assert!(elements
+    let view_usage = elements
         .iter()
-        .any(|e| matches!(e.value, PackageBodyElement::ViewUsage(_))));
+        .find(|e| matches!(e.value, PackageBodyElement::ViewUsage(_)))
+        .expect("view usage");
+    let expose_target = match &view_usage.value {
+        PackageBodyElement::ViewUsage(view) => match &view.value.body {
+            ViewBody::Brace { elements } => elements
+                .iter()
+                .find_map(|member| match &member.value {
+                    ViewBodyElement::Expose(expose) => Some(expose.value.target.clone()),
+                    _ => None,
+                })
+                .expect("expose member"),
+            other => panic!("expected brace view body, got {other:?}"),
+        },
+        other => panic!("expected view usage, got {other:?}"),
+    };
+    assert_eq!(
+        expose_target, "SurveillanceDrone.SurveillanceQuadrotorDrone",
+        "feature-chain segments should be preserved in expose target"
+    );
 }
 
 #[test]

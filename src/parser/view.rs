@@ -219,6 +219,25 @@ fn view_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<ViewBodyElemen
     Ok((input, node_from_to(start, input, elem)))
 }
 
+/// Append zero or more `.` + qualified-name feature-chain segments (SysML §7.6.6).
+fn parse_expose_feature_chain_suffix(
+    mut input: Input<'_>,
+    mut target: String,
+) -> IResult<Input<'_>, String> {
+    loop {
+        let (next, _) = ws_and_comments(input)?;
+        if next.fragment().first() != Some(&b'.') {
+            return Ok((next, target));
+        }
+        let (next, _) = tag(&b"."[..]).parse(next)?;
+        let (next, _) = ws_and_comments(next)?;
+        let (next, segment) = qualified_name.parse(next)?;
+        target.push('.');
+        target.push_str(&segment);
+        input = next;
+    }
+}
+
 /// expose (MembershipImport | NamespaceImport) RelationshipBody
 /// MembershipImport = QualifiedName (::**)?
 /// NamespaceImport = QualifiedName :: * (::**)?
@@ -258,13 +277,7 @@ fn expose_member(input: Input<'_>) -> IResult<Input<'_>, Node<ExposeMember>> {
         map(success(()), |_| first.clone()),
     ))
     .parse(input)?;
-    let (peek, _) = ws_and_comments(input)?;
-    if peek.fragment().first() == Some(&b'.') {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            peek,
-            nom::error::ErrorKind::Tag,
-        )));
-    }
+    let (input, target) = parse_expose_feature_chain_suffix(input, target)?;
     // Optional filter [ expr ] - skip content to reach body
     let (input, _) = nom::combinator::opt(nom::sequence::delimited(
         preceded(ws_and_comments, tag(&b"["[..])),
@@ -406,24 +419,40 @@ pub(crate) fn rendering_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Rende
 
 #[cfg(test)]
 mod expose_diagnostic_tests {
+    use crate::ast::{PackageBody, PackageBodyElement, RootElement, ViewBody, ViewBodyElement};
     use crate::parse_with_diagnostics;
 
     #[test]
-    fn invalid_expose_dot_produces_separator_diagnostic() {
+    fn expose_feature_chain_is_parsed_without_separator_diagnostic() {
         let input = "package Views { view structure: GeneralView { expose SurveillanceDrone.SurveillanceQuadrotorDrone; } }";
         let result = parse_with_diagnostics(input);
         assert!(
-            !result.is_ok(),
-            "expected diagnostics, got {:?}",
+            result.is_ok(),
+            "expected feature-chain expose to parse, got {:?}",
             result.errors
         );
-        assert!(
-            result
-                .errors
-                .iter()
-                .any(|e| { e.code.as_deref() == Some("invalid_qualified_name_separator") }),
-            "codes: {:?}",
-            result.errors.iter().map(|e| &e.code).collect::<Vec<_>>()
+        let root = result.root;
+        let pkg = match &root.elements[0].value {
+            RootElement::Package(p) => p,
+            other => panic!("expected package, got {other:?}"),
+        };
+        let view_usage = match &pkg.value.body {
+            PackageBody::Brace { elements } => match &elements[0].value {
+                PackageBodyElement::ViewUsage(v) => v,
+                other => panic!("expected view usage, got {other:?}"),
+            },
+            other => panic!("expected brace body, got {other:?}"),
+        };
+        let expose = match &view_usage.value.body {
+            ViewBody::Brace { elements } => match &elements[0].value {
+                ViewBodyElement::Expose(e) => e,
+                other => panic!("expected expose member, got {other:?}"),
+            },
+            other => panic!("expected view body, got {other:?}"),
+        };
+        assert_eq!(
+            expose.value.target, "SurveillanceDrone.SurveillanceQuadrotorDrone",
+            "feature-chain segments should be preserved in expose target"
         );
     }
 }
