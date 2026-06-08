@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-06-08
+
+### Breaking
+
+- **`ActionUsage.accept` / `ActionUsage.send`**: now `Option<PayloadClause>` (was `Option<(String, String)>`).
+- **`Transition`**: added `is_initial`, `accept: Option<TransitionAccept>`; `BinaryOperator` / `UnaryOperator` replace raw operator strings in expressions.
+
+### Added
+
+- **`PayloadClause`**, **`TransitionAccept`**, **`FinalState`** AST members for state-machine accept/send/final syntax.
+- **`MetadataKeywordUsage`** (`#keyword`) in part, state, requirement, and use-case bodies.
+- **`StakeholderMember`**, **`PurposeMember`**, **`TextualRep`** in requirement/viewpoint bodies.
+- **`spec42_diagnostics_ast`** integration tests and fixtures for the June 2026 parser wave.
+
 ## [0.18.0] - 2026-06-05
 
 ### Breaking
