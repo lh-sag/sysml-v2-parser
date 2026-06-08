@@ -1,5 +1,7 @@
 # Language Server Readiness Backlog
 
+> **Consolidated index:** open LSP/recovery items are summarized in [`PARSER_BACKLOG_ROADMAP.md`](./PARSER_BACKLOG_ROADMAP.md) § 3. This file keeps the full narrative and acceptance criteria.
+
 This backlog captures the work needed to make the parser's error handling robust enough for language-server use.
 
 ## Goal

@@ -2,6 +2,7 @@
 
 This document describes structural duplication and architectural gaps in `sysml-v2-parser` as of June 2026. It complements:
 
+- **[`PARSER_BACKLOG_ROADMAP.md`](./PARSER_BACKLOG_ROADMAP.md)** — **single backlog** for all open work (start here for priorities)
 - [`SYSML_V2_COMPLIANCE_GAP.md`](./SYSML_V2_COMPLIANCE_GAP.md) — what is implemented vs partial vs permissive
 - [`BNF_COMPLIANCE_MATRIX.md`](./BNF_COMPLIANCE_MATRIX.md) — compact grammar-family snapshot
 
@@ -139,7 +140,7 @@ P4 delivered: internal definition headers, view/part structured bodies, usage AS
 |----------|--------|
 | Is there a lot of duplication? | **Yes** — especially definition prefixes, body terminators, and recovery loops. |
 | Is the codebase unmaintainable? | **No** — modules and tests are coherent; debt is known and gated. |
-| Best next step? | **P5+** (see P4 plan notes): semantic layer, deeper BNF bodies, optional `part_def` prelude unify — not yet scheduled. |
+| Best next step? | See [`PARSER_BACKLOG_ROADMAP.md`](./PARSER_BACKLOG_ROADMAP.md) § Suggested execution order. |
 | Largest long-term gap? | **Unified definition/usage/specialization grammar** plus deeper body parsing, not more top-level `*_def` files. |
 
 The validation CI regression fixed in 2026 (typed library headers after `identification`) illustrates the preferred direction: **extract shared grammar fragments** as they are discovered, keep construct modules, and let library node-shape gates enforce that dedicated parsers stay on the happy path.

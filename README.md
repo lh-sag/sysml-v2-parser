@@ -72,9 +72,10 @@ SYSML_V2_RELEASE_DIR=/path/to/SysML-v2-Release
 
 ## Documentation
 
+- **[Parser backlog & roadmap](docs/PARSER_BACKLOG_ROADMAP.md)** — open work (Spec42, LSP, grammar depth)
+- [Spec42 diagnostics parser spec](docs/SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md)
 - [Error recovery](docs/ERROR_RECOVERY.md)
 - [BNF coverage gate](docs/BNF_COVERAGE.md)
-- [Language server backlog](docs/LANGUAGE_SERVER_BACKLOG.md)
 - [SysML v2 compliance gap](docs/SYSML_V2_COMPLIANCE_GAP.md)
 - [Parser technical debt](docs/PARSER_TECHNICAL_DEBT.md)
-- [P1 technical debt plan](docs/PARSER_DEBT_P1_PLAN.md)
+- [Language server backlog](docs/LANGUAGE_SERVER_BACKLOG.md) (detail; summarized in backlog doc)

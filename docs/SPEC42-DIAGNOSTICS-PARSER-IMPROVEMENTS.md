@@ -9,8 +9,28 @@ This document lists **sysml-v2-parser** changes that would unlock stronger, more
 
 **Related parser docs**
 
+- **[PARSER_BACKLOG_ROADMAP.md](./PARSER_BACKLOG_ROADMAP.md)** — **single backlog** for all open work (parser + Spec42 follow-up)
 - [SYSML_V2_COMPLIANCE_GAP.md](./SYSML_V2_COMPLIANCE_GAP.md) — general parser fidelity status
 - [LANGUAGE_SERVER_BACKLOG.md](./LANGUAGE_SERVER_BACKLOG.md) — recovery, ranges, and editor-grade parsing
+
+## Parser implementation status (June 2026)
+
+The items below were originally **parser gaps**. Most P0–P2 AST work is **done in sysml-v2-parser**; see the [completed table](./PARSER_BACKLOG_ROADMAP.md#completed--spec42-parser-wave-june-2026) and [fixture index](#parser-test-fixtures-this-repo). **Open work** (parser partials, Spec42 graph builders, LSP) lives in [PARSER_BACKLOG_ROADMAP.md](./PARSER_BACKLOG_ROADMAP.md).
+
+| Priority | Theme | Parser | Spec42 |
+| -------- | ----- | ------ | ------ |
+| P0 | Transition accept, send, final state | Done | Open — graph + collectors |
+| P0 | `#keyword` in bodies | Done (simple); declaration headers deferred | Open |
+| P0 | Viewpoint stakeholder / purpose | Done | Open |
+| P1 | Expression classification | Partial (`BinaryOperator` / `UnaryOperator`) | Open — replace heuristics |
+| P1 | Case attribute spans | Done (`name_span`) | Open — wire `AttributeDef` in graph |
+| P1 | Annotations in bodies | Partial | Open |
+| P1 | `rep` / language | Partial (requirement body) | Open |
+| P2 | Brace-body fidelity | Open (incremental) | — |
+| P2 | Diagnostic catalog | Partial (file exists; wiring open) | — |
+| P2 | `first` / initial state | Done (`is_initial`) | Open |
+
+Sections §P0–§P12 below retain the **original requirements** for traceability; treat status column above as authoritative.
 
 ## How Spec42 uses the parser
 
@@ -386,3 +406,4 @@ Spec42 and the LSP kernel suppress or cascade based on parser error presence. St
 | ---- | ------ |
 | 2026-06-08 | Initial version from Spec42 P2 diagnostics wave and roadmap deferred items |
 | 2026-06-08 | Added parser fixture table; P0–P2 AST items implemented in sysml-v2-parser |
+| 2026-06-08 | Added implementation status table; open work consolidated in PARSER_BACKLOG_ROADMAP.md |

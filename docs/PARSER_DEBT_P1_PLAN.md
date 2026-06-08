@@ -1,5 +1,7 @@
 # Plan: P1 parser technical debt (definition prefix + body terminators)
 
+> **Status:** Complete (June 2026). Open work: [PARSER_BACKLOG_ROADMAP.md](./PARSER_BACKLOG_ROADMAP.md).
+
 This plan addresses the **P1** items from [`PARSER_TECHNICAL_DEBT.md`](./PARSER_TECHNICAL_DEBT.md). Scope is deliberately narrow: shared parsing primitives and migration of call sites, **without** AST redesign, unified KerML grammar (P3), or package-dispatch refactor (P2).
 
 ## Goals

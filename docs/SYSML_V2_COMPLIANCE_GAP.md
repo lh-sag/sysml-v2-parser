@@ -1,5 +1,7 @@
 # SysML v2 Parser Status
 
+> **Open work index:** see [`PARSER_BACKLOG_ROADMAP.md`](./PARSER_BACKLOG_ROADMAP.md) for the consolidated backlog and suggested execution order.
+
 This document is the narrative status view of the parser as of April 9, 2026. It complements the compact snapshot in [`docs/BNF_COMPLIANCE_MATRIX.md`](C:\Git\sysml-v2-parser\docs\BNF_COMPLIANCE_MATRIX.md).
 
 Reference grammar:
@@ -144,12 +146,7 @@ For a maintainability-focused view (duplication, refactors, priorities), see [`P
 
 ## Recommended next work
 
-BNF coverage map status is now 100% `implemented` for all 640 textual productions (see `cargo test --test bnf_compliance`). Next fidelity work:
-
-1. Introduce a more explicit shared definition/usage/specialization layer in code (not only in the map).
-2. Replace remaining `take_until_terminator` header scraping with structured parses where library fixtures need them.
-3. Continue expanding expression and body-member AST precision (select/collect, control nodes, case bodies).
-4. Continue language-server hardening: more specific diagnostics, broader error-node coverage, and more recovery-focused tests.
+BNF coverage map status is now 100% `implemented` for all 640 textual productions (see `cargo test --test bnf_compliance`). Prioritized open items are tracked in [`PARSER_BACKLOG_ROADMAP.md`](./PARSER_BACKLOG_ROADMAP.md) (Spec42 follow-up, body fidelity, expression depth, LSP hardening, P5 grammar layer).
 
 ## Summary
 

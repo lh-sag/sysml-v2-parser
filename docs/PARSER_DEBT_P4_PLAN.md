@@ -1,5 +1,7 @@
 # Plan: P4 parser technical debt
 
+> **Status:** Complete (June 2026). Open work: [PARSER_BACKLOG_ROADMAP.md](./PARSER_BACKLOG_ROADMAP.md).
+
 Tracks **P4** work from [PARSER_TECHNICAL_DEBT.md](./PARSER_TECHNICAL_DEBT.md). P1–P3 are complete.
 
 ## Status
