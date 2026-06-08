@@ -1,6 +1,6 @@
 //! Expression and path parsing for values and bind/connect.
 
-use crate::ast::{Expression, Node};
+use crate::ast::{BinaryOperator, Expression, Node, UnaryOperator};
 use crate::parser::lex::{name, qualified_name, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::Input;
@@ -572,7 +572,7 @@ where
             start,
             next_input,
             Expression::BinaryOp {
-                op,
+                op: BinaryOperator::from_token(&op),
                 left: Box::new(left),
                 right: Box::new(right),
             },
@@ -606,7 +606,7 @@ fn unary_and_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
             start,
             input,
             Expression::UnaryOp {
-                op,
+                op: UnaryOperator::from_token(&op),
                 operand: Box::new(expr),
             },
         );
@@ -703,9 +703,9 @@ mod tests {
         let (_, node) = expression(input).expect("expression");
         match &node.value {
             Expression::BinaryOp { op, left, right } => {
-                assert_eq!(op, "implies");
+                assert_eq!(op, &BinaryOperator::Implies);
                 match &left.value {
-                    Expression::BinaryOp { op, .. } => assert_eq!(op, "||"),
+                    Expression::BinaryOp { op, .. } => assert_eq!(op, &BinaryOperator::Or),
                     other => panic!("expected or on lhs, got {other:?}"),
                 }
                 assert!(matches!(&right.value, Expression::FeatureRef(s) if s == "c"));

@@ -1,6 +1,6 @@
 use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::requirement::RequirementUsage;
-use super::structure::{Annotation, Bind, DefinitionBody, Perform, RefDecl};
+use super::structure::{Annotation, Bind, DefinitionBody, MetadataKeywordUsage, Perform, RefDecl};
 use crate::ast::core::{Expression, Node, Span};
 
 /// Action definition: `action def` Identification body (in/out params).
@@ -83,13 +83,31 @@ pub enum InOut {
     InOut,
 }
 
+/// Typed payload on accept/send control nodes: `accept name : Type` or `send name : Type`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PayloadClause {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub name_span: Span,
+    pub type_span: Option<Span>,
+}
+
+/// Transition accept trigger: typed payload or shorthand expression (`accept StartPressed`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TransitionAccept {
+    Payload(PayloadClause),
+    Shorthand(Node<Expression>),
+}
+
 /// Action usage: `action` name `:` type_name (`accept` param_name `:` param_type)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionUsage {
     pub name: String,
     pub type_name: String,
-    /// For accept form: (param_name, param_type).
-    pub accept: Option<(String, String)>,
+    /// For `action ... accept param : Type` form.
+    pub accept: Option<PayloadClause>,
+    /// For standalone `send param : Type` control-node statements.
+    pub send: Option<PayloadClause>,
     pub body: ActionUsageBody,
     /// Span of the usage name (for semantic tokens).
     pub name_span: Option<Span>,
@@ -239,11 +257,14 @@ pub enum StateDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     Annotation(Node<Annotation>),
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Other(String),
     /// `entry` (`;` or body) - entry action.
     Entry(Node<EntryAction>),
     /// `then` name `;` - initial state.
     Then(Node<ThenStmt>),
+    /// `final` / `final state` name `;` - explicit final state.
+    FinalState(Node<FinalState>),
     /// `ref` name `:` type body ÔÇô reference binding in state.
     Ref(Node<RefDecl>),
     RequirementUsage(Node<RequirementUsage>),
@@ -263,6 +284,14 @@ pub struct EntryAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ThenStmt {
     pub state_name: String,
+    pub name_span: Option<Span>,
+}
+
+/// Final state: `final` name `;` or `final state` name `;`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FinalState {
+    pub state_name: String,
+    pub name_span: Span,
 }
 
 /// State usage: `state` name (`:` type)? body.
@@ -273,12 +302,16 @@ pub struct StateUsage {
     pub body: StateDefBody,
 }
 
-/// Transition: `transition` name [`first` source] [`if` guard] [`do` effect] `then` target body.
+/// Transition: `transition` name [`first` source [`accept` trigger]] [`if` guard] [`do` effect] `then` target body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transition {
     pub name: Option<String>,
     /// If omitted, form is `transition name then target;`.
     pub source: Option<Node<Expression>>,
+    /// When `first` is present on a transition, the source state is also an initial state.
+    pub is_initial: bool,
+    /// Structured or shorthand accept trigger after `first` source.
+    pub accept: Option<TransitionAccept>,
     pub guard: Option<Node<Expression>>,
     pub effect: Option<Node<Expression>>,
     pub target: Node<Expression>,

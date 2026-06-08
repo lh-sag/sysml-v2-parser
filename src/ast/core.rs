@@ -82,6 +82,125 @@ impl<T> AstNode for Node<T> {
     }
 }
 
+/// Classified binary operator for semantic diagnostics.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BinaryOperator {
+    Eq,
+    Ne,
+    StrictEq,
+    StrictNe,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Exp,
+    Pow,
+    And,
+    Or,
+    Xor,
+    Implies,
+    Range,
+    BitOr,
+    BitAnd,
+    /// Unclassified or extension operator; retains source token.
+    Other(String),
+}
+
+impl BinaryOperator {
+    pub fn from_token(token: &str) -> Self {
+        match token {
+            "==" => Self::Eq,
+            "!=" => Self::Ne,
+            "===" => Self::StrictEq,
+            "!==" => Self::StrictNe,
+            "<" => Self::Lt,
+            "<=" => Self::Le,
+            ">" => Self::Gt,
+            ">=" => Self::Ge,
+            "+" => Self::Add,
+            "-" => Self::Sub,
+            "*" => Self::Mul,
+            "/" => Self::Div,
+            "%" => Self::Mod,
+            "^" => Self::Pow,
+            "**" => Self::Exp,
+            "&&" | "and" => Self::And,
+            "||" | "or" => Self::Or,
+            "xor" => Self::Xor,
+            "implies" => Self::Implies,
+            ".." => Self::Range,
+            "|" => Self::BitOr,
+            "&" => Self::BitAnd,
+            other => Self::Other(other.to_string()),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Eq => "==",
+            Self::Ne => "!=",
+            Self::StrictEq => "===",
+            Self::StrictNe => "!==",
+            Self::Lt => "<",
+            Self::Le => "<=",
+            Self::Gt => ">",
+            Self::Ge => ">=",
+            Self::Add => "+",
+            Self::Sub => "-",
+            Self::Mul => "*",
+            Self::Div => "/",
+            Self::Mod => "%",
+            Self::Pow => "^",
+            Self::Exp => "**",
+            Self::And => "&&",
+            Self::Or => "||",
+            Self::Xor => "xor",
+            Self::Implies => "implies",
+            Self::Range => "..",
+            Self::BitOr => "|",
+            Self::BitAnd => "&",
+            Self::Other(s) => s.as_str(),
+        }
+    }
+}
+
+/// Classified unary operator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnaryOperator {
+    Plus,
+    Minus,
+    Not,
+    BitNot,
+    Other(String),
+}
+
+impl UnaryOperator {
+    pub fn from_token(token: &str) -> Self {
+        match token {
+            "+" => Self::Plus,
+            "-" => Self::Minus,
+            "not" => Self::Not,
+            "~" => Self::BitNot,
+            other => Self::Other(other.to_string()),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Plus => "+",
+            Self::Minus => "-",
+            Self::Not => "not",
+            Self::BitNot => "~",
+            Self::Other(s) => s.as_str(),
+        }
+    }
+}
+
 /// Expression: literals, feature refs, member access, index, bracket/unit, etc.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
@@ -107,13 +226,13 @@ pub enum Expression {
     },
     /// Binary infix operation e.g. `a >= b * c`, `x / y`.
     BinaryOp {
-        op: String,
+        op: BinaryOperator,
         left: Box<Node<Expression>>,
         right: Box<Node<Expression>>,
     },
     /// Unary prefix: + - ~ not
     UnaryOp {
-        op: String,
+        op: UnaryOperator,
         operand: Box<Node<Expression>>,
     },
     /// Function-like invocation, e.g. `ComputeMargin(a, b)`.

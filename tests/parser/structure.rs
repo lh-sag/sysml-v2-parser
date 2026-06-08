@@ -259,7 +259,7 @@ fn test_expression_allows_qualified_names_and_invocation_arguments() {
         .expect("expected value expression");
     match &value.value {
         sysml_v2_parser::ast::Expression::BinaryOp { op, right, .. } => {
-            assert_eq!(op, "+");
+            assert_eq!(op, &sysml_v2_parser::ast::BinaryOperator::Add);
             match &right.value {
                 sysml_v2_parser::ast::Expression::Invocation { args, .. } => {
                     assert_eq!(args.len(), 1, "expected one invocation argument");
@@ -1197,7 +1197,7 @@ constraint def C {
     for expr in exprs {
         match &expr.value {
             sysml_v2_parser::ast::Expression::BinaryOp { op, right, .. } => {
-                assert_eq!(op, ">=");
+                assert_eq!(op, &sysml_v2_parser::ast::BinaryOperator::Ge);
                 assert!(matches!(
                     right.value,
                     sysml_v2_parser::ast::Expression::LiteralInteger(0)

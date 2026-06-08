@@ -703,12 +703,18 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
         String::from_utf8_lossy(first_30),
     );
     let (input, elem) = alt((
-        map(doc_comment, PartUsageBodyElement::Doc),
-        map(annotation, PartUsageBodyElement::Annotation),
-        map(
-            metadata_annotation,
-            PartUsageBodyElement::MetadataAnnotation,
-        ),
+        alt((
+            map(doc_comment, PartUsageBodyElement::Doc),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                PartUsageBodyElement::MetadataKeywordUsage,
+            ),
+            map(
+                metadata_annotation,
+                PartUsageBodyElement::MetadataAnnotation,
+            ),
+            map(annotation, PartUsageBodyElement::Annotation),
+        )),
         map(
             exhibit_state_as_state_usage,
             PartUsageBodyElement::StateUsage,

@@ -302,6 +302,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::Annotation(n) => {
             PartDefBodyElement::Annotation(dummy_node(n, n.value.clone()))
         }
+        PartDefBodyElement::MetadataKeywordUsage(n) => {
+            PartDefBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
+        }
         PartDefBodyElement::Other(text) => PartDefBodyElement::Other(text.clone()),
         PartDefBodyElement::AttributeDef(n) => {
             PartDefBodyElement::AttributeDef(dummy_node(n, normalize_attribute_def(&n.value)))
@@ -541,6 +544,9 @@ fn normalize_part_usage_body_element_node(
         }
         PartUsageBodyElement::MetadataAnnotation(n) => {
             PartUsageBodyElement::MetadataAnnotation(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::MetadataKeywordUsage(n) => {
+            PartUsageBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
         }
     };
     dummy_node(el, value)
@@ -830,6 +836,7 @@ fn normalize_action_usage(a: &ActionUsage) -> ActionUsage {
         name: a.name.clone(),
         type_name: a.type_name.clone(),
         accept: a.accept.clone(),
+        send: a.send.clone(),
         body: normalize_action_usage_body(&a.body),
         name_span: None,
         type_ref_span: None,

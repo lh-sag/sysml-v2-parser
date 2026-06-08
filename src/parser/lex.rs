@@ -108,11 +108,14 @@ pub(crate) const REQUIREMENT_BODY_STARTERS: &[&[u8]] = &[
     b"doc",
     b"frame",
     b"import",
+    b"rep",
     b"require",
     b"requirement",
     b"satisfy",
     b"subject",
     b"actor",
+    b"stakeholder",
+    b"purpose",
     b"verify",
 ];
 
@@ -122,6 +125,7 @@ pub(crate) const STATE_BODY_STARTERS: &[&[u8]] = &[
     b"@",
     b"doc",
     b"entry",
+    b"final",
     b"ref",
     b"state",
     b"then",

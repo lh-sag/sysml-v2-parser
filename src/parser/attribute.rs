@@ -167,7 +167,12 @@ pub(crate) fn attribute_def(
     let (input, _) = ws1(input)?;
     let (input, has_def) = nom::combinator::opt(preceded(tag(&b"def"[..]), ws1)).parse(input)?;
     let has_def = has_def.is_some();
+    let ident_start = input;
     let (input, ident) = identification(input)?;
+    let name_span = ident
+        .name
+        .as_ref()
+        .map(|_| crate::parser::span_from_to(ident_start, input));
     let Some(name_str) = ident.name.clone() else {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -224,7 +229,7 @@ pub(crate) fn attribute_def(
                 typing,
                 value,
                 body,
-                name_span: None,
+                name_span,
                 typing_span,
             },
         ),

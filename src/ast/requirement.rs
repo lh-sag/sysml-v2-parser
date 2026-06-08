@@ -1,6 +1,10 @@
 use super::behavior::{AssignStmt, ForLoop, ThenAction};
 use super::common::{ConnectBody, DocComment, Identification, Import, ParseErrorNode, Visibility};
-use super::structure::{Annotation, AttributeBody, AttributeDef, AttributeUsage};
+use super::common::TextualRepresentation;
+use super::structure::{
+    Annotation, AttributeBody, AttributeDef, AttributeUsage, MetadataAnnotation,
+    MetadataKeywordUsage,
+};
 use super::view::ConstraintDefBodyElement;
 use crate::ast::core::{Expression, Node, Span};
 
@@ -30,15 +34,34 @@ pub enum RequirementDefBodyElement {
     /// Unmodeled requirement-body element captured as raw text (used for library parsing).
     Other(String),
     Annotation(Node<Annotation>),
+    MetadataAnnotation(Node<MetadataAnnotation>),
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Import(Node<Import>),
     SubjectDecl(Node<SubjectDecl>),
     RequirementActorDecl(Node<RequirementActorDecl>),
+    Stakeholder(Node<StakeholderMember>),
+    Purpose(Node<PurposeMember>),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
     VerifyRequirement(Node<VerifyRequirementMember>),
     RequireConstraint(Node<RequireConstraint>),
     Frame(Node<FrameMember>),
+    TextualRep(Node<TextualRepresentation>),
     Doc(Node<DocComment>),
+}
+
+/// Viewpoint stakeholder concern reference.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StakeholderMember {
+    pub target: String,
+    pub target_span: Span,
+}
+
+/// Viewpoint purpose concern reference.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PurposeMember {
+    pub target: String,
+    pub target_span: Span,
 }
 
 /// Subject declaration: `subject` name `:` type `;`.
@@ -292,6 +315,8 @@ pub enum UseCaseDefBodyElement {
     Error(Node<ParseErrorNode>),
     /// Unmodeled use-case / analysis-case body element captured as raw text (used for library parsing).
     Other(String),
+    Annotation(Node<Annotation>),
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     AttributeDef(Node<AttributeDef>),
     Doc(Node<DocComment>),
     SubjectDecl(Node<SubjectDecl>),

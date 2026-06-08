@@ -417,8 +417,11 @@ pub(crate) fn then_action(input: Input<'_>) -> IResult<Input<'_>, Node<ThenActio
 ///
 /// SysML v2 ActionBodyItem includes both declarations and action behavior usages.
 /// We support a pragmatic subset used by function-based behavior examples.
-/// Control-node action usages (`accept`, `decision`, `fork`, …) map to `ActionUsage` nodes.
+/// Control-node action usages (`accept`, `send`, …) map to `ActionUsage` nodes.
 fn control_node_action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUsage>> {
+    if let Ok(result) = crate::parser::payload::control_node_action_usage(input) {
+        return Ok(result);
+    }
     let (peek, _) = ws_and_comments(input)?;
     if starts_with_any_keyword(peek.fragment(), CONTROL_NODE_KEYWORDS) {
         return visibility_action_usage(input);
@@ -557,7 +560,7 @@ fn merge_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<MergeStmt>> {
 }
 
 /// Action usage body: `;` or `{` ActionUsageBodyElement* `}`
-fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
+pub(crate) fn action_usage_body(input: Input<'_>) -> IResult<Input<'_>, ActionUsageBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(tag(&b";"[..]), |_| ActionUsageBody::Semicolon),
@@ -608,6 +611,9 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
         map(first_stmt, ActionUsageBodyElement::FirstStmt),
         map(merge_stmt, ActionUsageBodyElement::MergeStmt),
         map(state_usage, ActionUsageBodyElement::StateUsage),
+        map(control_node_action_usage, |a| {
+            ActionUsageBodyElement::ActionUsage(Box::new(a))
+        }),
         map(visibility_action_usage, |a| {
             ActionUsageBodyElement::ActionUsage(Box::new(a))
         }),
@@ -676,21 +682,13 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
     let (input, header) = usage_header(input)?;
     let (input, accept) = nom::combinator::opt(preceded(
         preceded(ws_and_comments, tag(&b"accept"[..])),
-        preceded(
-            ws1,
-            (
-                name,
-                preceded(ws_and_comments, tag(&b":"[..])),
-                preceded(ws_and_comments, qualified_name),
-            ),
-        ),
+        preceded(ws1, crate::parser::payload::typed_payload_clause),
     ))
     .parse(input)?;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = take_until_terminator(input, UNTIL_SEMI_OR_BRACE)?;
     let type_name = header.type_name.unwrap_or_default();
-    let type_ref_span = None;
-    let accept = accept.map(|(param_name, _, param_type)| (param_name, param_type));
+    let type_ref_span = accept.as_ref().and_then(|p| p.type_span.clone());
     let (input, body) = action_usage_body(input)?;
     // Spec-wise, a braced body does not require a trailing semicolon. However, in practice some
     // sources write `... { ... };` as a statement terminator. We accept an optional `;` here to
@@ -706,6 +704,7 @@ pub(crate) fn action_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ActionUs
                 name: name_str,
                 type_name,
                 accept,
+                send: None,
                 body,
                 name_span: Some(name_span),
                 type_ref_span,

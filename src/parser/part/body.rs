@@ -134,6 +134,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
         alt((
             map(doc_comment, PartDefBodyElement::Doc),
             map(comment_annotation, PartDefBodyElement::Comment),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                PartDefBodyElement::MetadataKeywordUsage,
+            ),
             map(annotation, PartDefBodyElement::Annotation),
             map(exhibit_state, PartDefBodyElement::ExhibitState),
             map(calc_usage, PartDefBodyElement::CalcUsage),

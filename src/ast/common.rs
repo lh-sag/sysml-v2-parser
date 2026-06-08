@@ -1,4 +1,4 @@
-use crate::ast::core::{Expression, Node};
+use crate::ast::core::{Expression, Node, Span};
 
 /// KerML ElementFilterMember: MemberPrefix? 'filter' condition ';'
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,6 +78,7 @@ pub struct CommentAnnotation {
 pub struct TextualRepresentation {
     pub rep_identification: Option<Identification>,
     pub language: String,
+    pub language_span: Option<Span>,
     pub text: String,
 }
 /// Body of a connect statement: `;` or `{` ... `}`.

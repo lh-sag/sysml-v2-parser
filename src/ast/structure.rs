@@ -42,6 +42,7 @@ pub enum PartDefBodyElement {
     Doc(Node<DocComment>),
     Comment(Node<CommentAnnotation>),
     Annotation(Node<Annotation>),
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Other(String),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
@@ -184,6 +185,18 @@ pub struct MetadataAnnotation {
     pub name: String,
     pub type_name: Option<String>,
     pub body: ConnectBody,
+    pub head_span: Option<Span>,
+    pub type_span: Option<Span>,
+}
+
+/// User-defined metadata keyword usage: `#keyword` (`:` Type)? body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MetadataKeywordUsage {
+    pub keyword: String,
+    pub type_name: Option<String>,
+    pub body: ConnectBody,
+    pub keyword_span: Span,
+    pub type_span: Option<Span>,
 }
 
 /// Generic annotation or metadata usage captured in body scopes.
@@ -193,6 +206,8 @@ pub struct Annotation {
     pub head: String,
     pub type_name: Option<String>,
     pub body: ConnectBody,
+    pub head_span: Option<Span>,
+    pub type_span: Option<Span>,
 }
 
 /// Element inside a part usage body.
@@ -216,6 +231,7 @@ pub enum PartUsageBodyElement {
     Satisfy(Node<Satisfy>),
     StateUsage(Node<StateUsage>),
     MetadataAnnotation(Node<MetadataAnnotation>),
+    MetadataKeywordUsage(Node<MetadataKeywordUsage>),
 }
 
 /// Enacted performance: `perform` action_path `{` body `}` inside a part usage.

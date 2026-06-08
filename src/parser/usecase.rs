@@ -423,6 +423,14 @@ pub(crate) fn use_case_def_body_element(
     let (input, elem) = alt((
         map(doc_comment, UseCaseDefBodyElement::Doc),
         map(
+            crate::parser::metadata_annotation::annotation,
+            UseCaseDefBodyElement::Annotation,
+        ),
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_usage,
+            UseCaseDefBodyElement::MetadataKeywordUsage,
+        ),
+        map(
             |i| attribute_def(i, false),
             UseCaseDefBodyElement::AttributeDef,
         ),

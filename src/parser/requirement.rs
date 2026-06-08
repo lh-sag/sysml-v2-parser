@@ -2,9 +2,9 @@
 
 use crate::ast::{
     CommentAnnotation, ConcernUsage, ConstraintBody, DocComment, FrameMember, Node, ParseErrorNode,
-    RequireConstraint, RequireConstraintBody, RequirementActorDecl, RequirementDef,
-    RequirementDefBody, RequirementDefBodyElement, RequirementUsage, Satisfy, SubjectDecl,
-    TextualRepresentation, VerifyRequirementMember,
+    PurposeMember, RequireConstraint, RequireConstraintBody, RequirementActorDecl, RequirementDef,
+    RequirementDefBody, RequirementDefBodyElement, RequirementUsage, Satisfy, StakeholderMember,
+    SubjectDecl, TextualRepresentation, VerifyRequirementMember,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage};
 use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
@@ -18,6 +18,7 @@ use crate::parser::lex::{
 };
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
+use crate::parser::with_span;
 use crate::parser::usage::{
     feature_usage_header, multiplicity, specialization_clauses, usage_header,
 };
@@ -164,6 +165,14 @@ fn requirement_def_body_element(
     let (rest, elem) = alt((
         alt((
             map(annotation, RequirementDefBodyElement::Annotation),
+            map(
+                crate::parser::metadata_annotation::metadata_annotation,
+                RequirementDefBodyElement::MetadataAnnotation,
+            ),
+            map(
+                crate::parser::metadata_annotation::metadata_keyword_usage,
+                RequirementDefBodyElement::MetadataKeywordUsage,
+            ),
             map(import_, RequirementDefBodyElement::Import),
             map(subject_decl, RequirementDefBodyElement::SubjectDecl),
             map(actor_decl, RequirementDefBodyElement::RequirementActorDecl),
@@ -181,6 +190,9 @@ fn requirement_def_body_element(
                 RequirementDefBodyElement::RequireConstraint,
             ),
             map(frame_member, RequirementDefBodyElement::Frame),
+            map(stakeholder_member, RequirementDefBodyElement::Stakeholder),
+            map(purpose_member, RequirementDefBodyElement::Purpose),
+            map(textual_representation, RequirementDefBodyElement::TextualRep),
             map(doc_comment, RequirementDefBodyElement::Doc),
         )),
         other_requirement_body_element,
@@ -264,6 +276,50 @@ fn verify_requirement(input: Input<'_>) -> IResult<Input<'_>, Node<VerifyRequire
         )
     };
     Ok((input, node_from_to(start, input, member)))
+}
+
+fn concern_reference_member<'a>(
+    input: Input<'a>,
+    keyword: &'static [u8],
+) -> IResult<Input<'a>, (String, crate::ast::Span)> {
+    let (input, _) = preceded(ws_and_comments, tag(keyword)).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, (target_span, target)) =
+        preceded(ws_and_comments, with_span(qualified_name)).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((input, (target, target_span)))
+}
+
+fn stakeholder_member(input: Input<'_>) -> IResult<Input<'_>, Node<StakeholderMember>> {
+    let start = input;
+    let (input, (target, target_span)) = concern_reference_member(input, b"stakeholder")?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            StakeholderMember {
+                target,
+                target_span,
+            },
+        ),
+    ))
+}
+
+fn purpose_member(input: Input<'_>) -> IResult<Input<'_>, Node<PurposeMember>> {
+    let start = input;
+    let (input, (target, target_span)) = concern_reference_member(input, b"purpose")?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            PurposeMember {
+                target,
+                target_span,
+            },
+        ),
+    ))
 }
 
 fn frame_member(input: Input<'_>) -> IResult<Input<'_>, Node<FrameMember>> {
@@ -489,31 +545,41 @@ pub(crate) fn textual_representation(
 ) -> IResult<Input<'_>, Node<TextualRepresentation>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, rep_identification) =
-        opt(preceded(preceded(tag(&b"rep"[..]), ws1), identification)).parse(input)?;
+    let (input, _) = tag(&b"rep"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, rep_identification) = {
+        let (peek, _) = ws_and_comments(input)?;
+        if crate::parser::lex::starts_with_keyword(peek.fragment(), b"language") {
+            (input, None)
+        } else {
+            let (input, id) = identification(input)?;
+            (
+                input,
+                if id.short_name.is_some() || id.name.is_some() {
+                    Some(id)
+                } else {
+                    None
+                },
+            )
+        }
+    };
     let (input, _) = preceded(ws_and_comments, tag(&b"language"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, language) = string_value(input)?;
+    let (input, (language_span, language)) = with_span(string_value).parse(input)?;
     // Use ws so we don't consume the body as a block comment.
     let (input, _) = preceded(ws, tag(&b"/*"[..])).parse(input)?;
     let (input, text_bytes) = nom::bytes::complete::take_until("*/").parse(input)?;
     let (input, _) = tag(&b"*/"[..]).parse(input)?;
     let text = String::from_utf8_lossy(text_bytes.fragment()).to_string();
-    let rep_id = rep_identification.and_then(|i| {
-        if i.short_name.is_some() || i.name.is_some() {
-            Some(i)
-        } else {
-            None
-        }
-    });
     Ok((
         input,
         node_from_to(
             start,
             input,
             TextualRepresentation {
-                rep_identification: rep_id,
+                rep_identification,
                 language,
+                language_span: Some(language_span),
                 text,
             },
         ),

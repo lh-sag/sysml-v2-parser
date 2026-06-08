@@ -1,8 +1,8 @@
 #![allow(dead_code, unused_imports)]
 
 use crate::ast::{
-    EntryAction, Node, RefBody, RefDecl, StateDef, StateDefBody, StateDefBodyElement, StateUsage,
-    ThenStmt, Transition,
+    EntryAction, FinalState, Node, RefBody, RefDecl, StateDef, StateDefBody, StateDefBodyElement,
+    StateUsage, ThenStmt, Transition,
 };
 use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
 use crate::parser::build_recovery_error_node_from_span;
@@ -15,7 +15,8 @@ use crate::parser::lex::{
 };
 
 const UNTIL_BODY: &[u8] = b";{";
-use crate::parser::metadata_annotation::annotation;
+use crate::parser::metadata_annotation::{annotation, metadata_keyword_usage};
+use crate::parser::payload::transition_accept;
 use crate::parser::node_from_to;
 use crate::parser::requirement::{doc_comment, requirement_usage};
 use crate::parser::usage::{feature_usage_header, multiplicity, usage_header};
@@ -192,9 +193,40 @@ fn then_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<ThenStmt>> {
     let start = input;
     let (input, _) = tag(&b"then"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, state_name) = name(input)?;
+    let (input, (name_span, state_name)) = with_span(name).parse(input)?;
     let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
-    Ok((input, node_from_to(start, input, ThenStmt { state_name })))
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            ThenStmt {
+                state_name,
+                name_span: Some(name_span),
+            },
+        ),
+    ))
+}
+
+/// Final state: `final` name `;` or `final state` name `;`
+fn final_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<FinalState>> {
+    let start = input;
+    let (input, _) = tag(&b"final"[..]).parse(input)?;
+    let (input, _) = opt(preceded(ws1, tag(&b"state"[..]))).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, (name_span, state_name)) = with_span(name).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            FinalState {
+                state_name,
+                name_span,
+            },
+        ),
+    ))
 }
 
 fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefBodyElement>> {
@@ -202,6 +234,9 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
     let mut parser = alt((
         map(doc_comment, |n| {
             node_from_to(start, input, StateDefBodyElement::Doc(n))
+        }),
+        map(metadata_keyword_usage, |n| {
+            node_from_to(start, input, StateDefBodyElement::MetadataKeywordUsage(n))
         }),
         map(annotation, |n| {
             node_from_to(start, input, StateDefBodyElement::Annotation(n))
@@ -211,6 +246,9 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
         }),
         map(then_stmt, |n| {
             node_from_to(start, input, StateDefBodyElement::Then(n))
+        }),
+        map(final_stmt, |n| {
+            node_from_to(start, input, StateDefBodyElement::FinalState(n))
         }),
         map(state_ref, |n| {
             node_from_to(start, input, StateDefBodyElement::Ref(n))
@@ -275,19 +313,18 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
             (input, Some(n))
         }
     };
-    // Optional: `first` source (simplified form is `transition name then target;`)
-    let (input, source) = opt((
+    // Optional: `first` source with optional `accept` trigger.
+    let (input, first_clause) = opt((
         preceded(ws_and_comments, tag(&b"first"[..])),
         ws1,
         expression,
-        // Optional: `accept` trigger expression (e.g. `accept PhaseTimerElapsed`)
-        opt((
-            preceded(ws_and_comments, tag(&b"accept"[..])),
-            preceded(ws1, expression),
-        )),
+        opt(transition_accept),
     ))
     .parse(input)?;
-    let source = source.map(|(_, _, expr, _)| expr);
+    let (source, accept, is_initial) = match first_clause {
+        Some((_, _, src, acc)) => (Some(src), acc, true),
+        None => (None, None, false),
+    };
     // Optional: `if` guard and `do` effect before `then`
     let (input, guard) = opt((
         preceded(ws_and_comments, tag(&b"if"[..])),
@@ -306,17 +343,7 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
     let (input, target) = expression(input)?;
     let (input, body) = preceded(
         ws_and_comments,
-        alt((
-            map(tag(&b";"[..]), |_| crate::ast::ConnectBody::Semicolon),
-            map(
-                delimited(
-                    tag(&b"{"[..]),
-                    advance_to_closing_brace,
-                    preceded(ws_and_comments, tag(&b"}"[..])),
-                ),
-                |_| crate::ast::ConnectBody::Brace,
-            ),
-        )),
+        crate::parser::interface::connect_body,
     )
     .parse(input)?;
     Ok((
@@ -327,6 +354,8 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
             Transition {
                 name: n,
                 source,
+                is_initial,
+                accept,
                 guard,
                 effect,
                 target,

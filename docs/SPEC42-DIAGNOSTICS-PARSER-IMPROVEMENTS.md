@@ -367,8 +367,22 @@ Spec42 and the LSP kernel suppress or cascade based on parser error presence. St
 - [ ] Spec42 integration test listed in this doc is linked or added in the same release train
 - [ ] No regression in `test_systems_library_strict_no_diagnostics` / full-library gates
 
+## Parser test fixtures (this repo)
+
+| Roadmap item | Fixture | Test |
+| ------------ | ------- | ---- |
+| P0 §1 Transition accept | [tests/fixtures/transition-accept-typed.sysml](../tests/fixtures/transition-accept-typed.sysml) | [tests/spec42_diagnostics_ast.rs](../tests/spec42_diagnostics_ast.rs) |
+| P0 §2 Final state | [tests/fixtures/final-state.sysml](../tests/fixtures/final-state.sysml) | `final_state_members_parsed` |
+| P0 §3 Send payload | [tests/fixtures/send-payload.sysml](../tests/fixtures/send-payload.sysml) | `send_payload_on_control_node_action` |
+| P0 §4 Metadata `#keyword` | [tests/fixtures/metadata-keyword-usage.sysml](../tests/fixtures/metadata-keyword-usage.sysml) | `metadata_keyword_usage_in_part_body` |
+| P0 §5 Stakeholder / purpose | [tests/fixtures/viewpoint-stakeholder-purpose.sysml](../tests/fixtures/viewpoint-stakeholder-purpose.sysml) | `viewpoint_stakeholder_and_purpose_members` |
+| P1 §7 Case attributes | [tests/fixtures/verification-local-attribute.sysml](../tests/fixtures/verification-local-attribute.sysml) | `verification_local_attribute_has_name_span` |
+| P2 §12 Initial / `first` | inline in spec42_diagnostics_ast | `transition_first_sets_is_initial_flag` |
+| Library regressions | [KitchenTimer.sysml](../tests/fixtures/KitchenTimer.sysml), [TrafficLightIntersection.sysml](../tests/fixtures/TrafficLightIntersection.sysml) | validation + apollo_regressions |
+
 ## Document history
 
 | Date | Change |
 | ---- | ------ |
 | 2026-06-08 | Initial version from Spec42 P2 diagnostics wave and roadmap deferred items |
+| 2026-06-08 | Added parser fixture table; P0–P2 AST items implemented in sysml-v2-parser |
