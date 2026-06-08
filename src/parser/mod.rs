@@ -37,6 +37,7 @@ mod lex;
 mod metadata;
 mod metadata_annotation;
 mod occurrence;
+mod occurrence_body;
 mod package;
 mod parse;
 mod payload;

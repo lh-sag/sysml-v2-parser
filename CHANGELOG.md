@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-06-08
+
+### Added
+
+- **DefinitionBody parity** — `flow def`, `flow`/`message` usage, `allocation def`, and `allocation`/`allocate` usage brace bodies now parse occurrence-style members (`attribute`, `part`, `occurrence`, `assert constraint`, `doc`, …) via shared [`occurrence_body.rs`](src/parser/occurrence_body.rs), aligned with `occurrence def` bodies.
+
+### Changed
+
+- Doc-only flow/allocation brace bodies now surface as `DefinitionBodyElement::OccurrenceMember(Doc(...))` instead of top-level `DefinitionBodyElement::Doc`.
+- Unknown statements in generic `DefinitionBody` brace bodies emit recovery `Error` nodes instead of being silently skipped.
+
 ## [0.19.0] - 2026-06-08
 
 ### Breaking

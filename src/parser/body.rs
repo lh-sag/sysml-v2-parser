@@ -1,12 +1,10 @@
 //! Shared definition body terminators (semicolon or structured brace).
 
-use crate::ast::{DefinitionBody, DefinitionBodyElement, Node};
-use crate::parser::build_recovery_error_node_from_span;
+use crate::ast::{DefinitionBody, Node};
 use crate::parser::lex::{
     recover_body_element, skip_statement_or_block, skip_until_brace_end, ws_and_comments,
 };
-use crate::parser::node_from_to;
-use crate::parser::requirement::doc_comment;
+use crate::parser::occurrence_body::occurrence_definition_body;
 use crate::parser::Input;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -14,16 +12,6 @@ use nom::combinator::map;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
-
-const GENERIC_DEFINITION_BODY_STARTERS: &[&[u8]] = &[
-    b"doc",
-    b"comment",
-    b"import",
-    b"metadata",
-    b"filter",
-    b"@",
-    b"#",
-];
 
 /// How to advance past a member that failed to parse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -143,60 +131,11 @@ where
     }
 }
 
-fn generic_definition_body_element(
-    input: Input<'_>,
-) -> IResult<Input<'_>, Node<DefinitionBodyElement>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, elem) = map(doc_comment, DefinitionBodyElement::Doc).parse(input)?;
-    Ok((input, node_from_to(start, input, elem)))
-}
-
-fn generic_definition_body_recovery(
-    start: Input<'_>,
-    end: Input<'_>,
-    scope_label: &str,
-    recovery_code: &str,
-) -> Node<DefinitionBodyElement> {
-    let recovery = build_recovery_error_node_from_span(
-        start,
-        end,
-        GENERIC_DEFINITION_BODY_STARTERS,
-        scope_label,
-        recovery_code,
-    );
-    node_from_to(
-        start,
-        end,
-        DefinitionBodyElement::Error(node_from_to(start, end, recovery)),
-    )
-}
-
-/// `;` or brace body with doc (and recovered) members for flow/allocation/metadata-style defs.
+/// `;` or brace body with occurrence-style members for flow/allocation defs and usages.
 pub(crate) fn semicolon_or_structured_definition_body(
     input: Input<'_>,
 ) -> IResult<Input<'_>, DefinitionBody> {
-    let (input, _) = ws_and_comments(input)?;
-    if input.fragment().starts_with(b";") {
-        let (input, _) = tag(&b";"[..]).parse(input)?;
-        return Ok((input, DefinitionBody::Semicolon));
-    }
-    let (input, elements) = parse_structured_brace_members(
-        input,
-        GENERIC_DEFINITION_BODY_STARTERS,
-        "definition body",
-        "recovered_definition_body_element",
-        generic_definition_body_element,
-        |start, end| {
-            generic_definition_body_recovery(
-                start,
-                end,
-                "definition body",
-                "recovered_definition_body_element",
-            )
-        },
-    )?;
-    Ok((input, DefinitionBody::Brace { elements }))
+    occurrence_definition_body(input)
 }
 
 /// Advance through statements/blocks until the next token is `}`.
@@ -239,6 +178,7 @@ pub(crate) fn semicolon_or_opaque_brace_body(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ast::DefinitionBodyElement;
     use nom_locate::LocatedSpan;
 
     fn span_input(text: &str) -> Input<'_> {
@@ -265,10 +205,18 @@ mod tests {
     }
 
     #[test]
-    fn statement_brace_body_consumes_statements() {
+    fn statement_brace_body_emits_recovery_for_unknown_statements() {
         let input = span_input("{ doc /* note */ x = y; nested { z = q; } }");
         let (rest, body) = semicolon_or_structured_definition_body(input).expect("body");
-        assert!(matches!(body, DefinitionBody::Brace { .. }));
+        let DefinitionBody::Brace { elements } = body else {
+            panic!("expected brace body");
+        };
+        assert!(
+            elements
+                .iter()
+                .any(|element| matches!(element.value, DefinitionBodyElement::Error(_))),
+            "unknown statements should surface as recovery Error nodes"
+        );
         assert!(rest.fragment().is_empty());
     }
 }

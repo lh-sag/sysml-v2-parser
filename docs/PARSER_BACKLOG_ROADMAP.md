@@ -10,7 +10,7 @@
 | ---------------- | ---------- |
 | See **all open work** in one place | This file — sections below |
 | Understand **what the parser already ships** for Spec42 | [§ Completed — Spec42 parser wave](#completed--spec42-parser-wave-june-2026) |
-| Wire **Spec42 graph builders / collectors** | [§ 1 — Spec42 cross-repo](#1-spec42-cross-repo-follow-up) |
+| Wire **Spec42 graph builders / collectors** | [§ 1 — Spec42 cross-repo](#1-spec42-cross-repo-follow-up) (**done** in Spec42 0.29.0) |
 | Improve **editor / LSP** behavior | [§ 3 — Language server](#3-language-server--recovery) |
 | Go deeper on **grammar fidelity** | [§ 4 — Grammar & compliance](#4-grammar-depth--compliance) |
 | Read the **original Spec42 parser spec** | [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md) |
@@ -31,7 +31,7 @@
 | CI & library gates | Green |
 | BNF coverage map | 640/640 productions classified `implemented` |
 | Spec42 diagnostics **parser AST** (P0–P2 wave) | **Largely done** — see completed table; partial items listed in § 2 |
-| Spec42 **semantic** diagnostics | **Open** — graph projection + collectors in Spec42 repo |
+| Spec42 **semantic** diagnostics (§1 wave) | **Done** in Spec42 0.29.0 — partial §2 items remain parser-side |
 | Deep body fidelity | **Open** — many `advance_to_closing_brace` call sites remain |
 | Full `OwnedExpression` | **Open** — operator enums added; full KerML expression family not modeled |
 | Unified definition/usage grammar layer | **Open** — P5+ architectural work |
