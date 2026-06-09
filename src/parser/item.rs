@@ -1,7 +1,7 @@
 //! Item definition and usage parsing.
 
 use crate::ast::{ItemDef, ItemUsage, Node};
-use crate::parser::attribute::attribute_body;
+use crate::parser::attribute::{attribute_body, direction_prefix};
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{name, ws1, ws_and_comments};
@@ -66,7 +66,18 @@ pub(crate) fn item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>
                 type_name: header.type_name,
                 multiplicity,
                 body,
+                direction: None,
             },
         ),
     ))
+}
+
+/// `in`/`out`/`inout item` usage (port def bodies): direction + [`item_usage`].
+pub(crate) fn directed_item_usage(input: Input<'_>) -> IResult<Input<'_>, Node<ItemUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, direction) = direction_prefix(input)?;
+    let (input, mut usage) = item_usage(input)?;
+    usage.value.direction = Some(direction);
+    Ok((input, node_from_to(start, input, usage.value)))
 }

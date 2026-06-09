@@ -213,13 +213,22 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
         // to reference the corresponding typed parameter on the referenced action definition.
         // Action definitions generally include the type (e.g. `out videoStream : String;`),
         // but accepting the shorthand here prevents recovery errors in common models.
-        let (input, type_name) = nom::combinator::opt(map(
-            (
-                preceded(ws_and_comments, tag(&b":"[..])),
-                preceded(ws_and_comments, qualified_name),
+        let (input, type_name) = nom::combinator::opt(alt((
+            map(
+                (
+                    preceded(ws_and_comments, tag(&b":>"[..])),
+                    preceded(ws_and_comments, qualified_name),
+                ),
+                |(_, tn)| tn,
             ),
-            |(_, tn)| tn,
-        ))
+            map(
+                (
+                    preceded(ws_and_comments, tag(&b":"[..])),
+                    preceded(ws_and_comments, qualified_name),
+                ),
+                |(_, tn)| tn,
+            ),
+        )))
         .parse(input)?;
         let mut type_name = type_name.unwrap_or_default();
         if action_typed_name.is_some() && type_name.is_empty() {

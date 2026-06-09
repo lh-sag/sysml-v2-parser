@@ -1,4 +1,4 @@
-use super::behavior::{AssignStmt, ForLoop, ThenAction};
+use super::behavior::{AssignStmt, ForLoop, InOut, ThenAction};
 use super::common::{ConnectBody, DocComment, Identification, Import, ParseErrorNode, Visibility};
 use super::common::TextualRepresentation;
 use super::structure::{
@@ -129,6 +129,8 @@ pub struct ItemUsage {
     pub type_name: Option<String>,
     pub multiplicity: Option<String>,
     pub body: AttributeBody,
+    /// Set when parsed as `in`/`out`/`inout item` in port def bodies.
+    pub direction: Option<InOut>,
 }
 
 /// Enumeration usage inside a definition body: `enum` name (`:` type)? body.

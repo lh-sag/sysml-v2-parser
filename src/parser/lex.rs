@@ -289,7 +289,39 @@ pub(crate) fn starts_with_any_keyword(fragment: &[u8], keywords: &[&[u8]]) -> bo
         .any(|keyword| starts_with_keyword(fragment, keyword))
 }
 
+/// Count `{` / `}` outside comments (line and block) for EOF brace balance checks.
+pub(crate) fn brace_balance_outside_comments(bytes: &[u8]) -> (usize, usize) {
+    let mut opens = 0usize;
+    let mut closes = 0usize;
+    let mut pos = 0usize;
+    while pos < bytes.len() {
+        if pos + 2 <= bytes.len() && bytes[pos..].starts_with(b"/*") {
+            if let Some(rel) = find_subslice(&bytes[pos..], b"*/") {
+                pos += rel + 2;
+                continue;
+            }
+            break;
+        }
+        if pos + 2 <= bytes.len() && bytes[pos..].starts_with(b"//") {
+            while pos < bytes.len() && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
+                pos += 1;
+            }
+            continue;
+        }
+        match bytes[pos] {
+            b'{' => opens += 1,
+            b'}' => closes += 1,
+            _ => {}
+        }
+        pos += 1;
+    }
+    (opens, closes)
+}
+
 fn balanced_inline_depth(fragment: &[u8], pos: usize, brace_depth: &mut usize) -> Option<usize> {
+    if pos >= fragment.len() {
+        return None;
+    }
     match fragment[pos] {
         b'{' => {
             *brace_depth += 1;
@@ -328,6 +360,7 @@ fn local_recovery_line_boundary<'a>(input: Input<'a>, starters: &[&[u8]]) -> Opt
             while pos < fragment.len() && fragment[pos] != b'\n' && fragment[pos] != b'\r' {
                 pos += 1;
             }
+            continue;
         }
 
         if pos < fragment.len()

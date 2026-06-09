@@ -633,6 +633,9 @@ fn normalize_port_def_body_element_node(el: &Node<PortDefBodyElement>) -> Node<P
         PortDefBodyElement::AttributeUsage(n) => {
             PortDefBodyElement::AttributeUsage(dummy_node(n, normalize_attribute_usage(&n.value)))
         }
+        PortDefBodyElement::ItemUsage(n) => {
+            PortDefBodyElement::ItemUsage(dummy_node(n, n.value.clone()))
+        }
         PortDefBodyElement::PortUsage(n) => {
             PortDefBodyElement::PortUsage(dummy_node(n, normalize_port_usage(&n.value)))
         }

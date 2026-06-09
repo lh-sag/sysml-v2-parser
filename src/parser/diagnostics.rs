@@ -965,17 +965,31 @@ pub(crate) fn missing_closing_brace_error_at_eof(bytes: &[u8]) -> ParseError {
 }
 
 pub(crate) fn extra_closing_brace_at_eof(bytes: &[u8]) -> Option<ParseError> {
-    let opens = bytes.iter().filter(|&&b| b == b'{').count();
-    let closes = bytes.iter().filter(|&&b| b == b'}').count();
+    let (opens, closes) = lex::brace_balance_outside_comments(bytes);
     if closes <= opens {
         return None;
     }
     let mut last_brace: Option<(usize, u32, usize)> = None;
     let mut line = 1u32;
     let mut column = 1usize;
-    for (offset, &b) in bytes.iter().enumerate() {
+    let mut pos = 0usize;
+    while pos < bytes.len() {
+        if pos + 2 <= bytes.len() && bytes[pos..].starts_with(b"/*") {
+            if let Some(rel) = lex::find_subslice(&bytes[pos..], b"*/") {
+                pos += rel + 2;
+                continue;
+            }
+            break;
+        }
+        if pos + 2 <= bytes.len() && bytes[pos..].starts_with(b"//") {
+            while pos < bytes.len() && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
+                pos += 1;
+            }
+            continue;
+        }
+        let b = bytes[pos];
         if b == b'}' {
-            last_brace = Some((offset, line, column));
+            last_brace = Some((pos, line, column));
         }
         if b == b'\n' {
             line += 1;
@@ -983,6 +997,7 @@ pub(crate) fn extra_closing_brace_at_eof(bytes: &[u8]) -> Option<ParseError> {
         } else {
             column += 1;
         }
+        pos += 1;
     }
     let (offset, line, column) = last_brace?;
     Some(
@@ -1010,8 +1025,7 @@ pub(crate) fn category_from_code(code: &str) -> DiagnosticCategory {
 }
 
 pub(crate) fn has_unclosed_brace(bytes: &[u8]) -> bool {
-    let opens = bytes.iter().filter(|&&b| b == b'{').count();
-    let closes = bytes.iter().filter(|&&b| b == b'}').count();
+    let (opens, closes) = lex::brace_balance_outside_comments(bytes);
     opens > closes
 }
 

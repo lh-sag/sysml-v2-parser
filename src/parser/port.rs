@@ -6,6 +6,7 @@ use crate::ast::{
 };
 use crate::parser::action::in_out_decl;
 use crate::parser::attribute::{attribute_def, attribute_usage, directed_attribute_usage};
+use crate::parser::item::directed_item_usage;
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
@@ -150,6 +151,7 @@ fn port_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PortDefBod
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, elem) = alt((
+        map(directed_item_usage, PortDefBodyElement::ItemUsage),
         map(directed_attribute_usage, PortDefBodyElement::AttributeUsage),
         map(in_out_decl, PortDefBodyElement::InOutDecl),
         map(doc_comment, PortDefBodyElement::Doc),

@@ -2008,6 +2008,59 @@ port def SuctionLevelPort :> Base::PowerOutPort {
 }
 
 #[test]
+fn test_port_def_directed_item_inout_with_nested_attributes() {
+    let input = r#"package P {
+port def DebrisPort {
+  inout item debris {
+    attribute vol :> ISQ::volume;
+    attribute mass :> ISQ::mass;
+  }
+}
+}"#;
+    let result = parse(input).expect("directed item inout should parse");
+    let item = port_def_body_item_usage(&result, 0, 0);
+    assert_eq!(item.name, "debris");
+    assert_eq!(item.direction, Some(sysml_v2_parser::ast::InOut::InOut));
+    match &item.body {
+        sysml_v2_parser::ast::AttributeBody::Brace { elements } => {
+            assert_eq!(elements.len(), 2);
+        }
+        other => panic!("expected brace body with nested attributes, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_port_def_out_pin_subsets_typing_parses_as_in_out_decl() {
+    let input = r#"package P {
+port def AirPort {
+  out volume :> ISQSpaceTime::volume;
+}
+}"#;
+    let result = parse(input).expect("out pin with :> typing should parse");
+    let pkg = package_from_root(&result);
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let port_def = match &elements[0].value {
+        PackageBodyElement::PortDef(p) => p,
+        other => panic!("expected port def, got {:?}", other),
+    };
+    let body = match &port_def.value.body {
+        sysml_v2_parser::ast::PortDefBody::Brace { elements } => elements,
+        other => panic!("expected port def brace body, got {:?}", other),
+    };
+    match &body[0].value {
+        sysml_v2_parser::ast::PortDefBodyElement::InOutDecl(decl) => {
+            assert_eq!(decl.value.name, "volume");
+            assert_eq!(decl.value.direction, sysml_v2_parser::ast::InOut::Out);
+            assert_eq!(decl.value.type_name, "ISQSpaceTime::volume");
+        }
+        other => panic!("expected InOutDecl, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_port_def_out_attribute_plain_still_uses_in_out_decl() {
     let input = r#"package P {
 port def FuelPort {
@@ -2134,6 +2187,30 @@ fn nested_port_usage_in_part_usage(
     }
 }
 
+fn port_def_body_item_usage(
+    root: &RootNamespace,
+    port_def_idx: usize,
+    item_idx: usize,
+) -> &sysml_v2_parser::ast::ItemUsage {
+    let pkg = package_from_root(root);
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let port_def = match &elements[port_def_idx].value {
+        PackageBodyElement::PortDef(p) => p,
+        other => panic!("expected port def, got {:?}", other),
+    };
+    let body = match &port_def.value.body {
+        sysml_v2_parser::ast::PortDefBody::Brace { elements } => elements,
+        other => panic!("expected port def brace body, got {:?}", other),
+    };
+    match &body[item_idx].value {
+        sysml_v2_parser::ast::PortDefBodyElement::ItemUsage(i) => &i.value,
+        other => panic!("expected item usage, got {:?}", other),
+    }
+}
+
 fn port_def_body_attribute_usage(
     root: &RootNamespace,
     port_def_idx: usize,
@@ -2181,3 +2258,4 @@ fn part_def_body_attribute_usage(
         other => panic!("expected attribute usage, got {:?}", other),
     }
 }
+

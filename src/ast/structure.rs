@@ -330,6 +330,7 @@ pub enum PortDefBodyElement {
     Error(Node<ParseErrorNode>),
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
+    ItemUsage(Node<ItemUsage>),
     PortUsage(Node<PortUsage>),
 }
 

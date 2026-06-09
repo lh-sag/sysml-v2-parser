@@ -240,7 +240,7 @@ pub(crate) fn attribute_def(
     ))
 }
 
-fn direction_prefix(input: Input<'_>) -> IResult<Input<'_>, InOut> {
+pub(crate) fn direction_prefix(input: Input<'_>) -> IResult<Input<'_>, InOut> {
     alt((
         map(preceded(tag(&b"in"[..]), ws1), |_| InOut::In),
         map(preceded(tag(&b"out"[..]), ws1), |_| InOut::Out),
