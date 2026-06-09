@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-06-09
+
+### Added
+
+- **`ItemUsage.direction`**: optional `InOut` on item usages parsed as `in`/`out`/`inout item …` in port def bodies.
+- **`directed_item_usage`**: parser path for direction-prefixed item usages (SysML §7.6.3 / port directed-features table).
+- **`PortDefBodyElement::ItemUsage`**: port def brace bodies accept directed items before legacy `in_out_decl` pins.
+- **`tests/vacuuming_types_parse`**: inline fixtures for directed port items, block/line comments with braces, and optional live-corpus checks via `MBSE_VACUUM_EXAMPLE_DIR`.
+- **Fixture** [`tests/fixtures/port-directed-item-inout.sysml`](tests/fixtures/port-directed-item-inout.sysml).
+
+### Fixed
+
+- **`in_out_decl`**: directed port pins accept `:>` subsetting (e.g. `out volume :> ISQSpaceTime::volume`), not only `:` typing.
+- **EOF brace balance**: `has_unclosed_brace` / `extra_closing_brace_at_eof` ignore `{`/`}` inside `//` and `/* */` comments (fixes false `missing_closing_brace` on commented-out blocks).
+- **Recovery**: `local_recovery_line_boundary` skips `//` line comments correctly; bounds check in `balanced_inline_depth`.
+
+### Changed
+
+- **`direction_prefix`**: `pub(crate)` in [`attribute.rs`](src/parser/attribute.rs) for reuse by item and attribute directed-usage parsers.
+
 ## [0.21.0] - 2026-06-09
 
 ### Added
