@@ -25,14 +25,12 @@ fn usage_ordered_modifier(input: Input<'_>) -> IResult<Input<'_>, bool> {
     Ok((input, ordered.is_some()))
 }
 
-/// Part usage redefines-only: ':>>' qualified_name multiplicity? ordered? value? body (no name/type).
+/// Part usage redefines-only: (`:>>` | `redefines`) qualified_name multiplicity? ordered? value? body.
 pub(crate) fn part_usage_redefines_only<'a>(
     start: Input<'a>,
     input: Input<'a>,
 ) -> IResult<Input<'a>, Node<PartUsage>> {
-    let (input, _) = preceded(ws_and_comments, tag(&b":>>"[..])).parse(input)?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, redefines_qname) = qualified_name.parse(input)?;
+    let (input, (_, redefines_qname)) = prefix_redefinition_target(input)?;
     let (input, multiplicity_opt) = opt(multiplicity).parse(input)?;
     let (input, ordered) = usage_ordered_modifier(input)?;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
@@ -78,6 +76,10 @@ pub(crate) fn part_usage_named<'a>(
     let (input, ordered_after_type) = usage_ordered_modifier(input)?;
     let ordered = ordered_before_type || ordered_after_type;
     let (input, leading_clauses) = specialization_clauses(input)?;
+    let (input, post_clause_multiplicity) = opt(multiplicity).parse(input)?;
+    let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
+    let (input, ordered_after_clauses) = usage_ordered_modifier(input)?;
+    let ordered = ordered || ordered_after_clauses;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
     let (input, trailing_clauses) = specialization_clauses(input)?;
@@ -159,6 +161,10 @@ fn anonymous_part_usage<'a>(
     let (input, ordered_after_type) = usage_ordered_modifier(input)?;
     let ordered = ordered_before_type || ordered_after_type;
     let (input, clauses) = specialization_clauses(input)?;
+    let (input, post_clause_multiplicity) = opt(multiplicity).parse(input)?;
+    let multiplicity_opt = multiplicity_opt.or(post_clause_multiplicity);
+    let (input, ordered_after_clauses) = usage_ordered_modifier(input)?;
+    let ordered = ordered || ordered_after_clauses;
     let (input, value) = opt(preceded(ws_and_comments, usage_value_part)).parse(input)?;
     let (input, body) = part_usage_body(input)?;
     Ok((

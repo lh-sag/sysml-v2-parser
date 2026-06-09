@@ -133,6 +133,9 @@ fn collect_part_def_body_errors(body: &PartDefBody, errors: &mut Vec<ParseError>
                 PartDefBodyElement::PartUsage(n) => {
                     collect_part_usage_body_errors(&n.value.body, errors)
                 }
+                PartDefBodyElement::PartDef(n) => {
+                    collect_part_def_body_errors(&n.value.body, errors)
+                }
                 PartDefBodyElement::Perform(n) => {
                     collect_perform_body_errors(&n.value.body, errors)
                 }

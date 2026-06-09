@@ -5,11 +5,13 @@ use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, qualified_name, starts_with_keyword, ws1, ws_and_comments,
+    identification, name, starts_with_keyword, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
-use crate::parser::usage::{multiplicity, optional_typings, specialization_clauses, typings};
+use crate::parser::usage::{
+    multiplicity, optional_typings, prefix_redefinition_target, specialization_clauses, typings,
+};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -259,10 +261,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
     let (input, _) = ws1(input)?;
     let (input, usage_head) = alt((
         map(
-            preceded(
-                preceded(ws_and_comments, tag(&b":>>"[..])),
-                preceded(ws_and_comments, with_span(qualified_name)),
-            ),
+            preceded(ws_and_comments, prefix_redefinition_target),
             |(redefines_span, redefines)| AttributeUsageHead::PrefixRedefines {
                 redefines_span,
                 redefines,

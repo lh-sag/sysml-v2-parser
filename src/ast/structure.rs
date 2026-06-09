@@ -52,6 +52,7 @@ pub enum PartDefBodyElement {
     Ref(Node<RefDecl>),
     PortUsage(Node<PortUsage>),
     PartUsage(Box<Node<PartUsage>>),
+    PartDef(Node<PartDef>),
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),
     InterfaceDef(Node<InterfaceDef>),
     InterfaceUsage(Node<InterfaceUsage>),

@@ -35,7 +35,8 @@ pub(crate) use crate::parser::requirement::{
 };
 pub(crate) use crate::parser::specialization::parse_optional_definition_specialization;
 pub(crate) use crate::parser::usage::{
-    multiplicity, optional_typings, redefinition, specialization_clauses, subsetting, typings,
+    multiplicity, optional_typings, prefix_redefinition_target, redefinition,
+    specialization_clauses, subsetting, typings,
 };
 pub(crate) use crate::parser::with_span;
 pub(crate) use crate::parser::Input;
@@ -50,4 +51,5 @@ pub(crate) use nom::Parser;
 
 pub(crate) const MEMBER_HEADER_UNTIL_BODY: &[u8] = b";{";
 
+pub(crate) use super::def::part_def;
 pub(crate) use super::PartDefOrUsage;

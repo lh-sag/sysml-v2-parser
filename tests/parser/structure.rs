@@ -362,6 +362,46 @@ part def Accumulator {
 }
 
 #[test]
+fn test_part_def_accepts_nested_part_definition() {
+    let input = r#"package P {
+part def Accumulator {
+  item def Energy;
+  part def Cell {
+    attribute capacity : Real;
+  }
+}
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "nested part def in part body should parse without recovery diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let part = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("expected part def");
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &part.body else {
+        panic!("expected part body");
+    };
+    assert!(elements.iter().any(|e| matches!(
+        e.value,
+        sysml_v2_parser::ast::PartDefBodyElement::PartDef(_)
+    )));
+}
+
+#[test]
 fn test_parse_part_attribute_prefix_redefines_shorthand() {
     let input = "package P {\npart def Laptop { attribute name : String; }\npart office {\npart laptop1: Laptop {\nattribute :>> name = \"My Laptop\";\n}\n}\n}";
     let result = parse(input).expect("attribute prefix redefines shorthand should parse");
@@ -1875,4 +1915,200 @@ part def Carrier {
     assert!(part_usage.value.name.is_empty());
     assert_eq!(part_usage.value.type_name, "Vehicle::Engine");
     assert_eq!(part_usage.value.multiplicity.as_deref(), Some("[2]"));
+}
+
+#[test]
+fn test_part_usage_redefines_only_keyword() {
+    let input = r#"package P {
+part def FourCylinderEngine :> Engine {
+  part redefines cylinders[4];
+}
+}"#;
+    let result = parse(input).expect("part redefines-only keyword should parse");
+    let part_usage = part_def_body_part_usage(&result, 0, 0);
+    assert!(part_usage.name.is_empty());
+    assert_eq!(part_usage.redefines.as_deref(), Some("cylinders"));
+    assert_eq!(part_usage.multiplicity.as_deref(), Some("[4]"));
+}
+
+#[test]
+fn test_part_usage_named_redefines_with_multiplicity() {
+    let input = r#"package P {
+part def logicalDriveUnit {
+  part motor1 : dcMotor {
+    part tire1 redefines motorTire[1];
+  }
+}
+}"#;
+    let diag = parse_with_diagnostics(input);
+    assert!(
+        !diag
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("recovered_part_usage_body_element")),
+        "unexpected recovery: {:?}",
+        diag.errors
+    );
+    let part_usage = nested_part_usage_in_part_usage(&diag.root, 0, 0, 0);
+    assert_eq!(part_usage.name, "tire1");
+    assert_eq!(part_usage.redefines.as_deref(), Some("motorTire"));
+    assert_eq!(part_usage.multiplicity.as_deref(), Some("[1]"));
+}
+
+#[test]
+fn test_port_usage_redefines_keyword_in_part_body() {
+    let input = r#"package P {
+part brushSystem : BrushSystem {
+  part mainBrush : MainBrush {
+    port redefines rotationSpeedIn;
+  }
+}
+}"#;
+    let diag = parse_with_diagnostics(input);
+    assert!(
+        !diag
+            .errors
+            .iter()
+            .any(|e| e.code.as_deref() == Some("recovered_part_usage_body_element")),
+        "unexpected recovery: {:?}",
+        diag.errors
+    );
+    let port_usage = nested_port_usage_in_part_usage(&diag.root, 0, 0, 0);
+    assert_eq!(port_usage.name, "rotationSpeedIn");
+    assert_eq!(port_usage.redefines.as_deref(), Some("rotationSpeedIn"));
+}
+
+#[test]
+fn test_attribute_usage_redefines_keyword_prefix() {
+    let input = r#"package P {
+part def DriveController {
+  attribute redefines architecture = EeArchitecture::arm;
+}
+}"#;
+    let result = parse(input).expect("attribute redefines prefix should parse");
+    let attr = part_def_body_attribute_usage(&result, 0, 0);
+    assert_eq!(attr.name, "architecture");
+    assert_eq!(attr.redefines.as_deref(), Some("architecture"));
+    assert!(attr.value.is_some());
+}
+
+fn package_from_root(root: &RootNamespace) -> &Package {
+    match &root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        other => panic!("expected package, got {:?}", other),
+    }
+}
+
+fn part_def_body_part_usage(
+    root: &RootNamespace,
+    pkg_part_def_idx: usize,
+    part_usage_idx: usize,
+) -> &PartUsage {
+    let pkg = package_from_root(root);
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = match &elements[pkg_part_def_idx].value {
+        PackageBodyElement::PartDef(p) => p,
+        other => panic!("expected part def, got {:?}", other),
+    };
+    let body = match &part_def.value.body {
+        PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    match &body[part_usage_idx].value {
+        PartDefBodyElement::PartUsage(p) => &p.value,
+        other => panic!("expected part usage, got {:?}", other),
+    }
+}
+
+fn nested_part_usage_in_part_usage(
+    root: &RootNamespace,
+    pkg_part_def_idx: usize,
+    outer_part_idx: usize,
+    inner_part_idx: usize,
+) -> &PartUsage {
+    let pkg = package_from_root(root);
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = match &elements[pkg_part_def_idx].value {
+        PackageBodyElement::PartDef(p) => p,
+        other => panic!("expected part def, got {:?}", other),
+    };
+    let def_body = match &part_def.value.body {
+        PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    let outer = match &def_body[outer_part_idx].value {
+        PartDefBodyElement::PartUsage(p) => p,
+        other => panic!("expected outer part usage, got {:?}", other),
+    };
+    let outer_body = match &outer.value.body {
+        PartUsageBody::Brace { elements } => elements,
+        other => panic!("expected part usage brace body, got {:?}", other),
+    };
+    match &outer_body[inner_part_idx].value {
+        PartUsageBodyElement::PartUsage(p) => &p.value,
+        other => panic!("expected inner part usage, got {:?}", other),
+    }
+}
+
+fn nested_port_usage_in_part_usage(
+    root: &RootNamespace,
+    pkg_part_idx: usize,
+    outer_part_idx: usize,
+    port_idx: usize,
+) -> &PortUsage {
+    let pkg = package_from_root(root);
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_usage_el = match &elements[pkg_part_idx].value {
+        PackageBodyElement::PartUsage(p) => p,
+        other => panic!("expected part usage, got {:?}", other),
+    };
+    let outer_body = match &part_usage_el.value.body {
+        PartUsageBody::Brace { elements } => elements,
+        other => panic!("expected part usage brace body, got {:?}", other),
+    };
+    let inner = match &outer_body[outer_part_idx].value {
+        PartUsageBodyElement::PartUsage(p) => p,
+        other => panic!("expected inner part usage, got {:?}", other),
+    };
+    let inner_body = match &inner.value.body {
+        PartUsageBody::Brace { elements } => elements,
+        other => panic!("expected inner brace body, got {:?}", other),
+    };
+    match &inner_body[port_idx].value {
+        PartUsageBodyElement::PortUsage(p) => &p.value,
+        other => panic!("expected port usage, got {:?}", other),
+    }
+}
+
+fn part_def_body_attribute_usage(
+    root: &RootNamespace,
+    part_def_idx: usize,
+    attr_idx: usize,
+) -> &AttributeUsage {
+    let pkg = package_from_root(root);
+    let elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        other => panic!("expected brace body, got {:?}", other),
+    };
+    let part_def = match &elements[part_def_idx].value {
+        PackageBodyElement::PartDef(p) => p,
+        other => panic!("expected part def, got {:?}", other),
+    };
+    let body = match &part_def.value.body {
+        PartDefBody::Brace { elements } => elements,
+        other => panic!("expected part def brace body, got {:?}", other),
+    };
+    match &body[attr_idx].value {
+        PartDefBodyElement::AttributeUsage(a) => &a.value,
+        other => panic!("expected attribute usage, got {:?}", other),
+    }
 }

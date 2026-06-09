@@ -146,6 +146,7 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(allocate_, PartDefBodyElement::Allocate),
             map(connection_usage_member, PartDefBodyElement::Connection),
             map(connect_, PartDefBodyElement::Connect),
+            map(part_def, PartDefBodyElement::PartDef),
             map(part_usage, |p| PartDefBodyElement::PartUsage(Box::new(p))),
             map(individual_usage, |n| {
                 PartDefBodyElement::OccurrenceUsage(Box::new(n))
@@ -289,6 +290,7 @@ fn opaque_part_member_decl(input: Input<'_>) -> IResult<Input<'_>, Node<OpaqueMe
                     | "port"
                     | "connection"
                     | "part"
+                    | "def"
                     | "private"
                     | "protected"
                     | "public"

@@ -142,6 +142,13 @@ pub(crate) fn redefinition(input: Input<'_>) -> IResult<Input<'_>, String> {
     .parse(input)
 }
 
+/// Prefix redefinition: `:>>` / `redefines` qualified_name (for usage heads).
+pub(crate) fn prefix_redefinition_target(input: Input<'_>) -> IResult<Input<'_>, (Span, String)> {
+    let before = input;
+    let (input, target) = redefinition(input)?;
+    Ok((input, (span_from_to(before, input), target)))
+}
+
 /// Reference subsetting: `::>` / `references` target.
 pub(crate) fn reference_subsetting(input: Input<'_>) -> IResult<Input<'_>, String> {
     preceded(

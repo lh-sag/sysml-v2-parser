@@ -13,7 +13,9 @@ use crate::parser::expr::expression;
 use crate::parser::lex::{name, ws1, ws_and_comments, PORT_BODY_STARTERS, PORT_DEF_BODY_STARTERS};
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
-use crate::parser::usage::{multiplicity, optional_typings, specialization_clauses};
+use crate::parser::usage::{
+    multiplicity, optional_typings, prefix_redefinition_target, specialization_clauses,
+};
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -71,30 +73,57 @@ fn port_body_brace(input: Input<'_>) -> IResult<Input<'_>, PortBody> {
     Ok((input, PortBody::Brace { elements }))
 }
 
-/// Port usage: 'port' ( ':>>' name | name ) ( ':' type )? multiplicity? ( ':>' ... )? ( 'redefines' ... )? body
+fn local_name_from_qualified_name(qname: &str) -> String {
+    qname.rsplit("::").next().unwrap_or(qname).to_string()
+}
+
+/// Port usage: 'port' ( (`:>>`|`redefines`) target | name ) ( ':' type )? multiplicity? clauses? body
 pub(crate) fn port_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PortUsage>> {
+    enum PortUsageHead {
+        PrefixRedefines {
+            name_span: crate::ast::Span,
+            redefines: String,
+        },
+        Named {
+            name_span: crate::ast::Span,
+            name: String,
+        },
+    }
+
     let start = input;
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"port"[..]).parse(input)?;
     let (input, _) = ws1(input)?;
-    let (input, prefix_redefines) = opt(preceded(ws_and_comments, tag(&b":>>"[..])))
-        .parse(input)
-        .map(|(i, o)| (i, o.is_some()))?;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    let (input, usage_head) = alt((
+        map(
+            preceded(ws_and_comments, prefix_redefinition_target),
+            |(name_span, redefines)| PortUsageHead::PrefixRedefines {
+                name_span,
+                redefines,
+            },
+        ),
+        map(with_span(name), |(name_span, name)| PortUsageHead::Named { name_span, name }),
+    ))
+    .parse(input)?;
+    let (input, name_str, name_span, prefix_redefines) = match usage_head {
+        PortUsageHead::PrefixRedefines {
+            name_span,
+            redefines,
+        } => (
+            input,
+            local_name_from_qualified_name(&redefines),
+            name_span,
+            Some(redefines),
+        ),
+        PortUsageHead::Named { name_span, name } => (input, name, name_span, None),
+    };
     let (input, type_result) = optional_typings(input)?;
     let (type_ref_span, type_name) = type_result
         .map(|(span, name)| (Some(span), Some(name)))
         .unwrap_or((None, None));
     let (input, multiplicity) = opt(multiplicity).parse(input)?;
     let (input, clauses) = specialization_clauses(input)?;
-    let redefines = clauses.redefines.or_else(|| {
-        if prefix_redefines {
-            Some(name_str.clone())
-        } else {
-            None
-        }
-    });
+    let redefines = clauses.redefines.or(prefix_redefines);
     let (input, body) = port_body(input)?;
     Ok((
         input,

@@ -331,6 +331,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::PartUsage(n) => {
             PartDefBodyElement::PartUsage(Box::new(dummy_node(n, normalize_part_usage(&n.value))))
         }
+        PartDefBodyElement::PartDef(n) => {
+            PartDefBodyElement::PartDef(dummy_node(n, normalize_part_def(&n.value)))
+        }
         PartDefBodyElement::OccurrenceUsage(n) => {
             PartDefBodyElement::OccurrenceUsage(Box::new(dummy_node(n, n.value.clone())))
         }
