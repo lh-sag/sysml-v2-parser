@@ -393,6 +393,7 @@ fn normalize_attribute_usage(a: &AttributeUsage) -> AttributeUsage {
         name_span: None,
         typing_span: None,
         redefines_span: None,
+        direction: a.direction,
     }
 }
 

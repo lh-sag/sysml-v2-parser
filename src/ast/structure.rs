@@ -295,6 +295,8 @@ pub struct AttributeUsage {
     pub typing_span: Option<Span>,
     /// Span of the redefines target after `redefines`, if present (for semantic tokens).
     pub redefines_span: Option<Span>,
+    /// Direction prefix when parsed as `in`/`out`/`inout attribute ...` (e.g. in port def bodies).
+    pub direction: Option<InOut>,
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 //! Attribute definition and usage parsing.
 
-use crate::ast::{AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, Node};
+use crate::ast::{AttributeBody, AttributeBodyElement, AttributeDef, AttributeUsage, InOut, Node};
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::expr::expression;
@@ -240,6 +240,27 @@ pub(crate) fn attribute_def(
     ))
 }
 
+fn direction_prefix(input: Input<'_>) -> IResult<Input<'_>, InOut> {
+    alt((
+        map(preceded(tag(&b"in"[..]), ws1), |_| InOut::In),
+        map(preceded(tag(&b"out"[..]), ws1), |_| InOut::Out),
+        map(preceded(tag(&b"inout"[..]), ws1), |_| InOut::InOut),
+    ))
+    .parse(input)
+}
+
+/// `in`/`out`/`inout attribute` usage (port def bodies): direction + [`attribute_usage`].
+pub(crate) fn directed_attribute_usage(
+    input: Input<'_>,
+) -> IResult<Input<'_>, Node<AttributeUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, direction) = direction_prefix(input)?;
+    let (input, mut usage) = attribute_usage(input)?;
+    usage.value.direction = Some(direction);
+    Ok((input, node_from_to(start, input, usage.value)))
+}
+
 /// Attribute usage:
 /// - `attribute` name ( (`:>` | `:`) type )? ( `redefines` qualified_name )? ( '=' value )? body
 /// - `attribute :>>` qualified_name ( '=' value )? body
@@ -344,6 +365,7 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
                 name_span,
                 typing_span,
                 redefines_span,
+                direction: None,
             },
         ),
     ))
@@ -391,6 +413,7 @@ pub(crate) fn attribute_usage_shorthand(
                 name_span: Some(name_span),
                 typing_span: None,
                 redefines_span: None,
+                direction: None,
             },
         ),
     ))

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-06-09
+
+### Added
+
+- **`AttributeUsage.direction`**: optional `InOut` when parsed as `in`/`out`/`inout attribute …` in port def bodies.
+- **`directed_attribute_usage`**: parser path for direction-prefixed attribute usages, including `out attribute redefines …`.
+
+### Fixed
+
+- Port def bodies no longer mis-parse `out attribute redefines name :> Type` as `InOutDecl` with name `redefines`.
+
 ## [0.20.0] - 2026-06-08
 
 ### Added
