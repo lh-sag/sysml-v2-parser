@@ -15,10 +15,33 @@ Each SysML file under `sysml-v2-release/sysml/src/validation/` can have a corres
 3. Compare with `assert_ast_eq` (hand-built expected AST) or `assert_ast_snapshot` (checked-in snapshot).
 4. Wire the module in `tests/validation.rs`.
 
-Regenerate snapshots after intentional parser output changes:
+## When to regenerate snapshots
+
+Refresh checked-in AST snapshots **in the same PR** whenever parser output changes, for example:
+
+- new optional fields on existing AST structs (`AttributeDef.value_span`, usage header spans, …)
+- new enum variants on body-element types (`MetadataAnnotation`, `MetadataKeywordUsage`, …)
+- a construct now parses into a different variant (e.g. `@Tag : Type` as `MetadataAnnotation` instead of `Annotation`)
+- structured brace parsing replaces `advance_to_closing_brace` / silent skip
+
+CI always runs `cargo test -- --include-ignored`; local `cargo test` alone does **not** run these snapshot tests.
+
+## Regenerate
+
+All snapshot fixtures:
 
 ```powershell
 $env:UPDATE_VALIDATION_AST = "1"
-cargo test --test validation -- --include-ignored parts_tree_1a functional_allocation_4a function_based_behavior_3a
+cargo test --test validation -- --include-ignored
 Remove-Item Env:UPDATE_VALIDATION_AST
 ```
+
+Or a subset (faster while iterating):
+
+```powershell
+$env:UPDATE_VALIDATION_AST = "1"
+cargo test --test validation test_parse_1a_parts_tree test_parse_3a_function_based_behavior -- --include-ignored
+Remove-Item Env:UPDATE_VALIDATION_AST
+```
+
+Unset `UPDATE_VALIDATION_AST` before committing. Review the `.txt` diff in `snapshots/` — only intentional AST changes should appear.

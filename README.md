@@ -48,11 +48,13 @@ Run formatting/lint checks used in CI:
 cargo clippy -- -W clippy::all
 ```
 
-Run the full validation suite against the SysML v2 release tree:
+Run the full validation suite against the SysML v2 release tree (required in CI):
 
 ```bash
 cargo test --test validation -- --include-ignored
 ```
+
+If you change AST fields or body-element shapes, refresh the checked-in AST snapshots in the same PR — see [validation test README](tests/validation/README.md) and [regression gates](docs/PARSER_BACKLOG_ROADMAP.md#ast-snapshot-refresh-when-ast-shape-changes).
 
 Fetch the pinned SysML v2 release fixtures into `./sysml-v2-release`:
 

@@ -2,7 +2,7 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-06-08
+**Last updated:** 2026-06-09
 
 ## How to use this document
 
@@ -21,6 +21,24 @@
 - `cargo test --test validation -- --include-ignored`
 - `test_systems_library_strict_no_diagnostics` / `test_full_library_strict_no_diagnostics` (validation suite)
 - `ExtendedLibraryDecl = 0` in library node-shape gates
+
+### AST snapshot refresh (when AST shape changes)
+
+CI runs the full validation suite (`cargo test -- --include-ignored`). Several fixtures compare against checked-in AST text under [`tests/validation/snapshots/`](../tests/validation/snapshots/). **Any PR that changes AST shape must refresh those snapshots in the same PR** — do not rely on the default `cargo test` alone (snapshot tests are `#[ignore]` unless `--include-ignored`).
+
+Regenerate after changes such as:
+
+- new or renamed AST fields (e.g. `value_span`, `MetadataAnnotation` variants)
+- new body-element enum variants or different parse classification (e.g. `@` metadata vs generic `Annotation`)
+- structured-body parsing replacing silent skip
+
+```powershell
+$env:UPDATE_VALIDATION_AST = "1"
+cargo test --test validation -- --include-ignored
+Remove-Item Env:UPDATE_VALIDATION_AST
+```
+
+See [`tests/validation/README.md`](../tests/validation/README.md) for layout and per-fixture commands. Review the snapshot diff before committing — it should reflect intentional parser output only.
 
 ---
 
