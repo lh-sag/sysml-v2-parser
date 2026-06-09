@@ -47,6 +47,7 @@ pub enum PartDefBodyElement {
     AttributeDef(Node<AttributeDef>),
     AttributeUsage(Node<AttributeUsage>),
     RequirementUsage(Node<RequirementUsage>),
+    ItemDef(Node<ItemDef>),
     ItemUsage(Node<ItemUsage>),
     Ref(Node<RefDecl>),
     PortUsage(Node<PortUsage>),

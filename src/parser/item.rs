@@ -15,8 +15,21 @@ use nom::Parser;
 
 /// Item definition: `item def` Identification body
 pub(crate) fn item_def(input: Input<'_>) -> IResult<Input<'_>, Node<ItemDef>> {
+    parse_item_def(input, false)
+}
+
+/// Item definition with required `def` keyword (disambiguates from `item` usages in part bodies).
+pub(crate) fn item_def_required(input: Input<'_>) -> IResult<Input<'_>, Node<ItemDef>> {
+    parse_item_def(input, true)
+}
+
+fn parse_item_def(input: Input<'_>, require_def: bool) -> IResult<Input<'_>, Node<ItemDef>> {
     let start = input;
-    let (input, prefix) = parse_definition_prefix(input, DefinitionPrefixOptions::new(b"item"))?;
+    let mut options = DefinitionPrefixOptions::new(b"item");
+    if require_def {
+        options = options.def_required();
+    }
+    let (input, prefix) = parse_definition_prefix(input, options)?;
     let (input, body) = attribute_body(input)?;
     Ok((
         input,

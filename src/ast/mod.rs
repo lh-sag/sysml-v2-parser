@@ -316,6 +316,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::RequirementUsage(n) => {
             PartDefBodyElement::RequirementUsage(dummy_node(n, n.value.clone()))
         }
+        PartDefBodyElement::ItemDef(n) => {
+            PartDefBodyElement::ItemDef(dummy_node(n, n.value.clone()))
+        }
         PartDefBodyElement::ItemUsage(n) => {
             PartDefBodyElement::ItemUsage(dummy_node(n, n.value.clone()))
         }

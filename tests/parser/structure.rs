@@ -319,6 +319,49 @@ part def Robot {
 }
 
 #[test]
+fn test_part_def_accepts_nested_item_definition() {
+    let input = r#"package P {
+part def Accumulator {
+  item def Energy;
+  attribute mass : Real;
+}
+}"#;
+    let result = parse_with_diagnostics(input);
+    assert!(
+        result.errors.is_empty(),
+        "nested item def in part body should parse without recovery diagnostics: {:?}",
+        result.errors
+    );
+
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected package body");
+    };
+    let part = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(p) => Some(&p.value),
+            _ => None,
+        })
+        .expect("expected part def");
+    let sysml_v2_parser::ast::PartDefBody::Brace { elements } = &part.body else {
+        panic!("expected part body");
+    };
+    assert!(elements.iter().any(|e| matches!(
+        e.value,
+        sysml_v2_parser::ast::PartDefBodyElement::ItemDef(_)
+    )));
+    assert!(elements.iter().any(|e| matches!(
+        e.value,
+        sysml_v2_parser::ast::PartDefBodyElement::AttributeDef(_)
+            | sysml_v2_parser::ast::PartDefBodyElement::AttributeUsage(_)
+    )));
+}
+
+#[test]
 fn test_parse_part_attribute_prefix_redefines_shorthand() {
     let input = "package P {\npart def Laptop { attribute name : String; }\npart office {\npart laptop1: Laptop {\nattribute :>> name = \"My Laptop\";\n}\n}\n}";
     let result = parse(input).expect("attribute prefix redefines shorthand should parse");

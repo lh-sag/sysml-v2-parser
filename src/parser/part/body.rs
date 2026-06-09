@@ -176,6 +176,7 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             ),
             map(enum_usage, PartDefBodyElement::EnumerationUsage),
             map(requirement_usage, PartDefBodyElement::RequirementUsage),
+            map(item_def_required, PartDefBodyElement::ItemDef),
             map(item_usage, PartDefBodyElement::ItemUsage),
             map(opaque_part_member_decl, PartDefBodyElement::OpaqueMember),
         )),
