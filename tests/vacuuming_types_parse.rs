@@ -115,10 +115,19 @@ fn vacuuming_types_line_comments_with_braces_do_not_break_parse() {
     assert!(brace_errors(input).is_empty(), "{:?}", brace_errors(input));
 }
 
+fn vacuuming_types_sysml_path() -> Option<std::path::PathBuf> {
+    let root = std::env::var_os("MBSE_VACUUM_EXAMPLE_DIR")?;
+    let path = std::path::PathBuf::from(root).join(
+        "Functions/legacy/VacuumingSystem/VacuumingTypes.sysml",
+    );
+    path.exists().then_some(path)
+}
+
 #[test]
+#[ignore = "requires MBSE_VACUUM_EXAMPLE_DIR pointing at the public example checkout"]
 fn vacuuming_types_port_definitions_package_without_block_comment() {
-    let path = r"C:\Git\MBSE_AG_vacuum-cleaner-robot-example\Functions\legacy\VacuumingSystem\VacuumingTypes.sysml";
-    let input = std::fs::read_to_string(path).expect("read");
+    let path = vacuuming_types_sysml_path().expect("MBSE_VACUUM_EXAMPLE_DIR");
+    let input = std::fs::read_to_string(&path).expect("read");
     let port_defs_start = input.find("package PortDefinitions").expect("port defs");
     let port_defs_end = input.find("// Interfaces between").expect("interfaces");
     let mut chunk = input[port_defs_start..port_defs_end].to_string();
@@ -134,9 +143,10 @@ fn vacuuming_types_port_definitions_package_without_block_comment() {
 }
 
 #[test]
+#[ignore = "requires MBSE_VACUUM_EXAMPLE_DIR pointing at the public example checkout"]
 fn vacuuming_types_port_definitions_package() {
-    let path = r"C:\Git\MBSE_AG_vacuum-cleaner-robot-example\Functions\legacy\VacuumingSystem\VacuumingTypes.sysml";
-    let input = std::fs::read_to_string(path).expect("read");
+    let path = vacuuming_types_sysml_path().expect("MBSE_VACUUM_EXAMPLE_DIR");
+    let input = std::fs::read_to_string(&path).expect("read");
     let port_defs_start = input.find("package PortDefinitions").expect("port defs");
     let port_defs_end = input.find("// Interfaces between").expect("interfaces");
     let chunk = format!(
