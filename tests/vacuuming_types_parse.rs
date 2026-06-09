@@ -126,7 +126,9 @@ fn vacuuming_types_sysml_path() -> Option<std::path::PathBuf> {
 #[test]
 #[ignore = "requires MBSE_VACUUM_EXAMPLE_DIR pointing at the public example checkout"]
 fn vacuuming_types_port_definitions_package_without_block_comment() {
-    let path = vacuuming_types_sysml_path().expect("MBSE_VACUUM_EXAMPLE_DIR");
+    let Some(path) = vacuuming_types_sysml_path() else {
+        return;
+    };
     let input = std::fs::read_to_string(&path).expect("read");
     let port_defs_start = input.find("package PortDefinitions").expect("port defs");
     let port_defs_end = input.find("// Interfaces between").expect("interfaces");
@@ -145,7 +147,9 @@ fn vacuuming_types_port_definitions_package_without_block_comment() {
 #[test]
 #[ignore = "requires MBSE_VACUUM_EXAMPLE_DIR pointing at the public example checkout"]
 fn vacuuming_types_port_definitions_package() {
-    let path = vacuuming_types_sysml_path().expect("MBSE_VACUUM_EXAMPLE_DIR");
+    let Some(path) = vacuuming_types_sysml_path() else {
+        return;
+    };
     let input = std::fs::read_to_string(&path).expect("read");
     let port_defs_start = input.find("package PortDefinitions").expect("port defs");
     let port_defs_end = input.find("// Interfaces between").expect("interfaces");
