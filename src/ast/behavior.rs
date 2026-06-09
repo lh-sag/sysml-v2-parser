@@ -1,6 +1,8 @@
 use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::requirement::RequirementUsage;
-use super::structure::{Annotation, Bind, DefinitionBody, MetadataKeywordUsage, Perform, RefDecl};
+use super::structure::{
+    Annotation, Bind, DefinitionBody, MetadataAnnotation, MetadataKeywordUsage, Perform, RefDecl,
+};
 use crate::ast::core::{Expression, Node, Span};
 
 /// Action definition: `action def` Identification body (in/out params).
@@ -28,6 +30,7 @@ pub enum ActionDefBodyElement {
     InOutDecl(Node<InOutDecl>),
     Doc(Node<DocComment>),
     Annotation(Node<Annotation>),
+    MetadataAnnotation(Node<MetadataAnnotation>),
     RefDecl(Node<RefDecl>),
     Perform(Node<Perform>),
     Bind(Node<Bind>),
@@ -130,6 +133,7 @@ pub enum ActionUsageBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     Annotation(Node<Annotation>),
+    MetadataAnnotation(Node<MetadataAnnotation>),
     InOutDecl(Node<InOutDecl>),
     RefDecl(Node<RefDecl>),
     Bind(Node<Bind>),

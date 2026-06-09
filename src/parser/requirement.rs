@@ -164,7 +164,6 @@ fn requirement_def_body_element(
     let start = input;
     let (rest, elem) = alt((
         alt((
-            map(annotation, RequirementDefBodyElement::Annotation),
             map(
                 crate::parser::metadata_annotation::metadata_annotation,
                 RequirementDefBodyElement::MetadataAnnotation,
@@ -173,6 +172,7 @@ fn requirement_def_body_element(
                 crate::parser::metadata_annotation::metadata_keyword_usage,
                 RequirementDefBodyElement::MetadataKeywordUsage,
             ),
+            map(annotation, RequirementDefBodyElement::Annotation),
             map(import_, RequirementDefBodyElement::Import),
             map(subject_decl, RequirementDefBodyElement::SubjectDecl),
             map(actor_decl, RequirementDefBodyElement::RequirementActorDecl),

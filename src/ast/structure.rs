@@ -109,6 +109,8 @@ pub struct AttributeDef {
     pub name_span: Option<Span>,
     /// Span of the type after `:>`, if present (for semantic tokens).
     pub typing_span: Option<Span>,
+    /// Span of the default/binding expression value, when present.
+    pub value_span: Option<Span>,
 }
 
 /// Body of an attribute (def or usage): `;` or `{` AttributeBodyElement* `}`.

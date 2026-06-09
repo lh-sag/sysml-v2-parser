@@ -216,6 +216,7 @@ pub(crate) fn attribute_def(
     let (input, value) =
         nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
     let value = value.or(leading_value);
+    let value_span = value.as_ref().map(|node| node.span.clone());
     let (input, _) = specialization_clauses(input)?;
     let (input, _) = ignored_feature_modifiers(input)?;
     let (input, body) = attribute_body(input)?;
@@ -231,6 +232,7 @@ pub(crate) fn attribute_def(
                 body,
                 name_span,
                 typing_span,
+                value_span,
             },
         ),
     ))

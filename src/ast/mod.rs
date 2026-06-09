@@ -266,6 +266,7 @@ fn normalize_attribute_def(a: &AttributeDef) -> AttributeDef {
         body: a.body.clone(),
         name_span: None,
         typing_span: None,
+        value_span: None,
     }
 }
 
@@ -797,6 +798,9 @@ fn normalize_action_def_body_element_node(
         ActionDefBodyElement::Annotation(n) => {
             ActionDefBodyElement::Annotation(dummy_node(n, n.value.clone()))
         }
+        ActionDefBodyElement::MetadataAnnotation(n) => {
+            ActionDefBodyElement::MetadataAnnotation(dummy_node(n, n.value.clone()))
+        }
         ActionDefBodyElement::RefDecl(n) => {
             ActionDefBodyElement::RefDecl(dummy_node(n, normalize_ref_decl(&n.value)))
         }
@@ -867,6 +871,9 @@ fn normalize_action_usage_body_element_node(
         }
         ActionUsageBodyElement::Annotation(n) => {
             ActionUsageBodyElement::Annotation(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::MetadataAnnotation(n) => {
+            ActionUsageBodyElement::MetadataAnnotation(dummy_node(n, n.value.clone()))
         }
         ActionUsageBodyElement::InOutDecl(n) => {
             ActionUsageBodyElement::InOutDecl(dummy_node(n, n.value.clone()))

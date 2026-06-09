@@ -267,13 +267,15 @@ fn literal_with_unit(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     }
     let (input, _) = tag(&b"["[..]).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
+    let unit_start = input;
     let (input, unit_name) = unit_name_in_brackets.parse(input)?;
+    let unit_name_span = crate::parser::span_from_to(unit_start, input);
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = tag(&b"]"[..]).parse(input)?;
     let unit = Node::new(
-        crate::ast::Span::dummy(),
+        unit_name_span.clone(),
         Expression::Bracket(Box::new(Node::new(
-            crate::ast::Span::dummy(),
+            unit_name_span,
             Expression::FeatureRef(unit_name),
         ))),
     );

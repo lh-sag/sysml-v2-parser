@@ -13,7 +13,7 @@ use crate::parser::interface::connect_body;
 use crate::parser::lex::{
     name, qualified_name, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
 };
-use crate::parser::metadata_annotation::annotation;
+use crate::parser::metadata_annotation::{annotation, metadata_annotation};
 use crate::parser::node_from_to;
 use crate::parser::part::bind_;
 use crate::parser::usage::usage_header;
@@ -448,6 +448,7 @@ fn action_def_body_element(
         map(action_body_decl, ActionDefBodyElement::Decl),
         map(in_out_decl, ActionDefBodyElement::InOutDecl),
         map(doc_comment_stmt, ActionDefBodyElement::Doc),
+        map(metadata_annotation, ActionDefBodyElement::MetadataAnnotation),
         map(annotation, ActionDefBodyElement::Annotation),
         map(action_ref_decl, ActionDefBodyElement::RefDecl),
         map(perform_action_decl, ActionDefBodyElement::Perform),
@@ -604,6 +605,7 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
         map(action_body_decl, ActionUsageBodyElement::Decl),
         map(in_out_decl, ActionUsageBodyElement::InOutDecl),
         map(doc_comment_stmt, ActionUsageBodyElement::Doc),
+        map(metadata_annotation, ActionUsageBodyElement::MetadataAnnotation),
         map(annotation, ActionUsageBodyElement::Annotation),
         map(action_ref_decl, ActionUsageBodyElement::RefDecl),
         map(bind_, ActionUsageBodyElement::Bind),
