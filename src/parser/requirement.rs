@@ -7,7 +7,7 @@ use crate::ast::{
     SubjectDecl, TextualRepresentation, VerifyRequirementMember,
 };
 use crate::parser::attribute::{attribute_def, attribute_usage};
-use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
+use crate::parser::body::parse_structured_brace_members;
 use crate::parser::constraint::{structured_constraint_body, StructuredConstraintBody};
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
@@ -290,20 +290,44 @@ fn concern_reference_member<'a>(
     Ok((input, (target, target_span)))
 }
 
-fn stakeholder_member(input: Input<'_>) -> IResult<Input<'_>, Node<StakeholderMember>> {
+fn stakeholder_typed_member(input: Input<'_>) -> IResult<Input<'_>, Node<StakeholderMember>> {
     let start = input;
-    let (input, (target, target_span)) = concern_reference_member(input, b"stakeholder")?;
+    let (input, decl) = requirement_parameter_decl(input, b"stakeholder", "stakeholder")?;
     Ok((
         input,
         node_from_to(
             start,
             input,
             StakeholderMember {
-                target,
-                target_span,
+                name: decl.value.name,
+                type_name: Some(decl.value.type_name),
+                name_span: decl.span.clone(),
+                type_span: Some(decl.span.clone()),
             },
         ),
     ))
+}
+
+fn stakeholder_shorthand_member(input: Input<'_>) -> IResult<Input<'_>, Node<StakeholderMember>> {
+    let start = input;
+    let (input, (name, name_span)) = concern_reference_member(input, b"stakeholder")?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            StakeholderMember {
+                name,
+                type_name: None,
+                name_span,
+                type_span: None,
+            },
+        ),
+    ))
+}
+
+fn stakeholder_member(input: Input<'_>) -> IResult<Input<'_>, Node<StakeholderMember>> {
+    alt((stakeholder_typed_member, stakeholder_shorthand_member)).parse(input)
 }
 
 fn purpose_member(input: Input<'_>) -> IResult<Input<'_>, Node<PurposeMember>> {
@@ -373,14 +397,7 @@ fn requirement_parameter_decl<'a>(
     let (input, type_name) = preceded(ws_and_comments, qualified_name).parse(input)?;
     let (input, _) = alt((
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| ()),
-        map(
-            delimited(
-                preceded(ws_and_comments, tag(&b"{"[..])),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| (),
-        ),
+        map(structured_constraint_body, |_| ()),
     ))
     .parse(input)?;
     Ok((
@@ -417,20 +434,14 @@ pub(crate) fn require_constraint_body(
 }
 
 pub(crate) fn constraint_body(input: Input<'_>) -> IResult<Input<'_>, ConstraintBody> {
-    alt((
-        map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
-            ConstraintBody::Semicolon
-        }),
-        map(
-            delimited(
-                preceded(ws_and_comments, tag(&b"{"[..])),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| ConstraintBody::Brace,
-        ),
+    let (input, body) = structured_constraint_body(input)?;
+    Ok((
+        input,
+        match body {
+            StructuredConstraintBody::Semicolon => ConstraintBody::Semicolon,
+            StructuredConstraintBody::Brace { .. } => ConstraintBody::Brace,
+        },
     ))
-    .parse(input)
 }
 
 /// KerML STRING_VALUE: double-quoted string, returns the inner string.
@@ -609,14 +620,10 @@ pub(crate) fn satisfy(input: Input<'_>) -> IResult<Input<'_>, Node<Satisfy>> {
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
             crate::ast::ConnectBody::Semicolon
         }),
-        map(
-            delimited(
-                preceded(ws_and_comments, tag(&b"{"[..])),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| crate::ast::ConnectBody::Brace,
-        ),
+        map(structured_constraint_body, |structured| match structured {
+            StructuredConstraintBody::Semicolon => crate::ast::ConnectBody::Semicolon,
+            StructuredConstraintBody::Brace { .. } => crate::ast::ConnectBody::Brace,
+        }),
     ))
     .parse(input)?;
     Ok((

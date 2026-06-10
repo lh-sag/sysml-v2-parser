@@ -303,6 +303,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::Annotation(n) => {
             PartDefBodyElement::Annotation(dummy_node(n, n.value.clone()))
         }
+        PartDefBodyElement::MetadataAnnotation(n) => {
+            PartDefBodyElement::MetadataAnnotation(dummy_node(n, n.value.clone()))
+        }
         PartDefBodyElement::MetadataKeywordUsage(n) => {
             PartDefBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
         }
@@ -497,6 +500,28 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
         Expression::Tuple(items) => {
             Expression::Tuple(items.iter().map(normalize_expression_node).collect())
         }
+        Expression::Classification { metaclass } => Expression::Classification {
+            metaclass: metaclass.clone(),
+        },
+        Expression::TypeCheck {
+            kind,
+            operand,
+            type_name,
+        } => Expression::TypeCheck {
+            kind: kind.clone(),
+            operand: operand
+                .as_ref()
+                .map(|node| Box::new(normalize_expression_node(node))),
+            type_name: type_name.clone(),
+        },
+        Expression::Select { base, selector } => Expression::Select {
+            base: Box::new(normalize_expression_node(base)),
+            selector: selector.clone(),
+        },
+        Expression::Collect { base, selector } => Expression::Collect {
+            base: Box::new(normalize_expression_node(base)),
+            selector: selector.clone(),
+        },
         Expression::Null => Expression::Null,
     };
     Node::new(Span::dummy(), value)

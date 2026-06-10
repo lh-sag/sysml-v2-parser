@@ -245,3 +245,139 @@ fn transition_first_sets_is_initial_flag() {
     assert!(transition.is_initial);
     assert!(transition.source.is_some());
 }
+
+fn filter_conditions(pkg: &Package) -> Vec<&Node<Expression>> {
+    for element in package_body_elements(pkg) {
+        if let PackageBodyElement::ViewDef(v) = &element.value {
+            if let ViewDefBody::Brace { elements } = &v.value.body {
+                return elements
+                    .iter()
+                    .filter_map(|el| match &el.value {
+                        ViewDefBodyElement::Filter(f) => Some(&f.value.condition),
+                        _ => None,
+                    })
+                    .collect();
+            }
+        }
+    }
+    Vec::new()
+}
+
+#[test]
+fn filter_expressions_use_classification_ast() {
+    let root = parse(&fixture("expression-classification.sysml")).expect("parse");
+    let pkg = first_package(&root);
+    let filters = filter_conditions(pkg);
+    assert_eq!(filters.len(), 4);
+
+    match &filters[0].value {
+        Expression::BinaryOp { op, left, right } => {
+            assert_eq!(op.as_str(), "||");
+            assert!(matches!(
+                left.value,
+                Expression::Classification { ref metaclass }
+                    if metaclass == "SysML::PartUsage"
+            ));
+            assert!(matches!(
+                right.value,
+                Expression::Classification { ref metaclass }
+                    if metaclass == "SysML::PortUsage"
+            ));
+        }
+        other => panic!("expected or of classifications, got {other:?}"),
+    }
+
+    match &filters[1].value {
+        Expression::UnaryOp { op, operand } => {
+            assert_eq!(op.as_str(), "not");
+            assert!(matches!(
+                operand.value,
+                Expression::Classification { ref metaclass }
+                    if metaclass == "SysML::ConnectionUsage"
+            ));
+        }
+        other => panic!("expected not classification, got {other:?}"),
+    }
+
+    match &filters[2].value {
+        Expression::BinaryOp { op, left, right } => {
+            assert_eq!(op.as_str(), "&&");
+            assert!(matches!(
+                left.value,
+                Expression::Classification { ref metaclass } if metaclass == "Approval"
+            ));
+            assert!(
+                matches!(
+                    &right.value,
+                    Expression::MemberAccess(_, member) if member == "approved"
+                ) || matches!(
+                    &right.value,
+                    Expression::FeatureRef(name) if name.ends_with("approved")
+                )
+            );
+        }
+        other => panic!("expected and of classification + member access, got {other:?}"),
+    }
+
+    assert!(matches!(
+        filters[3].value,
+        Expression::FeatureRef(ref name) if name == "guardExpr"
+    ));
+    assert!(filters[0].span.len > 0);
+}
+
+#[test]
+fn transition_guard_feature_ref_retained() {
+    let root = parse(&fixture("expression-classification.sysml")).expect("parse");
+    let pkg = first_package(&root);
+    let state_def = package_body_elements(pkg)
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::StateDef(sd) => Some(&sd.value),
+            _ => None,
+        })
+        .expect("state def");
+    let transition = match &state_def.body {
+        StateDefBody::Brace { elements } => elements
+            .iter()
+            .find_map(|e| match &e.value {
+                StateDefBodyElement::Transition(t) => Some(&t.value),
+                _ => None,
+            })
+            .expect("transition"),
+        _ => panic!("expected brace state body"),
+    };
+    let guard = transition.guard.as_ref().expect("guard");
+    assert!(matches!(
+        guard.value,
+        Expression::FeatureRef(ref name) if name == "guardExpr"
+    ));
+}
+
+#[test]
+fn typed_stakeholder_parameter_parsed() {
+    let root = parse(&fixture("stakeholder-typed.sysml")).expect("parse");
+    let pkg = first_package(&root);
+    let req = match &package_body_elements(pkg)[0].value {
+        PackageBodyElement::RequirementDef(r) => &r.value,
+        other => panic!("expected requirement def, got {other:?}"),
+    };
+    let body = match &req.body {
+        RequirementDefBody::Brace { elements } => elements,
+        _ => panic!("expected brace requirement body"),
+    };
+    let stakeholders: Vec<&StakeholderMember> = body
+        .iter()
+        .filter_map(|e| match &e.value {
+            RequirementDefBodyElement::Stakeholder(s) => Some(&s.value),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(stakeholders.len(), 2);
+    assert_eq!(stakeholders[0].name, "driver");
+    assert_eq!(stakeholders[0].type_name.as_deref(), Some("Person"));
+    assert!(stakeholders[0].name_span.len > 0);
+    assert!(stakeholders[0].type_span.is_some());
+    assert_eq!(stakeholders[1].name, "SafetyConcern");
+    assert!(stakeholders[1].type_name.is_none());
+}

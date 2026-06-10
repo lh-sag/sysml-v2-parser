@@ -15,7 +15,7 @@ use crate::parser::lex::{
 };
 
 const UNTIL_BODY: &[u8] = b";{";
-use crate::parser::metadata_annotation::{annotation, metadata_keyword_usage};
+use crate::parser::metadata_annotation::{annotation, metadata_annotation, metadata_keyword_usage};
 use crate::parser::payload::transition_accept;
 use crate::parser::node_from_to;
 use crate::parser::requirement::{doc_comment, requirement_usage};
@@ -237,6 +237,9 @@ fn state_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<StateDefB
         }),
         map(metadata_keyword_usage, |n| {
             node_from_to(start, input, StateDefBodyElement::MetadataKeywordUsage(n))
+        }),
+        map(metadata_annotation, |n| {
+            node_from_to(start, input, StateDefBodyElement::MetadataAnnotation(n))
         }),
         map(annotation, |n| {
             node_from_to(start, input, StateDefBodyElement::Annotation(n))

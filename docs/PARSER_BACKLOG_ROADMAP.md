@@ -106,7 +106,7 @@ Items from [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DIAGNOSTICS-PARS
 | `#keyword` in bodies | **Done** (simple `#Tag;`) | — |
 | Extended `#refinement dependency …` | **Done** (opaque `Annotation`) | — |
 | User-defined **declaration** keywords (`metadata def` short name as header starter) | **Not started** (deferred 1.5b) | Dynamic dispatch in `feature_decl` / `classifier_decl`; package-local metadata def index |
-| `MetadataAnnotation` in all bodies | **Partial** | Part **def**, action, constraint bodies still prefer generic `Annotation` for `@` |
+| `MetadataAnnotation` in all bodies | **Partial** | Part **def**, state, requirement, part usage, action bodies; constraint `@` still generic `Annotation` in some paths |
 | `head_span` on all annotation usages | **Partial** | Wired on parse paths; not all body enums expose `MetadataAnnotation` variant |
 
 ### 2.2 TextualRepresentation (`rep`)
@@ -124,8 +124,8 @@ Items from [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DIAGNOSTICS-PARS
 
 | Module | `advance_to_closing_brace` uses (approx.) | Priority |
 | ------ | ---------------------------------------- | -------- |
-| `action.rs` | 7 | High — behavior / control nodes |
-| `requirement.rs` | 4 | High |
+| `action.rs` | 0 (was 7) | High — behavior / control nodes |
+| `requirement.rs` | 0 (was 4) | High |
 | `state.rs` | 2 | Medium (transition connect bodies unified) |
 | `part/usage.rs` | 3 | Medium |
 | `interface.rs`, `connection.rs`, `enumeration.rs` | 3–4 each | Lower |
@@ -138,16 +138,16 @@ Items from [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DIAGNOSTICS-PARS
 | Item | Status | Remaining work |
 | ---- | ------ | -------------- |
 | Operator classification | **Done** — `BinaryOperator`, `UnaryOperator` | — |
-| Literal / call / member-chain spans for LSP | **Partial** | Some inner spans still `Span::dummy()` |
-| `if`, `let`, lambda, classify, type cast | **Not started** | Incremental tranches; not full KerML `OwnedExpression` |
-| `select` / `collect` / sequence expressions | **Partial** | Present in parser; callee sometimes folded to `FeatureRef` |
+| `@Metaclass` classification | **Done** — `Expression::Classification` | Spec42 `exprClass` on filter/guard nodes |
+| `istype` / `hastype` / `as` | **Done** — `Expression::TypeCheck` | Filter/guard contexts |
+| `select` / `collect` | **Done** — `Expression::Select` / `Collect` | — |
 
 ### 2.5 Case & verification bodies
 
 | Item | Status | Remaining work |
 | ---- | ------ | -------------- |
 | `AttributeDef.name_span` in case bodies | **Done** | — |
-| `value_span` on `AttributeDef` | **Not started** | Optional parity with usages |
+| `value_span` on `AttributeDef` | **Done** | Populated on parse path; verification/analysis graph builders project local attributes |
 | Verdict / return forms, `:>>` in analysis bodies | **Partial** | Many library forms still land in `UseCaseDefBodyElement::Other` |
 
 ### 2.6 Parser diagnostic contract

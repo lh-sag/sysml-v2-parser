@@ -50,11 +50,13 @@ pub enum RequirementDefBodyElement {
     Doc(Node<DocComment>),
 }
 
-/// Viewpoint stakeholder concern reference.
+/// Viewpoint stakeholder: typed parameter or shorthand concern reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StakeholderMember {
-    pub target: String,
-    pub target_span: Span,
+    pub name: String,
+    pub type_name: Option<String>,
+    pub name_span: Span,
+    pub type_span: Option<Span>,
 }
 
 /// Viewpoint purpose concern reference.

@@ -261,6 +261,7 @@ pub enum StateDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     Annotation(Node<Annotation>),
+    MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Other(String),
     /// `entry` (`;` or body) - entry action.

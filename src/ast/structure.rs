@@ -42,6 +42,7 @@ pub enum PartDefBodyElement {
     Doc(Node<DocComment>),
     Comment(Node<CommentAnnotation>),
     Annotation(Node<Annotation>),
+    MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
     Other(String),
     AttributeDef(Node<AttributeDef>),

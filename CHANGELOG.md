@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-06-10
+
+### Added
+
+- **`Expression::Classification`**: `@Metaclass` filter/guard forms (e.g. `@SysML::PartUsage`) no longer stored as `FeatureRef("@…")`.
+- **`Expression::TypeCheck`**: `istype`, `hastype`, and `as` type tests with optional operand.
+- **`Expression::Select` / `Collect`**: structured `.?` / `.**` selector expressions.
+- **Typed `stakeholder name : Type;`**: extends `StakeholderMember` while keeping shorthand `stakeholder ConcernRef;`.
+- **`MetadataAnnotation`** variants on `StateDefBodyElement` and `PartDefBodyElement` parse paths.
+- **Fixtures** [`expression-classification.sysml`](tests/fixtures/expression-classification.sysml), [`stakeholder-typed.sysml`](tests/fixtures/stakeholder-typed.sysml).
+
+### Changed
+
+- **Opaque brace bodies** in `action.rs` and `requirement.rs` use structured recovery instead of silent `advance_to_closing_brace` (11 sites removed).
+- **`constraint_body` / `satisfy` connect bodies** delegate to `structured_constraint_body`.
+- **`metadata_ref_primary`** emits `Classification` AST nodes.
+
 ## [0.22.0] - 2026-06-09
 
 ### Added

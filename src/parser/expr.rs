@@ -1,6 +1,6 @@
 //! Expression and path parsing for values and bind/connect.
 
-use crate::ast::{BinaryOperator, Expression, Node, UnaryOperator};
+use crate::ast::{BinaryOperator, Expression, Node, TypeCheckKind, UnaryOperator};
 use crate::parser::lex::{name, qualified_name, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::Input;
@@ -159,7 +159,7 @@ fn metadata_ref_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>
     let (input, n) = qualified_name(input)?;
     Ok((
         input,
-        node_from_to(start, input, Expression::FeatureRef(format!("@{}", n))),
+        node_from_to(start, input, Expression::Classification { metaclass: n }),
     ))
 }
 
@@ -360,12 +360,15 @@ fn select_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         node_from_to(
             start,
             input,
-            Expression::MemberAccess(Box::new(base), format!("?{selector}")),
+            Expression::Select {
+                base: Box::new(base),
+                selector,
+            },
         ),
     ))
 }
 
-/// CollectExpression: base `.`**` selector
+/// CollectExpression: base `.**` selector
 fn collect_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let start = input;
     let (input, base) = feature_ref_primary(input)?;
@@ -376,7 +379,10 @@ fn collect_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> 
         node_from_to(
             start,
             input,
-            Expression::MemberAccess(Box::new(base), format!("**{selector}")),
+            Expression::Collect {
+                base: Box::new(base),
+                selector,
+            },
         ),
     ))
 }
@@ -407,6 +413,36 @@ fn sequence_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>>
     ))
 }
 
+/// KerML type test suffix: `istype Type`, `hastype Type`, or `as Type`.
+fn type_check_kind_token(input: Input<'_>) -> IResult<Input<'_>, TypeCheckKind> {
+    let (input, _) = ws_and_comments(input)?;
+    alt((
+        map(tag(&b"istype"[..]), |_| TypeCheckKind::Istype),
+        map(tag(&b"hastype"[..]), |_| TypeCheckKind::Hastype),
+        map(tag(&b"as"[..]), |_| TypeCheckKind::As),
+    ))
+    .parse(input)
+}
+
+fn type_check_primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+    let start = input;
+    let (input, kind) = type_check_kind_token(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, type_name) = qualified_name(input)?;
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            Expression::TypeCheck {
+                kind,
+                operand: None,
+                type_name,
+            },
+        ),
+    ))
+}
+
 /// Primary expression: literal with unit, literal only, metadata ref, feature ref, null, or parenthesized.
 fn primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = ws_and_comments(input)?;
@@ -415,6 +451,7 @@ fn primary(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
         literal_only,
         null_expression,
         metadata_ref_primary,
+        type_check_primary,
         constructor_expression,
         collect_expression,
         select_expression,
@@ -485,6 +522,20 @@ fn postfix<'a>(
         let (input, member) = name(input)?;
         let expr = Expression::MemberAccess(Box::new(current), member);
         return postfix(input, start, node_from_to(start, input, expr));
+    }
+    if let Ok((after_kind, kind)) = type_check_kind_token(input) {
+        if let Ok((after_type, type_name)) = qualified_name(after_kind) {
+            let expr = node_from_to(
+                start,
+                after_type,
+                Expression::TypeCheck {
+                    kind,
+                    operand: Some(Box::new(current)),
+                    type_name,
+                },
+            );
+            return postfix(after_type, start, expr);
+        }
     }
     Ok((input, current))
 }

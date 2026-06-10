@@ -169,6 +169,14 @@ impl BinaryOperator {
     }
 }
 
+/// KerML type-check operator (`istype`, `hastype`, `as`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TypeCheckKind {
+    Istype,
+    Hastype,
+    As,
+}
+
 /// Classified unary operator.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnaryOperator {
@@ -242,6 +250,69 @@ pub enum Expression {
     },
     /// Comma-separated sequence in parentheses, e.g. `(engine1, engine2)` for ordered composition values.
     Tuple(Vec<Node<Expression>>),
+    /// Metadata classification: `@Metaclass` (e.g. `@SysML::PartUsage`).
+    Classification {
+        metaclass: String,
+    },
+    /// Type test: `expr istype Type`, `expr hastype Type`, or `expr as Type`.
+    TypeCheck {
+        kind: TypeCheckKind,
+        operand: Option<Box<Node<Expression>>>,
+        type_name: String,
+    },
+    /// Select expression: `base.?selector`.
+    Select {
+        base: Box<Node<Expression>>,
+        selector: String,
+    },
+    /// Collect expression: `base.**selector`.
+    Collect {
+        base: Box<Node<Expression>>,
+        selector: String,
+    },
     /// KerML null or empty sequence ().
     Null,
+}
+
+impl Expression {
+    /// Whether this expression node is a literal Boolean.
+    pub fn is_boolean_literal(&self) -> bool {
+        matches!(self, Self::LiteralBoolean(_))
+    }
+
+    /// Whether this expression is a metadata `@Metaclass` classification.
+    pub fn is_classification(&self) -> bool {
+        matches!(self, Self::Classification { .. })
+    }
+
+    /// Whether this expression is a KerML type test (`istype` / `hastype` / `as`).
+    pub fn is_type_check(&self) -> bool {
+        matches!(self, Self::TypeCheck { .. })
+    }
+
+    /// Whether a binary operator is a comparison.
+    pub fn binary_op_is_comparison(op: &BinaryOperator) -> bool {
+        matches!(
+            op,
+            BinaryOperator::Eq
+                | BinaryOperator::Ne
+                | BinaryOperator::StrictEq
+                | BinaryOperator::StrictNe
+                | BinaryOperator::Lt
+                | BinaryOperator::Le
+                | BinaryOperator::Gt
+                | BinaryOperator::Ge
+        )
+    }
+
+    /// Whether a binary operator is logical (`and` / `or` / `xor` / `implies`).
+    pub fn binary_op_is_logical(op: &BinaryOperator) -> bool {
+        matches!(
+            op,
+            BinaryOperator::And
+                | BinaryOperator::Or
+                | BinaryOperator::Xor
+                | BinaryOperator::Implies
+        )
+    }
 }

@@ -25,7 +25,7 @@ pub use ast::{
     PerformInOutBinding, PortBody, PortBodyElement, PortDef, PortDefBody, PortDefBodyElement,
     PortUsage, RefBody, RefDecl, RequireConstraint, RequireConstraintBody, RequirementDef,
     RequirementDefBody, RequirementDefBodyElement, RequirementUsage, RootElement, RootNamespace,
-    Span, TextualRepresentation, VerificationCaseDef, VerificationCaseUsage, Visibility,
+    Span, TextualRepresentation, TypeCheckKind, VerificationCaseDef, VerificationCaseUsage, Visibility,
 };
 pub use error::{DiagnosticCategory, DiagnosticSeverity, ParseError};
 pub use parser::{parse_root, parse_with_diagnostics, ParseResult};

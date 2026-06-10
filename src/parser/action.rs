@@ -5,7 +5,7 @@ use crate::ast::{
     ActionUsageBodyElement, AssignStmt, FirstMergeBody, FirstStmt, Flow, ForLoop, InOut, InOutDecl,
     MergeStmt, Node, ParseErrorNode, ThenAction,
 };
-use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
+use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
@@ -148,14 +148,7 @@ fn action_ref_decl(input: Input<'_>) -> IResult<Input<'_>, Node<crate::ast::RefD
         ws_and_comments,
         alt((
             map(tag(&b";"[..]), |_| crate::ast::RefBody::Semicolon),
-            map(
-                delimited(
-                    tag(&b"{"[..]),
-                    advance_to_closing_brace,
-                    preceded(ws_and_comments, tag(&b"}"[..])),
-                ),
-                |_| crate::ast::RefBody::Brace,
-            ),
+            map(consume_action_structured_brace, |_| crate::ast::RefBody::Brace),
         )),
     )
     .parse(input)?;
@@ -182,14 +175,7 @@ fn first_merge_body(input: Input<'_>) -> IResult<Input<'_>, FirstMergeBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(tag(&b";"[..]), |_| FirstMergeBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| FirstMergeBody::Brace,
-        ),
+        map(consume_action_structured_brace, |_| FirstMergeBody::Brace),
     ))
     .parse(input)
 }
@@ -239,11 +225,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
         let (input, _) = opt((
             preceded(ws_and_comments, tag(&b"default"[..])),
             ws1,
-            delimited(
-                tag(&b"{"[..]),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
+            consume_action_structured_brace,
         ))
         .parse(input)?;
 
@@ -253,14 +235,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
             ws_and_comments,
             alt((
                 map(tag(&b";"[..]), |_| ()),
-                map(
-                    delimited(
-                        tag(&b"{"[..]),
-                        advance_to_closing_brace,
-                        preceded(ws_and_comments, tag(&b"}"[..])),
-                    ),
-                    |_| (),
-                ),
+                map(consume_action_structured_brace, |_| ()),
             )),
         )
         .parse(input)?;
@@ -282,14 +257,7 @@ pub(crate) fn in_out_decl(input: Input<'_>) -> IResult<Input<'_>, Node<InOutDecl
                 ws_and_comments,
                 alt((
                     map(tag(&b";"[..]), |_| ()),
-                    map(
-                        delimited(
-                            tag(&b"{"[..]),
-                            advance_to_closing_brace,
-                            preceded(ws_and_comments, tag(&b"}"[..])),
-                        ),
-                        |_| (),
-                    ),
+                    map(consume_action_structured_brace, |_| ()),
                 )),
             )
             .parse(input)?;
@@ -342,6 +310,29 @@ pub(crate) fn action_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, Acti
         },
     )?;
     Ok((input, ActionDefBody::Brace { elements }))
+}
+
+/// Parse `{` action-body members `}` with recovery, discarding elements (opaque ref/first/merge bodies).
+fn consume_action_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _elements) = parse_structured_brace_members(
+        input,
+        ACTION_BODY_STARTERS,
+        "action body",
+        "recovered_action_body_element",
+        action_def_body_element,
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                ACTION_BODY_STARTERS,
+                "action body",
+                "recovered_action_body_element",
+            );
+            let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+            node_from_to(start, end, ActionDefBodyElement::Error(node))
+        },
+    )?;
+    Ok((input, ()))
 }
 
 fn slice_text(start: Input<'_>, end: Input<'_>) -> String {
@@ -665,14 +656,7 @@ fn action_body_decl(input: Input<'_>) -> IResult<Input<'_>, Node<ActionBodyDecl>
     let (input, _) = ws_and_comments(input)?;
     let (input, _) = alt((
         map(tag(&b";"[..]), |_| ()),
-        map(
-            delimited(
-                tag(&b"{"[..]),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| (),
-        ),
+        map(consume_action_structured_brace, |_| ()),
     ))
     .parse(input)?;
 
