@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.2] - 2026-06-11
+
+### Added
+
+- **`PartUsage.usage_prefix`**: optional `abstract` or `variation` prefix on part usages (package-level `variation part …` and nested part usage bodies).
+- **`PartUsageBodyElement::VariantUsage`** and **`VariantUsage`**: `variant` *name* `;` inside variation part usage bodies.
+- **`variation` / `variant`** in `PART_BODY_STARTERS` so part usage body recovery does not abort on variation modelling members.
+
+### Changed
+
+- **`part_usage`**: parses leading `abstract` / `variation` before `part` (nested bodies); package-level `part_def_or_usage` propagates `usage_prefix` onto usages.
+- **Validation fixtures** updated for the new `PartUsage` field (`usage_prefix: None`).
+
+## [0.25.1] - 2026-06-11
+
+### Added
+
+- **`MetadataKeywordUsage`** in action and usage body element parse paths.
+- **`Expression::MetaCast`**: reflective `meta` cast expressions.
+- **`about` targets** on metadata annotations and metadata usages.
+- **Tests** in [`spec42_diagnostics_ast.rs`](tests/spec42_diagnostics_ast.rs) for metadata keyword, `about`, and meta-cast forms.
+
 ## [0.24.0] - 2026-06-10
 
 ### Added
