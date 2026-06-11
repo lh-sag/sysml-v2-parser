@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:-2026-01}"
+VERSION="${1:-2026-04}"
 DESTINATION="${2:-sysml-v2-release}"
 REPO_NAME="SysML-v2-Release"
 ARCHIVE_URL="https://github.com/Systems-Modeling/${REPO_NAME}/archive/refs/tags/${VERSION}.tar.gz"

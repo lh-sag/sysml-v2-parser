@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "2026-01",
+    [string]$Version = "2026-04",
     [string]$Destination = "sysml-v2-release"
 )
 
