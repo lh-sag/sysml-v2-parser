@@ -404,3 +404,296 @@ fn constraint_body_metadata_annotation_parsed() {
     assert_eq!(meta.type_name.as_deref(), Some("ApprovalKind"));
     assert!(meta.head_span.as_ref().is_some_and(|s| s.len > 0));
 }
+
+#[test]
+fn metadata_annotation_brace_body_parses_shorthand_bindings() {
+    let root = parse(
+        r#"package P {
+  part def Design {
+    @ApprovalAnnotation {
+      approved = true;
+      approver = "John";
+    }
+  }
+}"#,
+    )
+    .expect("parse");
+    let pkg = first_package(&root);
+    let part_def = package_body_elements(pkg)
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(pd) => Some(&pd.value),
+            _ => None,
+        })
+        .expect("part def");
+    let meta = match &part_def.body {
+        PartDefBody::Brace { elements } => elements
+            .iter()
+            .find_map(|e| match &e.value {
+                PartDefBodyElement::MetadataAnnotation(m) => Some(&m.value),
+                _ => None,
+            })
+            .expect("metadata annotation"),
+        _ => panic!("expected brace part body"),
+    };
+    let AttributeBody::Brace { elements } = &meta.body else {
+        panic!("expected brace metadata body");
+    };
+    assert_eq!(elements.len(), 2);
+    assert!(matches!(
+        &elements[0].value,
+        AttributeBodyElement::AttributeUsage(u) if u.value.name == "approved"
+    ));
+}
+
+#[test]
+fn metadata_usage_about_clause_parses_targets() {
+    let root = parse(
+        r#"package P {
+  metadata def SecurityRelated;
+  metadata securityNote : SecurityRelated about SecurityReq, Design;
+}"#,
+    )
+    .expect("parse");
+    let pkg = first_package(&root);
+    let usage = package_body_elements(pkg)
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::MetadataUsage(mu) => Some(&mu.value),
+            _ => None,
+        })
+        .expect("metadata usage");
+    assert_eq!(usage.about_targets, vec!["SecurityReq", "Design"]);
+}
+
+#[test]
+fn metadata_annotation_about_clause_parses_targets() {
+    let root = parse(
+        r#"package P {
+  metadata def Tag;
+  part def Design {
+    @Tag about OtherPart;
+  }
+  part def OtherPart;
+}"#,
+    )
+    .expect("parse");
+    let pkg = first_package(&root);
+    let part_def = package_body_elements(pkg)
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::PartDef(pd) if pd.value.identification.name.as_deref() == Some("Design") => {
+                Some(&pd.value)
+            }
+            _ => None,
+        })
+        .expect("Design part def");
+    let meta = match &part_def.body {
+        PartDefBody::Brace { elements } => elements
+            .iter()
+            .find_map(|e| match &e.value {
+                PartDefBodyElement::MetadataAnnotation(m) => Some(&m.value),
+                _ => None,
+            })
+            .expect("metadata annotation"),
+        _ => panic!("expected brace part body"),
+    };
+    assert_eq!(meta.about_targets, vec!["OtherPart"]);
+}
+
+#[test]
+fn action_def_body_metadata_keyword_parses() {
+    let root = parse(
+        r#"package P {
+  metadata def Tag;
+  action def A {
+    #Tag;
+  }
+}"#,
+    )
+    .expect("parse");
+    let pkg = first_package(&root);
+    let action_def = package_body_elements(pkg)
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::ActionDef(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("action def");
+    let keyword = match &action_def.body {
+        ActionDefBody::Brace { elements } => elements
+            .iter()
+            .find_map(|e| match &e.value {
+                ActionDefBodyElement::MetadataKeywordUsage(k) => Some(&k.value),
+                _ => None,
+            })
+            .expect("metadata keyword"),
+        _ => panic!("expected brace action body"),
+    };
+    assert_eq!(keyword.keyword, "Tag");
+}
+
+#[test]
+fn meta_cast_expression_parses_in_attribute_binding() {
+    let root = parse(
+        r#"package P {
+  metadata def SituationMetadata :> SemanticMetadata {
+    attribute :>> baseType = userActions meta SysML::Usage;
+  }
+}"#,
+    )
+    .expect("parse");
+    let pkg = first_package(&root);
+    let metadata_def = match &package_body_elements(pkg)[0].value {
+        PackageBodyElement::MetadataDef(m) => &m.value,
+        other => panic!("expected metadata def, got {other:?}"),
+    };
+    let attr = match &metadata_def.body {
+        AttributeBody::Brace { elements } => elements
+            .iter()
+            .find_map(|e| match &e.value {
+                AttributeBodyElement::AttributeUsage(a) => Some(&a.value),
+                _ => None,
+            })
+            .expect("attribute usage"),
+        _ => panic!("expected brace metadata def body"),
+    };
+    let Some(expr) = attr.value.as_ref() else {
+        panic!("expected value expression");
+    };
+    assert!(matches!(
+        &expr.value,
+        Expression::MetaCast { metaclass, .. } if metaclass == "SysML::Usage"
+    ));
+}
+
+fn metadata_def_body_elements(metadata_def: &MetadataDef) -> &[Node<AttributeBodyElement>] {
+    match &metadata_def.body {
+        AttributeBody::Brace { elements } => elements.as_slice(),
+        _ => panic!("expected brace metadata def body"),
+    }
+}
+
+fn attribute_body_error_count(elements: &[Node<AttributeBodyElement>]) -> usize {
+    elements
+        .iter()
+        .filter(|e| matches!(e.value, AttributeBodyElement::Error(_)))
+        .count()
+}
+
+#[test]
+fn metadata_def_shorthand_annotated_element() {
+    let root = parse(
+        r#"package P {
+  metadata def RequirementRole {
+    :> annotatedElement : SysML::RequirementUsage;
+    attribute role;
+  }
+}"#,
+    )
+    .expect("parse");
+    let pkg = first_package(&root);
+    let metadata_def = match &package_body_elements(pkg)[0].value {
+        PackageBodyElement::MetadataDef(m) => &m.value,
+        other => panic!("expected metadata def, got {other:?}"),
+    };
+    let elements = metadata_def_body_elements(metadata_def);
+    assert_eq!(
+        attribute_body_error_count(elements),
+        0,
+        "unexpected attribute body errors"
+    );
+    let attr = elements
+        .iter()
+        .find_map(|e| match &e.value {
+            AttributeBodyElement::AttributeUsage(a) if a.value.name == "annotatedElement" => {
+                Some(&a.value)
+            }
+            _ => None,
+        })
+        .expect("annotatedElement shorthand binding");
+    assert_eq!(attr.subsets.as_deref(), Some("annotatedElement"));
+    assert_eq!(attr.typing.as_deref(), Some("SysML::RequirementUsage"));
+}
+
+#[test]
+fn metadata_def_shorthand_base_type_meta_cast() {
+    let root = parse(
+        r#"package P {
+  metadata def UserRequirementRole :> SemanticMetadata {
+    :>> baseType = requirementChecks meta SysML::Usage;
+  }
+}"#,
+    )
+    .expect("parse");
+    let pkg = first_package(&root);
+    let metadata_def = match &package_body_elements(pkg)[0].value {
+        PackageBodyElement::MetadataDef(m) => &m.value,
+        other => panic!("expected metadata def, got {other:?}"),
+    };
+    let attr = metadata_def_body_elements(metadata_def)
+        .iter()
+        .find_map(|e| match &e.value {
+            AttributeBodyElement::AttributeUsage(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("baseType shorthand binding");
+    assert_eq!(attr.redefines.as_deref(), Some("baseType"));
+    let Some(expr) = attr.value.as_ref() else {
+        panic!("expected value expression");
+    };
+    assert!(matches!(
+        &expr.value,
+        Expression::MetaCast { metaclass, .. } if metaclass == "SysML::Usage"
+    ));
+}
+
+#[test]
+fn requirement_metadata_def_body_no_errors() {
+    let root = parse(
+        r#"package RequirementMetadata {
+  enum def RequirementRoleKind {
+    enum user;
+    enum system;
+  }
+
+  metadata def RequirementRole {
+    :> annotatedElement : SysML::RequirementUsage;
+    attribute role : RequirementRoleKind;
+  }
+
+  metadata def RequirementIdentity {
+    :> annotatedElement : SysML::RequirementUsage;
+    attribute requirementId;
+  }
+
+  metadata def <user> UserRequirementRole :> SemanticMetadata {
+    :> annotatedElement : SysML::RequirementUsage;
+    :>> baseType = requirementChecks meta SysML::Usage;
+  }
+
+  metadata def <system> SystemRequirementRole :> SemanticMetadata {
+    :> annotatedElement : SysML::RequirementUsage;
+    :>> baseType = requirementChecks meta SysML::Usage;
+  }
+}"#,
+    )
+    .expect("parse");
+    let pkg = first_package(&root);
+    let metadata_defs: Vec<&MetadataDef> = package_body_elements(pkg)
+        .iter()
+        .filter_map(|e| match &e.value {
+            PackageBodyElement::MetadataDef(m) => Some(&m.value),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(metadata_defs.len(), 4, "expected four metadata defs");
+    for metadata_def in metadata_defs {
+        let errors = attribute_body_error_count(metadata_def_body_elements(metadata_def));
+        assert_eq!(
+            errors, 0,
+            "metadata def body should have no parse errors: {:?}",
+            metadata_def.identification.name.as_deref().unwrap_or("<unnamed>")
+        );
+    }
+}

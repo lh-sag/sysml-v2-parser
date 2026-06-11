@@ -184,22 +184,24 @@ pub enum PartUsageBody {
     },
 }
 
-/// Metadata annotation on usage: `@` Name (`:` Type)? MetadataBody (e.g. `@Security;` or `@Safety{isMandatory = true;}`).
+/// Metadata annotation on usage: `@` Name (`:` Type)? (`about` targets)? MetadataBody.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MetadataAnnotation {
     pub name: String,
     pub type_name: Option<String>,
-    pub body: ConnectBody,
+    pub about_targets: Vec<String>,
+    pub body: AttributeBody,
     pub head_span: Option<Span>,
     pub type_span: Option<Span>,
 }
 
-/// User-defined metadata keyword usage: `#keyword` (`:` Type)? body.
+/// User-defined metadata keyword usage: `#keyword` (`:` Type)? (`about` targets)? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MetadataKeywordUsage {
     pub keyword: String,
     pub type_name: Option<String>,
-    pub body: ConnectBody,
+    pub about_targets: Vec<String>,
+    pub body: AttributeBody,
     pub keyword_span: Span,
     pub type_span: Option<Span>,
 }
@@ -490,11 +492,12 @@ pub struct MetadataDef {
     pub body: AttributeBody,
 }
 
-/// Metadata usage: `metadata` name (`:` type)? body (BNF MetadataUsage).
+/// Metadata usage: `metadata` name (`:` type)? (`about` targets)? body (BNF MetadataUsage).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MetadataUsage {
     pub name: String,
     pub type_name: Option<String>,
+    pub about_targets: Vec<String>,
     pub body: AttributeBody,
 }
 

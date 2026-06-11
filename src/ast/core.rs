@@ -254,6 +254,11 @@ pub enum Expression {
     Classification {
         metaclass: String,
     },
+    /// Reflective meta cast: `expr meta Metaclass` (e.g. `userActions meta SysML::Usage`).
+    MetaCast {
+        base: Box<Node<Expression>>,
+        metaclass: String,
+    },
     /// Type test: `expr istype Type`, `expr hastype Type`, or `expr as Type`.
     TypeCheck {
         kind: TypeCheckKind,

@@ -1,10 +1,11 @@
 //! Metadata definition and usage parsing (BNF MetadataDefinition / MetadataUsage).
 
 use crate::ast::{MetadataDef, MetadataUsage, Node};
-use crate::parser::attribute::attribute_body;
+use crate::parser::attribute::metadata_body;
 use crate::parser::definition_header::parse_feature_usage_header;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{name, starts_with_keyword, ws1, ws_and_comments};
+use crate::parser::metadata_annotation::parse_about_targets;
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
@@ -19,7 +20,7 @@ pub(crate) fn metadata_def(input: Input<'_>) -> IResult<Input<'_>, Node<Metadata
         input,
         DefinitionPrefixOptions::new(b"metadata").def_required(),
     )?;
-    let (input, body) = attribute_body(input)?;
+    let (input, body) = metadata_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -47,7 +48,8 @@ pub(crate) fn metadata_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
     }
     let (input, name) = name(input)?;
     let (input, header) = parse_feature_usage_header(input)?;
-    let (input, body) = attribute_body(input)?;
+    let (input, about_targets) = parse_about_targets(input)?;
+    let (input, body) = metadata_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -56,6 +58,7 @@ pub(crate) fn metadata_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Metada
             MetadataUsage {
                 name,
                 type_name: header.type_name,
+                about_targets,
                 body,
             },
         ),

@@ -1,19 +1,38 @@
 //! Metadata/annotation parsing helpers.
 
 use crate::ast::{Annotation, MetadataAnnotation, MetadataKeywordUsage, Node};
+use crate::parser::attribute::metadata_body;
 use crate::parser::interface::connect_body;
-use crate::parser::lex::{name, qualified_name, take_until_terminator, ws_and_comments};
+use crate::parser::lex::{name, qualified_name, starts_with_keyword, take_until_terminator, ws1, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::with_span;
 use crate::parser::Input;
 use nom::bytes::complete::tag;
 use nom::combinator::opt;
+use nom::multi::separated_list1;
 use nom::sequence::preceded;
 use nom::IResult;
 use nom::Parser;
 
-/// Metadata usage: @ Identification ( : Type )? MetadataBody
-/// Simplified: @ name ( : qualified_name )? ( ; | { ... } )
+/// Optional `about` qualifiedName (, qualifiedName)* clause (SysML §7.27.2).
+pub(crate) fn parse_about_targets(input: Input<'_>) -> IResult<Input<'_>, Vec<String>> {
+    let (input, _) = ws_and_comments(input)?;
+    if !starts_with_keyword(input.fragment(), b"about") {
+        return Ok((input, Vec::new()));
+    }
+    let (input, _) = tag(&b"about"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    separated_list1(
+        preceded(
+            ws_and_comments,
+            preceded(tag(&b","[..]), ws_and_comments),
+        ),
+        qualified_name,
+    )
+    .parse(input)
+}
+
+/// Metadata usage: @ Identification ( : Type )? ( about targets )? MetadataBody
 pub(crate) fn metadata_annotation(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<MetadataAnnotation>> {
@@ -29,7 +48,8 @@ pub(crate) fn metadata_annotation(
     let (type_name, type_span) = typed
         .map(|(span, ty)| (Some(ty), Some(span)))
         .unwrap_or((None, None));
-    let (input, body) = connect_body(input)?;
+    let (input, about_targets) = parse_about_targets(input)?;
+    let (input, body) = metadata_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -38,6 +58,7 @@ pub(crate) fn metadata_annotation(
             MetadataAnnotation {
                 name: name_str,
                 type_name,
+                about_targets,
                 body,
                 head_span: Some(head_span),
                 type_span,
@@ -46,7 +67,7 @@ pub(crate) fn metadata_annotation(
     ))
 }
 
-/// User-defined metadata keyword: `#keyword` (`:` Type)? body (simple form only).
+/// User-defined metadata keyword: `#keyword` (`:` Type)? (`about` targets)? body.
 pub(crate) fn metadata_keyword_usage(
     input: Input<'_>,
 ) -> IResult<Input<'_>, Node<MetadataKeywordUsage>> {
@@ -58,7 +79,8 @@ pub(crate) fn metadata_keyword_usage(
     let peek = input.fragment();
     if !(peek.starts_with(b":")
         || peek.starts_with(b";")
-        || peek.starts_with(b"{"))
+        || peek.starts_with(b"{")
+        || starts_with_keyword(peek, b"about"))
     {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
@@ -73,7 +95,8 @@ pub(crate) fn metadata_keyword_usage(
     let (type_name, type_span) = typed
         .map(|(span, ty)| (Some(ty), Some(span)))
         .unwrap_or((None, None));
-    let (input, body) = connect_body(input)?;
+    let (input, about_targets) = parse_about_targets(input)?;
+    let (input, body) = metadata_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -82,6 +105,7 @@ pub(crate) fn metadata_keyword_usage(
             MetadataKeywordUsage {
                 keyword,
                 type_name,
+                about_targets,
                 body,
                 keyword_span,
                 type_span,

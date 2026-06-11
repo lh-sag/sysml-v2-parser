@@ -449,6 +449,10 @@ fn action_def_body_element(
         map(in_out_decl, ActionDefBodyElement::InOutDecl),
         map(doc_comment_stmt, ActionDefBodyElement::Doc),
         map(metadata_annotation, ActionDefBodyElement::MetadataAnnotation),
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_usage,
+            ActionDefBodyElement::MetadataKeywordUsage,
+        ),
         map(annotation, ActionDefBodyElement::Annotation),
         map(action_ref_decl, ActionDefBodyElement::RefDecl),
         map(perform_action_decl, ActionDefBodyElement::Perform),
@@ -606,6 +610,10 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
         map(in_out_decl, ActionUsageBodyElement::InOutDecl),
         map(doc_comment_stmt, ActionUsageBodyElement::Doc),
         map(metadata_annotation, ActionUsageBodyElement::MetadataAnnotation),
+        map(
+            crate::parser::metadata_annotation::metadata_keyword_usage,
+            ActionUsageBodyElement::MetadataKeywordUsage,
+        ),
         map(annotation, ActionUsageBodyElement::Annotation),
         map(action_ref_decl, ActionUsageBodyElement::RefDecl),
         map(bind_, ActionUsageBodyElement::Bind),

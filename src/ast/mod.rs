@@ -503,6 +503,10 @@ fn normalize_expression_node(node: &Node<Expression>) -> Node<Expression> {
         Expression::Classification { metaclass } => Expression::Classification {
             metaclass: metaclass.clone(),
         },
+        Expression::MetaCast { base, metaclass } => Expression::MetaCast {
+            base: Box::new(normalize_expression_node(base)),
+            metaclass: metaclass.clone(),
+        },
         Expression::TypeCheck {
             kind,
             operand,
@@ -836,6 +840,9 @@ fn normalize_action_def_body_element_node(
         ActionDefBodyElement::MetadataAnnotation(n) => {
             ActionDefBodyElement::MetadataAnnotation(dummy_node(n, n.value.clone()))
         }
+        ActionDefBodyElement::MetadataKeywordUsage(n) => {
+            ActionDefBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
+        }
         ActionDefBodyElement::RefDecl(n) => {
             ActionDefBodyElement::RefDecl(dummy_node(n, normalize_ref_decl(&n.value)))
         }
@@ -909,6 +916,9 @@ fn normalize_action_usage_body_element_node(
         }
         ActionUsageBodyElement::MetadataAnnotation(n) => {
             ActionUsageBodyElement::MetadataAnnotation(dummy_node(n, n.value.clone()))
+        }
+        ActionUsageBodyElement::MetadataKeywordUsage(n) => {
+            ActionUsageBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
         }
         ActionUsageBodyElement::InOutDecl(n) => {
             ActionUsageBodyElement::InOutDecl(dummy_node(n, n.value.clone()))

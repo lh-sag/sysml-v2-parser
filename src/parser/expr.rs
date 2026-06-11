@@ -1,7 +1,7 @@
 //! Expression and path parsing for values and bind/connect.
 
 use crate::ast::{BinaryOperator, Expression, Node, TypeCheckKind, UnaryOperator};
-use crate::parser::lex::{name, qualified_name, ws_and_comments};
+use crate::parser::lex::{name, qualified_name, starts_with_keyword, ws_and_comments};
 use crate::parser::node_from_to;
 use crate::parser::Input;
 use nom::branch::alt;
@@ -536,6 +536,16 @@ fn postfix<'a>(
             );
             return postfix(after_type, start, expr);
         }
+    }
+    if starts_with_keyword(input.fragment(), b"meta") {
+        let (input, _) = tag(&b"meta"[..]).parse(input)?;
+        let (input, _) = ws_and_comments(input)?;
+        let (input, metaclass) = qualified_name(input)?;
+        let expr = Expression::MetaCast {
+            base: Box::new(current),
+            metaclass,
+        };
+        return postfix(input, start, node_from_to(start, input, expr));
     }
     Ok((input, current))
 }

@@ -5,7 +5,7 @@ use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::expr::expression;
 use crate::parser::lex::{
-    identification, name, starts_with_keyword, ws1, ws_and_comments,
+    identification, name, starts_with_keyword, subset_operator, ws1, ws_and_comments,
 };
 use crate::parser::node_from_to;
 use crate::parser::requirement::doc_comment;
@@ -23,6 +23,16 @@ use nom::IResult;
 use nom::Parser;
 
 const ATTRIBUTE_BODY_STARTERS: &[&[u8]] = &[b"doc", b"attribute", b"comment", b"@", b"#"];
+
+const METADATA_BODY_STARTERS: &[&[u8]] = &[
+    b"doc",
+    b"attribute",
+    b"ref",
+    b"comment",
+    b":>",
+    b":>>",
+    b":",
+];
 
 fn local_name_from_qualified_name(qname: &str) -> String {
     qname.rsplit("::").next().unwrap_or(qname).to_string()
@@ -369,6 +379,125 @@ pub(crate) fn attribute_usage(input: Input<'_>) -> IResult<Input<'_>, Node<Attri
             },
         ),
     ))
+}
+
+enum MetadataBindingPrefix {
+    Subsets,
+    Redefines,
+}
+
+/// Metadata usage body binding: `ref`? (`:>` | `:>>`)? name (`:` type)? (`=` value)? `;`
+///
+/// Covers §7.27.2 forms such as `approved = true;`, `ref :>> approved = true;`,
+/// `:> annotatedElement : Type;`, and `:>> baseType = expr meta Type;`.
+fn metadata_binding(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeUsage>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, _) =
+        nom::combinator::opt(preceded(ws_and_comments, tag(&b"ref"[..]))).parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, prefix) = nom::combinator::opt(alt((
+        map(
+            preceded(ws_and_comments, tag(&b":>>"[..])),
+            |_| MetadataBindingPrefix::Redefines,
+        ),
+        map(
+            preceded(ws_and_comments, subset_operator),
+            |_| MetadataBindingPrefix::Subsets,
+        ),
+    )))
+    .parse(input)?;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, (name_span, name_str)) = with_span(name).parse(input)?;
+    if is_reserved_shorthand_starter(&name_str) {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            start,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+    let (input, typing_result) = optional_typings(input)?;
+    let (typing_span, typing) = typing_result
+        .map(|(span, s)| (Some(span), Some(s)))
+        .unwrap_or((None, None));
+    let (input, _) = ignored_feature_modifiers(input)?;
+    let (input, value) =
+        nom::combinator::opt(preceded(ws_and_comments, value_part)).parse(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    let (subsets, redefines) = match prefix {
+        Some(MetadataBindingPrefix::Subsets) => (Some(name_str.clone()), None),
+        Some(MetadataBindingPrefix::Redefines) => (None, Some(name_str.clone())),
+        None => (None, None),
+    };
+    Ok((
+        input,
+        node_from_to(
+            start,
+            input,
+            AttributeUsage {
+                name: name_str,
+                typing,
+                subsets,
+                redefines,
+                references: None,
+                crosses: None,
+                value,
+                body: AttributeBody::Semicolon,
+                name_span: Some(name_span),
+                typing_span,
+                redefines_span: None,
+                direction: None,
+            },
+        ),
+    ))
+}
+
+fn metadata_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<AttributeBodyElement>> {
+    let start = input;
+    let (input, _) = ws_and_comments(input)?;
+    let (input, elem) = alt((
+        map(doc_comment, AttributeBodyElement::Doc),
+        map(
+            |i| attribute_def(i, true),
+            AttributeBodyElement::AttributeDef,
+        ),
+        map(attribute_usage, AttributeBodyElement::AttributeUsage),
+        map(metadata_binding, AttributeBodyElement::AttributeUsage),
+    ))
+    .parse(input)?;
+    Ok((input, node_from_to(start, input, elem)))
+}
+
+fn metadata_body_recovery(start: Input<'_>, end: Input<'_>) -> Node<AttributeBodyElement> {
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        METADATA_BODY_STARTERS,
+        "metadata body",
+        "recovered_metadata_body_element",
+    );
+    node_from_to(
+        start,
+        end,
+        AttributeBodyElement::Error(node_from_to(start, end, recovery)),
+    )
+}
+
+/// Metadata annotation/usage body: `;` or `{` members `}` (structured attribute bindings).
+pub(crate) fn metadata_body(input: Input<'_>) -> IResult<Input<'_>, AttributeBody> {
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b";") {
+        let (input, _) = tag(&b";"[..]).parse(input)?;
+        return Ok((input, AttributeBody::Semicolon));
+    }
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        METADATA_BODY_STARTERS,
+        "metadata body",
+        "recovered_metadata_body_element",
+        metadata_body_element,
+        metadata_body_recovery,
+    )?;
+    Ok((input, AttributeBody::Brace { elements }))
 }
 
 /// Shorthand attribute usage (no `attribute` keyword) commonly used inside part bodies.
