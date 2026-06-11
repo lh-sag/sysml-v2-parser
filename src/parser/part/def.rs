@@ -84,10 +84,12 @@ pub(crate) fn part_def_or_usage(input: Input<'_>) -> IResult<Input<'_>, PartDefO
     }
     if let Ok((input, usage)) = part_usage_redefines_only(start, input) {
         let mut usage = usage;
+        usage.value.usage_prefix = definition_prefix;
         usage.value.is_individual = is_individual;
         return Ok((input, PartDefOrUsage::Usage(usage)));
     }
     let (input, mut usage) = part_usage_named(start, input)?;
+    usage.value.usage_prefix = definition_prefix;
     usage.value.is_individual = is_individual;
     Ok((input, PartDefOrUsage::Usage(usage)))
 }

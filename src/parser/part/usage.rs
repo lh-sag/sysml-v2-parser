@@ -41,6 +41,7 @@ pub(crate) fn part_usage_redefines_only<'a>(
             start,
             input,
             PartUsage {
+                usage_prefix: None,
                 is_individual: false,
                 name: String::new(),
                 type_name: String::new(),
@@ -103,6 +104,7 @@ pub(crate) fn part_usage_named<'a>(
             start,
             input,
             PartUsage {
+                usage_prefix: None,
                 is_individual: false,
                 name: name_str,
                 type_name,
@@ -123,7 +125,15 @@ pub(crate) fn part_usage_named<'a>(
 pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>> {
     let start = input;
     let (input, _) = ws_and_comments(input)?;
-    let (input, _) = opt(preceded(tag(&b"abstract"[..]), ws1)).parse(input)?;
+    let (input, usage_prefix) = opt(alt((
+        map(preceded(tag(&b"abstract"[..]), ws1), |_| {
+            DefinitionPrefix::Abstract
+        }),
+        map(preceded(tag(&b"variation"[..]), ws1), |_| {
+            DefinitionPrefix::Variation
+        }),
+    )))
+    .parse(input)?;
     let (input, is_individual) = opt(preceded(tag(&b"individual"[..]), ws1))
         .parse(input)
         .map(|(i, o)| (i, o.is_some()))?;
@@ -136,15 +146,18 @@ pub(crate) fn part_usage(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsage>
         || starts_with_keyword(peek.fragment(), b"defined")
     {
         let (input, mut usage) = anonymous_part_usage(start, input)?;
+        usage.value.usage_prefix = usage_prefix;
         usage.value.is_individual = is_individual;
         return Ok((input, usage));
     }
     if let Ok((input, usage)) = part_usage_redefines_only(start, input) {
         let mut usage = usage;
+        usage.value.usage_prefix = usage_prefix;
         usage.value.is_individual = is_individual;
         return Ok((input, usage));
     }
     let (input, mut usage) = part_usage_named(start, input)?;
+    usage.value.usage_prefix = usage_prefix;
     usage.value.is_individual = is_individual;
     Ok((input, usage))
 }
@@ -173,6 +186,7 @@ fn anonymous_part_usage<'a>(
             start,
             input,
             PartUsage {
+                usage_prefix: None,
                 is_individual: false,
                 name: String::new(),
                 type_name,
@@ -705,6 +719,18 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
     ))
 }
 
+fn variant_usage(input: Input<'_>) -> IResult<Input<'_>, Node<VariantUsage>> {
+    let start = input;
+    let (input, _) = tag(&b"variant"[..]).parse(input)?;
+    let (input, _) = ws1(input)?;
+    let (input, name) = name(input)?;
+    let (input, _) = preceded(ws_and_comments, tag(&b";"[..])).parse(input)?;
+    Ok((
+        input,
+        node_from_to(start, input, VariantUsage { name }),
+    ))
+}
+
 fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsageBodyElement>> {
     let (input, _) = ws_and_comments(input)?;
     let start = input;
@@ -735,6 +761,7 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
         map(perform_action_decl, PartUsageBodyElement::Perform),
         map(perform_usage, PartUsageBodyElement::Perform),
         map(allocate_, PartUsageBodyElement::Allocate),
+        map(variant_usage, PartUsageBodyElement::VariantUsage),
         map(attribute_usage, PartUsageBodyElement::AttributeUsage),
         map(
             attribute_usage_shorthand,

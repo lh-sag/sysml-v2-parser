@@ -155,6 +155,8 @@ pub struct IndividualDef {
 /// Part usage: `part` name `:` type multiplicity? `ordered`? (`redefines`|`:>>`)? value? body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartUsage {
+    /// Optional `abstract` or `variation` prefix on a part usage.
+    pub usage_prefix: Option<DefinitionPrefix>,
     pub is_individual: bool,
     pub name: String,
     /// Type after `:`, e.g. "Vehicle", "AxleAssembly".
@@ -239,6 +241,14 @@ pub enum PartUsageBodyElement {
     StateUsage(Node<StateUsage>),
     MetadataAnnotation(Node<MetadataAnnotation>),
     MetadataKeywordUsage(Node<MetadataKeywordUsage>),
+    /// `variant` name `;` inside a variation part usage body.
+    VariantUsage(Node<VariantUsage>),
+}
+
+/// Variant reference inside a variation part usage: `variant` name `;`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VariantUsage {
+    pub name: String,
 }
 
 /// Enacted performance: `perform` action_path `{` body `}` inside a part usage.

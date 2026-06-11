@@ -465,6 +465,7 @@ fn usages_package() -> Package {
 
 fn part_vehicle1_c1() -> PartUsage {
     PartUsage {
+        usage_prefix: None,
         is_individual: false,
         name: "vehicle1_c1".to_string(),
         type_name: "VehicleA".to_string(),
@@ -483,6 +484,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     body: Some(ConnectBody::Semicolon),
                 }))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
+                    usage_prefix: None,
                     is_individual: false,
                     name: "engine".to_string(),
                     type_name: "Engine".to_string(),
@@ -505,6 +507,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     },
                 ))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
+                    usage_prefix: None,
                     is_individual: false,
                     name: "transmission".to_string(),
                     type_name: "Transmission".to_string(),
@@ -518,6 +521,7 @@ fn part_vehicle1_c1() -> PartUsage {
                     type_ref_span: None,
                 })))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
+                    usage_prefix: None,
                     is_individual: false,
                     name: "driveshaft".to_string(),
                     type_name: "Driveshaft".to_string(),
@@ -608,6 +612,7 @@ fn part_vehicle1_c1() -> PartUsage {
 
 fn part_rear_axle_assembly() -> PartUsage {
     PartUsage {
+        usage_prefix: None,
         is_individual: false,
         name: "rearAxleAssembly".to_string(),
         type_name: "RearAxleAssembly".to_string(),
@@ -656,6 +661,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     body: ConnectBody::Semicolon,
                 }))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
+                    usage_prefix: None,
                     is_individual: false,
                     name: "rearWheel".to_string(),
                     type_name: "Wheel".to_string(),
@@ -669,6 +675,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     type_ref_span: None,
                 })))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
+                    usage_prefix: None,
                     is_individual: false,
                     name: "leftWheel".to_string(),
                     type_name: "".to_string(),
@@ -709,6 +716,7 @@ fn part_rear_axle_assembly() -> PartUsage {
                     type_ref_span: None,
                 })))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
+                    usage_prefix: None,
                     is_individual: false,
                     name: "rightWheel".to_string(),
                     type_name: "".to_string(),
@@ -755,6 +763,7 @@ fn part_rear_axle_assembly() -> PartUsage {
 
 fn part_differential() -> PartUsage {
     PartUsage {
+        usage_prefix: None,
         is_individual: false,
         name: "differential".to_string(),
         type_name: "Differential".to_string(),
@@ -810,6 +819,7 @@ fn part_differential() -> PartUsage {
 
 fn part_rear_axle() -> PartUsage {
     PartUsage {
+        usage_prefix: None,
         is_individual: false,
         name: "rearAxle".to_string(),
         type_name: "RearAxle".to_string(),
@@ -823,6 +833,7 @@ fn part_rear_axle() -> PartUsage {
         body: PartUsageBody::Brace {
             elements: vec![
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
+                    usage_prefix: None,
                     is_individual: false,
                     name: "leftHalfAxle".to_string(),
                     type_name: "HalfAxle".to_string(),
@@ -836,6 +847,7 @@ fn part_rear_axle() -> PartUsage {
                     type_ref_span: None,
                 })))),
                 n(PartUsageBodyElement::PartUsage(Box::new(n(PartUsage {
+                    usage_prefix: None,
                     is_individual: false,
                     name: "rightHalfAxle".to_string(),
                     type_name: "HalfAxle".to_string(),

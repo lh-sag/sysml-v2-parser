@@ -402,6 +402,7 @@ fn normalize_attribute_usage(a: &AttributeUsage) -> AttributeUsage {
 
 fn normalize_part_usage(p: &PartUsage) -> PartUsage {
     PartUsage {
+        usage_prefix: p.usage_prefix.clone(),
         is_individual: p.is_individual,
         name: p.name.clone(),
         type_name: p.type_name.clone(),
@@ -584,6 +585,9 @@ fn normalize_part_usage_body_element_node(
         }
         PartUsageBodyElement::MetadataKeywordUsage(n) => {
             PartUsageBodyElement::MetadataKeywordUsage(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::VariantUsage(n) => {
+            PartUsageBodyElement::VariantUsage(dummy_node(n, n.value.clone()))
         }
     };
     dummy_node(el, value)

@@ -94,6 +94,8 @@ pub(crate) const PART_BODY_STARTERS: &[&[u8]] = &[
     b"satisfy",
     b"snapshot",
     b"timeslice",
+    b"variant",
+    b"variation",
 ];
 
 pub(crate) const PORT_DEF_BODY_STARTERS: &[&[u8]] =
