@@ -111,6 +111,12 @@ pub(crate) fn constraint_def_body_element(
             ConstraintDefBodyElement::Doc,
         )
         .parse(input)?
+    } else if input.fragment().starts_with(b"@") {
+        map(
+            crate::parser::metadata_annotation::metadata_annotation,
+            ConstraintDefBodyElement::MetadataAnnotation,
+        )
+        .parse(input)?
     } else if starts_with_keyword(input.fragment(), b"in")
         || starts_with_keyword(input.fragment(), b"out")
         || starts_with_keyword(input.fragment(), b"inout")
@@ -253,7 +259,7 @@ fn calc_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<CalcDefBod
         }
         if let Ok((input, decl)) = return_decl(input) {
             (input, CalcDefBodyElement::ReturnDecl(decl))
-        } else if let Ok((input, expr)) = calc_return_expression(input) {
+        } else if let Ok((input, expr)) = return_expression_stmt(input) {
             (input, CalcDefBodyElement::Expression(expr))
         } else {
             other_calc_return(input)?
@@ -371,8 +377,8 @@ fn named_return_missing_type(input: Input<'_>) -> bool {
     false
 }
 
-/// `return sum(parts.massKg);` — expression return (SysML calc body), not `return name : Type;`.
-fn calc_return_expression(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
+/// `return sum(parts.massKg);` — expression return (SysML calc / return-ref body), not `return name : Type;`.
+pub(crate) fn return_expression_stmt(input: Input<'_>) -> IResult<Input<'_>, Node<Expression>> {
     let (input, _) = preceded(ws_and_comments, tag(&b"return"[..])).parse(input)?;
     let (input, _) = ws1(input)?;
     let (input, expr) = expression(input)?;

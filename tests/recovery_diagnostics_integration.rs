@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use sysml_v2_parser::ast::{
     PackageBody, PackageBodyElement, PartDefBody, PartDefBodyElement, RequirementDefBody,
-    RequirementDefBodyElement, RootElement, UseCaseDefBody, UseCaseDefBodyElement, ViewBody,
-    ViewBodyElement,
+    RequirementDefBodyElement, RootElement, StateDefBody, StateDefBodyElement, UseCaseDefBody,
+    UseCaseDefBodyElement, ViewBody, ViewBodyElement,
 };
 use sysml_v2_parser::{parse_with_diagnostics, DiagnosticCategory};
 
@@ -682,6 +682,89 @@ fn fixture_glued_package_member_parses_without_separator_diagnostic() {
         })
         .collect();
     assert_eq!(packages, vec![Some("A"), Some("B")]);
+}
+
+#[test]
+fn state_ref_brace_body_recovers_without_aborting_siblings() {
+    let input = r#"package P {
+  state def S {
+    ref r {
+      Ready;
+      entry;
+    }
+    transition t then S;
+  }
+  part def Good;
+}"#;
+    let result = parse_with_diagnostics(input);
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements: pkg_elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    let state_def = pkg_elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::StateDef(s) => Some(&s.value),
+            _ => None,
+        })
+        .expect("state def should be present");
+    let StateDefBody::Brace { elements } = &state_def.body else {
+        panic!("expected state brace body");
+    };
+    assert!(
+        elements
+            .iter()
+            .any(|e| matches!(e.value, StateDefBodyElement::Transition(_))),
+        "transition after opaque ref body should still parse"
+    );
+    assert!(
+        pkg_elements
+            .iter()
+            .any(|e| matches!(e.value, PackageBodyElement::PartDef(_))),
+        "sibling part def should still parse"
+    );
+}
+
+#[test]
+fn part_usage_bind_brace_body_recovers_without_aborting_siblings() {
+    let input = r#"package P {
+  part def Host {
+    port p;
+    part child {
+      port q;
+      bind child.q = p {
+        connect q to p;
+        orphan junk;
+        connect q to p;
+      }
+    }
+  }
+}"#;
+    let result = parse_with_diagnostics(input);
+    let pkg = match &result.root.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let PackageBody::Brace { elements } = &pkg.body else {
+        panic!("expected brace body");
+    };
+    assert!(
+        elements.iter().any(|e| matches!(e.value, PackageBodyElement::PartDef(_))),
+        "part def should parse despite malformed bind connect body"
+    );
+    assert!(
+        !result.errors.iter().any(|e| {
+            matches!(
+                e.code.as_deref(),
+                Some("illegal_top_level_definition") | Some("expected_keyword")
+            )
+        }),
+        "malformed bind body should not cascade as top-level errors: {:?}",
+        result.errors
+    );
 }
 
 #[test]

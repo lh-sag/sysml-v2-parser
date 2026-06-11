@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-06-10
+
+### Added
+
+- **`ConstraintDefBodyElement::MetadataAnnotation`**: `@Name : Type` in constraint definition bodies (not only generic expressions).
+- **`b"@"`** in `CONSTRAINT_DEF_BODY_STARTERS` for structured recovery.
+- **Fixture** [`constraint-metadata-annotation.sysml`](tests/fixtures/constraint-metadata-annotation.sysml).
+- **`ReturnRef.return_expression`**: structured `return <expr>;` inside verification return-ref bodies.
+- **Recovery tests** for state `ref` brace bodies and part-usage bind/ref connect bodies.
+
+### Changed
+
+- **Opaque brace bodies** in `state.rs` (`ref` bodies) and `part/usage.rs` (bind/ref connect bodies) use structured recovery instead of silent `advance_to_closing_brace` (5 sites removed).
+- **`use_case_def_body_brace`** uses `parse_structured_brace_members` (removes body-level abort); `ref :>>` and `return ref` inner bodies parse with structured recovery.
+- **`return_expression_stmt`** shared between calc and return-ref bodies (was private `calc_return_expression`).
+
 ## [0.23.0] - 2026-06-10
 
 ### Added

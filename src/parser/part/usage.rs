@@ -273,6 +273,34 @@ fn part_usage_body_brace(input: Input<'_>) -> IResult<Input<'_>, PartUsageBody> 
     }
 }
 
+fn consume_part_usage_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _elements) = parse_structured_brace_members_with_skip(
+        input,
+        PART_BODY_STARTERS,
+        "part usage body",
+        "recovered_part_usage_body_element",
+        part_usage_body_element,
+        |start, end| {
+            node_from_to(
+                start,
+                end,
+                PartUsageBodyElement::Error(Node::new(
+                    crate::ast::Span::dummy(),
+                    build_recovery_error_node_from_span(
+                        start,
+                        end,
+                        PART_BODY_STARTERS,
+                        "part usage body",
+                        "recovered_part_usage_body_element",
+                    ),
+                )),
+            )
+        },
+        BraceMemberSkip::BodyElementRecover,
+    )?;
+    Ok((input, ()))
+}
+
 /// Action path for perform: name ( '.' name )* -> joined with ".".
 fn perform_action_path(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, first) = name(input)?;
@@ -438,14 +466,7 @@ pub(crate) fn bind_(input: Input<'_>) -> IResult<Input<'_>, Node<Bind>> {
         map(preceded(ws_and_comments, tag(&b";"[..])), |_| {
             Some(ConnectBody::Semicolon)
         }),
-        map(
-            nom::sequence::delimited(
-                preceded(ws_and_comments, tag(&b"{"[..])),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| Some(ConnectBody::Brace),
-        ),
+        map(consume_part_usage_structured_brace, |_| Some(ConnectBody::Brace)),
     ));
     let (input, body) = body_parser.parse(input)?;
     Ok((
@@ -524,14 +545,7 @@ fn ref_body_parse(input: Input<'_>) -> IResult<Input<'_>, RefBody> {
     let (input, _) = ws_and_comments(input)?;
     alt((
         map(tag(&b";"[..]), |_| RefBody::Semicolon),
-        map(
-            nom::sequence::delimited(
-                tag(&b"{"[..]),
-                advance_to_closing_brace,
-                preceded(ws_and_comments, tag(&b"}"[..])),
-            ),
-            |_| RefBody::Brace,
-        ),
+        map(consume_part_usage_structured_brace, |_| RefBody::Brace),
     ))
     .parse(input)
 }
@@ -670,14 +684,7 @@ pub(crate) fn part_ref_usage(input: Input<'_>) -> IResult<Input<'_>, Node<RefDec
         ws_and_comments,
         alt((
             map(tag(&b";"[..]), |_| RefBody::Semicolon),
-            map(
-                delimited(
-                    tag(&b"{"[..]),
-                    advance_to_closing_brace,
-                    preceded(ws_and_comments, tag(&b"}"[..])),
-                ),
-                |_| RefBody::Brace,
-            ),
+            map(consume_part_usage_structured_brace, |_| RefBody::Brace),
         )),
     )
     .parse(input)?;

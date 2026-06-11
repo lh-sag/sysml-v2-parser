@@ -2,6 +2,7 @@ use super::behavior::InOutDecl;
 use super::common::FilterMember;
 use super::common::{ConnectBody, DocComment, Identification, ParseErrorNode};
 use super::requirement::RequirementDefBody;
+use super::structure::MetadataAnnotation;
 use crate::ast::core::{Expression, Node, Span};
 
 /// Constraint definition: `constraint def` Identification body.
@@ -26,6 +27,7 @@ pub enum ConstraintDefBodyElement {
     Error(Node<ParseErrorNode>),
     Doc(Node<DocComment>),
     InOutDecl(Node<InOutDecl>),
+    MetadataAnnotation(Node<MetadataAnnotation>),
     Expression(Node<Expression>), // e.g. totalThrust >= totalWeight * margin
     /// Unmodeled constraint-body element captured as raw text (used for library parsing).
     Other(String),

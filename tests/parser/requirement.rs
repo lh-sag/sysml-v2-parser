@@ -215,6 +215,90 @@ fn test_objective_body_parses_verify_shorthand_and_explicit_requirement() {
 }
 
 #[test]
+fn test_verification_return_ref_parses_return_expression() {
+    let input = "package P { verification def V { return ref verdictResult { return VerdictKind::unknown; } } }";
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let body_elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected package brace body"),
+    };
+    let verification = body_elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::VerificationCaseDef(v) => Some(&v.value),
+            _ => None,
+        })
+        .expect("verification def should be present");
+    let case_body = match &verification.body {
+        UseCaseDefBody::Brace { elements } => elements,
+        _ => panic!("expected verification brace body"),
+    };
+    let return_ref = case_body
+        .iter()
+        .find_map(|e| match &e.value {
+            UseCaseDefBodyElement::ReturnRef(r) => Some(&r.value),
+            _ => None,
+        })
+        .expect("return ref should be present");
+    assert_eq!(return_ref.name, "verdictResult");
+    let expr = return_ref
+        .return_expression
+        .as_ref()
+        .expect("return expression should be parsed");
+    let token = match &expr.value {
+        Expression::MemberAccess(_, member) => member.as_str(),
+        Expression::FeatureRef(name) => name.as_str(),
+        other => panic!("unexpected verdict expression: {other:?}"),
+    };
+    assert!(
+        token.ends_with("unknown"),
+        "expected VerdictKind::unknown token, got {token}"
+    );
+}
+
+#[test]
+fn test_analysis_ref_redefinition_is_structured_not_other() {
+    let input = "package P { analysis def A { ref :>> inheritedResult { return true; } subject s : S; } part def S; }";
+    let result = parse(input).expect("parse should succeed");
+    let pkg = match &result.elements[0].value {
+        RootElement::Package(p) => &p.value,
+        _ => panic!("expected package"),
+    };
+    let body_elements = match &pkg.body {
+        PackageBody::Brace { elements } => elements,
+        _ => panic!("expected package brace body"),
+    };
+    let analysis = body_elements
+        .iter()
+        .find_map(|e| match &e.value {
+            PackageBodyElement::AnalysisCaseDef(a) => Some(&a.value),
+            _ => None,
+        })
+        .expect("analysis def should be present");
+    let case_body = match &analysis.body {
+        UseCaseDefBody::Brace { elements } => elements,
+        _ => panic!("expected analysis brace body"),
+    };
+    assert!(
+        case_body.iter().any(|e| {
+            matches!(e.value, UseCaseDefBodyElement::RefRedefinition(_))
+        }),
+        "expected RefRedefinition, got {:?}",
+        case_body.iter().map(|e| format!("{:?}", e.value)).collect::<Vec<_>>()
+    );
+    assert!(
+        !case_body.iter().any(|e| {
+            matches!(e.value, UseCaseDefBodyElement::Other(_))
+        }),
+        "ref :>> should not land in Other"
+    );
+}
+
+#[test]
 fn test_requirement_body_keeps_structured_attributes_and_later_require_constraint() {
     let input = "package P {\nrequirement def R {\nsubject vehicle : Vehicle;\nattribute massActual: MassValue;\nattribute measuredMass = 42;\nrequire constraint { }\n}\n}";
     let result = parse(input).expect("parse should succeed");

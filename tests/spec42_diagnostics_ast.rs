@@ -381,3 +381,26 @@ fn typed_stakeholder_parameter_parsed() {
     assert_eq!(stakeholders[1].name, "SafetyConcern");
     assert!(stakeholders[1].type_name.is_none());
 }
+
+#[test]
+fn constraint_body_metadata_annotation_parsed() {
+    let root = parse(&fixture("constraint-metadata-annotation.sysml")).expect("parse");
+    let pkg = first_package(&root);
+    let constraint = match &package_body_elements(pkg)[0].value {
+        PackageBodyElement::ConstraintDef(c) => &c.value,
+        other => panic!("expected constraint def, got {other:?}"),
+    };
+    let meta = match &constraint.body {
+        ConstraintDefBody::Brace { elements } => elements
+            .iter()
+            .find_map(|e| match &e.value {
+                ConstraintDefBodyElement::MetadataAnnotation(m) => Some(&m.value),
+                _ => None,
+            })
+            .expect("metadata annotation in constraint body"),
+        _ => panic!("expected brace constraint body"),
+    };
+    assert_eq!(meta.name, "Approval");
+    assert_eq!(meta.type_name.as_deref(), Some("ApprovalKind"));
+    assert!(meta.head_span.as_ref().is_some_and(|s| s.len > 0));
+}

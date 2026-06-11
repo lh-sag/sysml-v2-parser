@@ -310,8 +310,10 @@ pub struct RefRedefinition {
 pub struct ReturnRef {
     pub name: String,
     pub multiplicity: Option<String>,
-    /// Raw body text for now (balanced `{ ... }` including nested braces).
+    /// Raw body text (balanced `{ ... }` including nested braces).
     pub body: String,
+    /// Structured `return <expr>;` inside the body when parsed.
+    pub return_expression: Option<crate::ast::Node<crate::ast::Expression>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

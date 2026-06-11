@@ -7,7 +7,8 @@ use crate::ast::{
     UseCaseUsage, Visibility,
 };
 use crate::parser::attribute::attribute_def;
-use crate::parser::body::advance_to_closing_brace;
+use crate::parser::body::parse_structured_brace_members;
+use crate::parser::constraint::return_expression_stmt;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::lex::{
     identification, name, qualified_name, recover_body_element, skip_statement_or_block,
@@ -21,7 +22,7 @@ use crate::parser::{build_recovery_error_node, build_recovery_error_node_from_sp
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, opt};
-use nom::sequence::preceded;
+use nom::sequence::{delimited, preceded};
 use nom::{IResult, Parser};
 
 fn slice_text(start: Input<'_>, end: Input<'_>) -> String {
@@ -182,12 +183,37 @@ fn ref_redefinition(input: Input<'_>) -> IResult<Input<'_>, Node<RefRedefinition
     let (input, n) = name(input)?;
     let (input, _) = ws_and_comments(input)?;
     let body_start = input;
-    let (input, _) = skip_statement_or_block(input)?;
+    let (input, _) = if input.fragment().starts_with(b"{") {
+        consume_use_case_structured_brace(input)
+    } else {
+        skip_statement_or_block(input)
+    }?;
     let body = slice_text(body_start, input);
     Ok((
         input,
         node_from_to(start, input, RefRedefinition { name: n, body }),
     ))
+}
+
+fn return_ref_body(
+    input: Input<'_>,
+) -> IResult<Input<'_>, (String, Option<crate::ast::Node<crate::ast::Expression>>)> {
+    let body_start = input;
+    let (input, _) = ws_and_comments(input)?;
+    if input.fragment().starts_with(b"{") {
+        let (input, return_expression) = delimited(
+            preceded(ws_and_comments, tag(&b"{"[..])),
+            opt(return_expression_stmt),
+            preceded(ws_and_comments, tag(&b"}"[..])),
+        )
+        .parse(input)?;
+        let body = slice_text(body_start, input);
+        Ok((input, (body, return_expression)))
+    } else {
+        let (input, _) = skip_statement_or_block(input)?;
+        let body = slice_text(body_start, input);
+        Ok((input, (body, None)))
+    }
 }
 
 fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
@@ -199,9 +225,7 @@ fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
     let (input, n) = name(input)?;
     let (input, mult) = opt(multiplicity).parse(input)?;
     let (input, _) = ws_and_comments(input)?;
-    let body_start = input;
-    let (input, _) = skip_statement_or_block(input)?;
-    let body = slice_text(body_start, input);
+    let (input, (body, return_expression)) = return_ref_body(input)?;
     Ok((
         input,
         node_from_to(
@@ -211,9 +235,47 @@ fn return_ref(input: Input<'_>) -> IResult<Input<'_>, Node<ReturnRef>> {
                 name: n,
                 multiplicity: mult,
                 body,
+                return_expression,
             },
         ),
     ))
+}
+
+fn map_use_case_body_recovery(start: Input<'_>, end: Input<'_>) -> UseCaseDefBodyElement {
+    let trimmed = start.fragment();
+    let is_redefinition = trimmed.windows(3).any(|w| w == b":>>");
+    let recovery = build_recovery_error_node_from_span(
+        start,
+        end,
+        USE_CASE_BODY_STARTERS,
+        "use case body",
+        "recovered_use_case_body_element",
+    );
+    let should_error = matches!(
+        recovery.code.as_str(),
+        "missing_member_name" | "missing_type_reference"
+    ) && !is_redefinition;
+    if should_error {
+        let node: Node<ParseErrorNode> = node_from_to(start, end, recovery);
+        UseCaseDefBodyElement::Error(node)
+    } else {
+        let frag = start.fragment();
+        let take = frag.len().min(80);
+        let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+        UseCaseDefBodyElement::Other(preview)
+    }
+}
+
+fn consume_use_case_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _elements) = parse_structured_brace_members(
+        input,
+        USE_CASE_BODY_STARTERS,
+        "use case body",
+        "recovered_use_case_body_element",
+        use_case_def_body_element,
+        |start, end| node_from_to(start, end, map_use_case_body_recovery(start, end)),
+    )?;
+    Ok((input, ()))
 }
 
 fn other_use_case_body_element(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBodyElement> {
@@ -336,83 +398,15 @@ pub(crate) fn use_case_def_body(input: Input<'_>) -> IResult<Input<'_>, UseCaseD
 }
 
 fn use_case_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, UseCaseDefBody> {
-    let (mut input, _) = preceded(ws_and_comments, tag(&b"{"[..])).parse(input)?;
-    let mut elements = Vec::new();
-    loop {
-        let (next, _) = ws_and_comments(input)?;
-        input = next;
-        if input.fragment().is_empty() {
-            return Err(nom::Err::Error(nom::error::Error::new(
-                input,
-                nom::error::ErrorKind::Eof,
-            )));
-        }
-        if input.fragment().starts_with(b"}") {
-            let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-            return Ok((input, UseCaseDefBody::Brace { elements }));
-        }
-        match use_case_def_body_element(input) {
-            Ok((next, element)) => {
-                if next.location_offset() == input.location_offset() {
-                    return Err(nom::Err::Error(nom::error::Error::new(
-                        input,
-                        nom::error::ErrorKind::Many0,
-                    )));
-                }
-                elements.push(element);
-                input = next;
-            }
-            Err(_) => {
-                // Library analysis-case bodies contain many constructs we don't model yet (e.g. `objective name : Type { ... }`,
-                // feature redefinitions with `:>>`, nested calcs/returns). Skip one statement/block to keep parsing stable
-                // but still emit a recoverable diagnostic for malformed or unsupported members.
-                let start_unknown = input;
-                let (next, _) = recover_body_element(input, USE_CASE_BODY_STARTERS)?;
-                if next.location_offset() == start_unknown.location_offset() {
-                    // Fall back to aborting this body to avoid infinite loops.
-                    let (input, _) = advance_to_closing_brace(input)?;
-                    let (input, _) = preceded(ws_and_comments, tag(&b"}"[..])).parse(input)?;
-                    return Ok((input, UseCaseDefBody::Brace { elements }));
-                }
-                // Emit diagnostics only for likely-user mistakes. The SysML v2 release libraries and
-                // validation fixtures use many valid constructs we don't fully model yet (notably `:>>`
-                // redefinitions); those should be captured as `Other` without diagnostics so strict
-                // suites can remain diagnostic-free.
-                let trimmed = start_unknown.fragment();
-                let is_redefinition = trimmed.windows(3).any(|w| w == b":>>");
-                let recovery = build_recovery_error_node_from_span(
-                    start_unknown,
-                    next,
-                    USE_CASE_BODY_STARTERS,
-                    "use case body",
-                    "recovered_use_case_body_element",
-                );
-                let should_error = matches!(
-                    recovery.code.as_str(),
-                    "missing_member_name" | "missing_type_reference"
-                ) && !is_redefinition;
-
-                if should_error {
-                    let node: Node<ParseErrorNode> = node_from_to(start_unknown, next, recovery);
-                    elements.push(node_from_to(
-                        start_unknown,
-                        next,
-                        UseCaseDefBodyElement::Error(node),
-                    ));
-                } else {
-                    let frag = start_unknown.fragment();
-                    let take = frag.len().min(80);
-                    let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
-                    elements.push(node_from_to(
-                        start_unknown,
-                        next,
-                        UseCaseDefBodyElement::Other(preview),
-                    ));
-                }
-                input = next;
-            }
-        }
-    }
+    let (input, elements) = parse_structured_brace_members(
+        input,
+        USE_CASE_BODY_STARTERS,
+        "use case body",
+        "recovered_use_case_body_element",
+        use_case_def_body_element,
+        |start, end| node_from_to(start, end, map_use_case_body_recovery(start, end)),
+    )?;
+    Ok((input, UseCaseDefBody::Brace { elements }))
 }
 
 pub(crate) fn use_case_def_body_element(

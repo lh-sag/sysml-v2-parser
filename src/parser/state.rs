@@ -4,7 +4,7 @@ use crate::ast::{
     EntryAction, FinalState, Node, RefBody, RefDecl, StateDef, StateDefBody, StateDefBodyElement,
     StateUsage, ThenStmt, Transition,
 };
-use crate::parser::body::{advance_to_closing_brace, parse_structured_brace_members};
+use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::expression;
@@ -97,6 +97,46 @@ fn state_def_body_brace(input: Input<'_>) -> IResult<Input<'_>, StateDefBody> {
     Ok((input, StateDefBody::Brace { elements }))
 }
 
+/// Parse `{` state-body members `}` with recovery, discarding elements (opaque ref bodies).
+fn consume_state_structured_brace(input: Input<'_>) -> IResult<Input<'_>, ()> {
+    let (input, _elements) = parse_structured_brace_members(
+        input,
+        STATE_BODY_STARTERS,
+        "state body",
+        "recovered_state_body_element",
+        state_def_body_element,
+        |start, end| {
+            let recovery = build_recovery_error_node_from_span(
+                start,
+                end,
+                STATE_BODY_STARTERS,
+                "state body",
+                "recovered_state_body_element",
+            );
+            if matches!(
+                recovery.code.as_str(),
+                "missing_member_name"
+                    | "missing_type_reference"
+                    | "invalid_bare_identifier_in_state_body"
+                    | "missing_semicolon"
+                    | "missing_body_or_semicolon"
+            ) {
+                node_from_to(
+                    start,
+                    end,
+                    StateDefBodyElement::Error(Node::new(crate::ast::Span::dummy(), recovery)),
+                )
+            } else {
+                let frag = start.fragment();
+                let take = frag.len().min(80);
+                let preview = String::from_utf8_lossy(&frag[..take]).trim().to_string();
+                node_from_to(start, end, StateDefBodyElement::Other(preview))
+            }
+        },
+    )?;
+    Ok((input, ()))
+}
+
 /// Entry action: `entry` (`;` or body)  or  `entry action` name body
 fn entry_action(input: Input<'_>) -> IResult<Input<'_>, Node<EntryAction>> {
     let start = input;
@@ -160,14 +200,7 @@ fn state_ref(input: Input<'_>) -> IResult<Input<'_>, Node<RefDecl>> {
         ws_and_comments,
         alt((
             map(tag(&b";"[..]), |_| RefBody::Semicolon),
-            map(
-                delimited(
-                    tag(&b"{"[..]),
-                    advance_to_closing_brace,
-                    preceded(ws_and_comments, tag(&b"}"[..])),
-                ),
-                |_| RefBody::Brace,
-            ),
+            map(consume_state_structured_brace, |_| RefBody::Brace),
         )),
     )
     .parse(input)?;

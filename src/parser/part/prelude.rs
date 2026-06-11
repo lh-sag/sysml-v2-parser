@@ -11,7 +11,7 @@ pub(crate) use crate::parser::attribute::{
     attribute_def, attribute_usage, attribute_usage_shorthand,
 };
 pub(crate) use crate::parser::body::{
-    advance_to_closing_brace, parse_structured_brace_members_with_skip, BraceMemberSkip,
+    parse_structured_brace_members_with_skip, BraceMemberSkip,
 };
 pub(crate) use crate::parser::build_recovery_error_node_from_span;
 pub(crate) use crate::parser::connection::connection_member_body;

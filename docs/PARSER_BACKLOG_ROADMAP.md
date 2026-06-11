@@ -87,8 +87,9 @@ Parser changes unlock diagnostics only after Spec42 projects new AST fields. **H
 | `metadata_keyword_unresolved` (`#Tag`) | Yes — `MetadataKeywordUsage` (simple `#name`) | Walk new node in part/state/requirement builders | [AST-SEMANTIC-COVERAGE](https://github.com/spec42/spec42/blob/main/docs/engineering/AST-SEMANTIC-COVERAGE.md) |
 | `viewpoint_reference_unresolved` (stakeholder/purpose) | Yes — `StakeholderMember`, `PurposeMember` | Extend collector for new ref spans | same |
 | `viewpoint_rep_language_unresolved` | Partial — `rep` in requirement body | Wire `TextualRep` + `language_span` in graph | same |
-| `transition_guard_non_boolean`, filters, assignments | Partial — `BinaryOperator` / `UnaryOperator` | Replace string heuristics with classified expr walk | same |
-| `assignment_value_incompatible` in case bodies | Partial — `AttributeDef.name_span` | Wire verification-local `AttributeDef` in graph | same |
+| `transition_guard_non_boolean`, filters, assignments | **Done** — `Expression::Classification`, `exprClass` AST walk (0.23.0) | — | same |
+| Typed `stakeholder name : Type` | **Done** — `StakeholderMember` with optional typing (0.23.0) | Graph: `stakeholderType` + typing edge | same |
+| `assignment_value_incompatible` in case bodies | **Done** — `AttributeDef.value_span` + verification graph (0.23.0) | — | same |
 | Initial state via `first` | Yes — `Transition.is_initial` | Align with `ThenStmt` initial edges | same |
 
 **Release train:** parser release → Spec42 graph_builder PR → collector + catalog entry → move item **Deferred → Done** in Spec42 roadmap.
@@ -126,10 +127,9 @@ Items from [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DIAGNOSTICS-PARS
 | ------ | ---------------------------------------- | -------- |
 | `action.rs` | 0 (was 7) | High — behavior / control nodes |
 | `requirement.rs` | 0 (was 4) | High |
-| `state.rs` | 2 | Medium (transition connect bodies unified) |
-| `part/usage.rs` | 3 | Medium |
-| `interface.rs`, `connection.rs`, `enumeration.rs` | 3–4 each | Lower |
-| `usecase.rs`, `import.rs`, `alias.rs`, … | 1–2 each | Lower |
+| `state.rs` | 0 (was 2) | Medium (transition connect bodies unified) |
+| `part/usage.rs` | 0 (was 3) | Medium |
+| `usecase.rs` | 0 (was 2) | Lower — structured case bodies + return-ref expressions |
 
 **Direction:** Per construct family, replace silent skip with `ParseErrorNode` + partial member lists ([LANGUAGE_SERVER_BACKLOG.md](./LANGUAGE_SERVER_BACKLOG.md) P0). One family per PR; track remaining sites here.
 
@@ -148,7 +148,7 @@ Items from [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DIAGNOSTICS-PARS
 | ---- | ------ | -------------- |
 | `AttributeDef.name_span` in case bodies | **Done** | — |
 | `value_span` on `AttributeDef` | **Done** | Populated on parse path; verification/analysis graph builders project local attributes |
-| Verdict / return forms, `:>>` in analysis bodies | **Partial** | Many library forms still land in `UseCaseDefBodyElement::Other` |
+| Verdict / return forms, `:>>` in analysis bodies | **Partial** — `ReturnRef.return_expression`, structured `ref :>>` bodies | Typed objective + remaining library `:>>` nesting |
 
 ### 2.6 Parser diagnostic contract
 
