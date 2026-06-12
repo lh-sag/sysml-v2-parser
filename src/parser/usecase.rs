@@ -458,6 +458,10 @@ pub(crate) fn use_case_def_body_element(
             crate::parser::action::then_action,
             UseCaseDefBodyElement::ThenAction,
         ),
+        map(
+            crate::parser::flow::flow_usage_member,
+            UseCaseDefBodyElement::FlowUsage,
+        ),
         other_use_case_body_element,
     ))
     .parse(input)?;

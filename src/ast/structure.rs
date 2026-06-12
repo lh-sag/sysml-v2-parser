@@ -58,6 +58,7 @@ pub enum PartDefBodyElement {
     InterfaceDef(Node<InterfaceDef>),
     InterfaceUsage(Node<InterfaceUsage>),
     Connect(Node<Connect>),
+    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
     /// `connection` usage member inside a part definition body.
     Connection(Node<ConnectionUsageMember>),
     Perform(Node<Perform>),
@@ -235,6 +236,7 @@ pub enum PartUsageBodyElement {
     Ref(Node<RefDecl>),
     InterfaceUsage(Node<InterfaceUsage>),
     Connect(Node<Connect>),
+    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
     Perform(Node<Perform>),
     Allocate(Node<Allocate>),
     Satisfy(Node<Satisfy>),
@@ -581,6 +583,7 @@ pub enum OccurrenceBodyElement {
     Annotation(Node<Annotation>),
     AssertConstraint(Node<AssertConstraintMember>),
     Other(String),
+    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
     AttributeUsage(Node<AttributeUsage>),
     PartUsage(Box<Node<PartUsage>>),
     OccurrenceUsage(Box<Node<OccurrenceUsage>>),

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.4] - 2026-06-12
+
+### Added
+
+- **Generic `FlowUsage`**: unified parser for `flow`, `message`, and `succession flow` with optional name, `of` payload, `from`/`to` or shorthand `expr to expr`, and `DefinitionBody` brace bodies.
+- **`FlowUsageKind`** and extended **`FlowUsage`** AST (replaces anonymous **`Flow`** struct in action bodies).
+- **`FlowUsage`** wiring in `OccurrenceBodyElement`, `PartDefBodyElement`, `PartUsageBodyElement`, `UseCaseDefBodyElement`, and action bodies (via shared `flow_usage_member`).
+
+### Changed
+
+- **`flow_usage` / `flow_usage_member`**: supersedes named-only package parser and action-body `flow_` helper.
+- **`PART_BODY_STARTERS` / `OCCURRENCE_BODY_STARTERS`**: include `flow`, `message`, `succession`.
+
 ## [0.25.3] - 2026-06-12
 
 ### Fixed

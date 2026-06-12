@@ -35,7 +35,7 @@ pub enum ActionDefBodyElement {
     RefDecl(Node<RefDecl>),
     Perform(Node<Perform>),
     Bind(Node<Bind>),
-    Flow(Node<Flow>),
+    FlowUsage(Node<FlowUsage>),
     FirstStmt(Node<FirstStmt>),
     MergeStmt(Node<MergeStmt>),
     StateUsage(Node<StateUsage>),
@@ -139,7 +139,7 @@ pub enum ActionUsageBodyElement {
     InOutDecl(Node<InOutDecl>),
     RefDecl(Node<RefDecl>),
     Bind(Node<Bind>),
-    Flow(Node<Flow>),
+    FlowUsage(Node<FlowUsage>),
     FirstStmt(Node<FirstStmt>),
     MergeStmt(Node<MergeStmt>),
     StateUsage(Node<StateUsage>),
@@ -157,14 +157,6 @@ pub struct ActionBodyDecl {
     pub text: String,
 }
 
-/// Flow: `flow` from `to` to body.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Flow {
-    pub from: Node<Expression>,
-    pub to: Node<Expression>,
-    pub body: ConnectBody,
-}
-
 /// Flow definition: `flow def` Identification body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowDef {
@@ -174,11 +166,21 @@ pub struct FlowDef {
     pub body: DefinitionBody,
 }
 
-/// Flow usage: `flow` name (`:` type)? [`from` expr `to` expr]? body.
+/// Kind of flow usage statement per SysML v2 §8.2.2.16.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowUsageKind {
+    Flow,
+    Message,
+    SuccessionFlow,
+}
+
+/// Flow usage: `flow` | `message` | `succession flow` with optional name, payload, and endpoints.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowUsage {
-    pub name: String,
+    pub kind: FlowUsageKind,
+    pub name: Option<String>,
     pub type_name: Option<String>,
+    pub payload: Option<Node<Expression>>,
     pub from: Option<Node<Expression>>,
     pub to: Option<Node<Expression>>,
     pub body: DefinitionBody,

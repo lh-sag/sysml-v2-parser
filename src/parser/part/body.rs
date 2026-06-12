@@ -150,6 +150,10 @@ fn part_def_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartDefBod
             map(allocate_, PartDefBodyElement::Allocate),
             map(connection_usage_member, PartDefBodyElement::Connection),
             map(connect_, PartDefBodyElement::Connect),
+            map(
+                crate::parser::flow::flow_usage_member,
+                PartDefBodyElement::FlowUsage,
+            ),
             map(part_def, PartDefBodyElement::PartDef),
             map(part_usage, |p| PartDefBodyElement::PartUsage(Box::new(p))),
             map(individual_usage, |n| {

@@ -349,6 +349,9 @@ fn normalize_part_def_body_element_node(el: &Node<PartDefBodyElement>) -> Node<P
         PartDefBodyElement::Connect(n) => {
             PartDefBodyElement::Connect(dummy_node(n, n.value.clone()))
         }
+        PartDefBodyElement::FlowUsage(n) => {
+            PartDefBodyElement::FlowUsage(dummy_node(n, n.value.clone()))
+        }
         PartDefBodyElement::Connection(n) => {
             PartDefBodyElement::Connection(dummy_node(n, n.value.clone()))
         }
@@ -567,6 +570,9 @@ fn normalize_part_usage_body_element_node(
         }
         PartUsageBodyElement::Connect(n) => {
             PartUsageBodyElement::Connect(dummy_node(n, n.value.clone()))
+        }
+        PartUsageBodyElement::FlowUsage(n) => {
+            PartUsageBodyElement::FlowUsage(dummy_node(n, n.value.clone()))
         }
         PartUsageBodyElement::Perform(n) => {
             PartUsageBodyElement::Perform(dummy_node(n, normalize_perform(&n.value)))
@@ -854,7 +860,9 @@ fn normalize_action_def_body_element_node(
             ActionDefBodyElement::Perform(dummy_node(n, normalize_perform(&n.value)))
         }
         ActionDefBodyElement::Bind(n) => ActionDefBodyElement::Bind(dummy_node(n, n.value.clone())),
-        ActionDefBodyElement::Flow(n) => ActionDefBodyElement::Flow(dummy_node(n, n.value.clone())),
+        ActionDefBodyElement::FlowUsage(n) => {
+            ActionDefBodyElement::FlowUsage(dummy_node(n, n.value.clone()))
+        }
         ActionDefBodyElement::FirstStmt(n) => {
             ActionDefBodyElement::FirstStmt(dummy_node(n, n.value.clone()))
         }
@@ -933,8 +941,8 @@ fn normalize_action_usage_body_element_node(
         ActionUsageBodyElement::Bind(n) => {
             ActionUsageBodyElement::Bind(dummy_node(n, n.value.clone()))
         }
-        ActionUsageBodyElement::Flow(n) => {
-            ActionUsageBodyElement::Flow(dummy_node(n, n.value.clone()))
+        ActionUsageBodyElement::FlowUsage(n) => {
+            ActionUsageBodyElement::FlowUsage(dummy_node(n, n.value.clone()))
         }
         ActionUsageBodyElement::FirstStmt(n) => {
             ActionUsageBodyElement::FirstStmt(dummy_node(n, n.value.clone()))

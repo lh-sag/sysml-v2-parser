@@ -2,7 +2,7 @@
 
 **Single entry point** for open work on `sysml-v2-parser` and the Spec42 diagnostics integration. Historical plans remain as references; this document is updated when items open or close.
 
-**Last updated:** 2026-06-09
+**Last updated:** 2026-06-12
 
 ## How to use this document
 
@@ -211,6 +211,7 @@ Parser-side delivery for [SPEC42-DIAGNOSTICS-PARSER-IMPROVEMENTS.md](./SPEC42-DI
 | P2 §10 | Brace skipping (increment) | Transition uses `connect_body` | — |
 | P2 §11 | Diagnostic catalog | [`diagnostic_catalog.rs`](../src/parser/diagnostic_catalog.rs) | `diagnostic_catalog_documents_stable_codes` |
 | P2 §12 | `first` = initial | `Transition.is_initial` | `transition_first_sets_is_initial_flag` |
+| S42-LIM-005 | Generic `FlowUsage` | `FlowUsageKind`, `flow_usage_member`, body wiring | [tests/parser/flow_usage.rs](../tests/parser/flow_usage.rs) |
 
 **Fixtures:** [tests/fixtures/](../tests/fixtures/) (`transition-accept-typed.sysml`, `final-state.sysml`, `send-payload.sysml`, `metadata-keyword-usage.sysml`, `viewpoint-stakeholder-purpose.sysml`, `verification-local-attribute.sysml`, `requirement-rep-language.sysml`)
 

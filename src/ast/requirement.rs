@@ -341,6 +341,7 @@ pub enum UseCaseDefBodyElement {
     Assign(Node<AssignStmt>),
     ForLoop(Node<ForLoop>),
     ThenAction(Node<ThenAction>),
+    FlowUsage(Node<crate::ast::behavior::FlowUsage>),
 }
 
 /// actor usage `actor pilot : Operator;`

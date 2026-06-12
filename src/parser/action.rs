@@ -2,14 +2,13 @@
 
 use crate::ast::{
     ActionBodyDecl, ActionDef, ActionDefBody, ActionDefBodyElement, ActionUsage, ActionUsageBody,
-    ActionUsageBodyElement, AssignStmt, FirstMergeBody, FirstStmt, Flow, ForLoop, InOut, InOutDecl,
+    ActionUsageBodyElement, AssignStmt, FirstMergeBody, FirstStmt, ForLoop, InOut, InOutDecl,
     MergeStmt, Node, ParseErrorNode, ThenAction,
 };
 use crate::parser::body::parse_structured_brace_members;
 use crate::parser::build_recovery_error_node_from_span;
 use crate::parser::definition_prefix::{parse_definition_prefix, DefinitionPrefixOptions};
 use crate::parser::expr::path_expression;
-use crate::parser::interface::connect_body;
 use crate::parser::lex::{
     name, qualified_name, starts_with_any_keyword, take_until_terminator, ws1, ws_and_comments,
 };
@@ -457,7 +456,10 @@ fn action_def_body_element(
         map(action_ref_decl, ActionDefBodyElement::RefDecl),
         map(perform_action_decl, ActionDefBodyElement::Perform),
         map(bind_, ActionDefBodyElement::Bind),
-        map(flow_, ActionDefBodyElement::Flow),
+        map(
+            crate::parser::flow::flow_usage_member,
+            ActionDefBodyElement::FlowUsage,
+        ),
         map(first_stmt, ActionDefBodyElement::FirstStmt),
         map(merge_stmt, ActionDefBodyElement::MergeStmt),
         map(state_usage, ActionDefBodyElement::StateUsage),
@@ -489,30 +491,6 @@ pub(crate) fn action_def(input: Input<'_>) -> IResult<Input<'_>, Node<ActionDef>
                 identification: prefix.identification,
                 specializes: prefix.specializes,
                 specializes_span: prefix.specializes_span,
-                body,
-            },
-        ),
-    ))
-}
-
-/// Flow: `flow` path `to` path body
-fn flow_(input: Input<'_>) -> IResult<Input<'_>, Node<Flow>> {
-    let start = input;
-    let (input, _) = ws_and_comments(input)?;
-    let (input, _) = tag(&b"flow"[..]).parse(input)?;
-    let (input, _) = ws1(input)?;
-    let (input, from_expr) = path_expression(input)?;
-    let (input, _) = preceded(ws_and_comments, tag(&b"to"[..])).parse(input)?;
-    let (input, to_expr) = preceded(ws_and_comments, path_expression).parse(input)?;
-    let (input, body) = connect_body(input)?;
-    Ok((
-        input,
-        node_from_to(
-            start,
-            input,
-            Flow {
-                from: from_expr,
-                to: to_expr,
                 body,
             },
         ),
@@ -617,7 +595,10 @@ fn action_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<Action
         map(annotation, ActionUsageBodyElement::Annotation),
         map(action_ref_decl, ActionUsageBodyElement::RefDecl),
         map(bind_, ActionUsageBodyElement::Bind),
-        map(flow_, ActionUsageBodyElement::Flow),
+        map(
+            crate::parser::flow::flow_usage_member,
+            ActionUsageBodyElement::FlowUsage,
+        ),
         map(first_stmt, ActionUsageBodyElement::FirstStmt),
         map(merge_stmt, ActionUsageBodyElement::MergeStmt),
         map(state_usage, ActionUsageBodyElement::StateUsage),

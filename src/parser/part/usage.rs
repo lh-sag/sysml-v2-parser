@@ -792,6 +792,10 @@ fn part_usage_body_element(input: Input<'_>) -> IResult<Input<'_>, Node<PartUsag
         map(satisfy, PartUsageBodyElement::Satisfy),
         map(interface_usage, PartUsageBodyElement::InterfaceUsage),
         map(connect_, PartUsageBodyElement::Connect),
+        map(
+            crate::parser::flow::flow_usage_member,
+            PartUsageBodyElement::FlowUsage,
+        ),
     ))
     .parse(input)?;
     Ok((input, node_from_to(start, input, elem)))

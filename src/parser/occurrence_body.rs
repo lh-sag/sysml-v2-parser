@@ -11,6 +11,7 @@ use crate::parser::constraint::{structured_constraint_body, StructuredConstraint
 use crate::parser::lex::{name, recover_body_element, ws1, ws_and_comments};
 use crate::parser::metadata_annotation::annotation;
 use crate::parser::node_from_to;
+use crate::parser::flow::flow_usage_member;
 use crate::parser::part::part_usage;
 use crate::parser::requirement::doc_comment;
 use crate::parser::usage::{optional_typings, specialization_clauses};
@@ -26,6 +27,9 @@ pub(crate) const OCCURRENCE_BODY_STARTERS: &[&[u8]] = &[
     b"doc",
     b"assert",
     b"attribute",
+    b"flow",
+    b"message",
+    b"succession",
     b"part",
     b"individual",
     b"occurrence",
@@ -268,6 +272,7 @@ pub(crate) fn occurrence_body_element(
             OccurrenceBodyElement::AssertConstraint,
         ),
         map(attribute_usage, OccurrenceBodyElement::AttributeUsage),
+        map(flow_usage_member, OccurrenceBodyElement::FlowUsage),
         map(part_usage, |p| {
             OccurrenceBodyElement::PartUsage(Box::new(p))
         }),
