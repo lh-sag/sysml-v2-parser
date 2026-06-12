@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.3] - 2026-06-12
+
+### Fixed
+
+- **State transitions**: `transition <name> first <source> then <target>` no longer sets `is_initial` on named transitions; only unnamed `transition first … then …` forms are initial transitions.
+
 ## [0.25.2] - 2026-06-11
 
 ### Added

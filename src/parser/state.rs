@@ -358,7 +358,8 @@ pub(crate) fn transition(input: Input<'_>) -> IResult<Input<'_>, Node<Transition
     ))
     .parse(input)?;
     let (source, accept, is_initial) = match first_clause {
-        Some((_, _, src, acc)) => (Some(src), acc, true),
+        // Named transitions use `first` for the source state; only unnamed transitions are initial.
+        Some((_, _, src, acc)) => (Some(src), acc, n.is_none()),
         None => (None, None, false),
     };
     // Optional: `if` guard and `do` effect before `then`

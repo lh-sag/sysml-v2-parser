@@ -224,8 +224,8 @@ fn diagnostic_catalog_documents_stable_codes() {
 }
 
 #[test]
-fn transition_first_sets_is_initial_flag() {
-    let input = "package P { state def S { transition t first idle then running; } }";
+fn unnamed_transition_first_sets_is_initial_flag() {
+    let input = "package P { state def S { transition first idle then running; } }";
     let root = parse(input).expect("parse");
     let pkg = first_package(&root);
     let state_def = match &package_body_elements(pkg)[0].value {
@@ -243,6 +243,32 @@ fn transition_first_sets_is_initial_flag() {
         _ => panic!("expected brace body"),
     };
     assert!(transition.is_initial);
+    assert!(transition.source.is_some());
+}
+
+#[test]
+fn named_transition_first_source_is_not_initial() {
+    let input = "package P { state def S { transition t first idle then running; } }";
+    let root = parse(input).expect("parse");
+    let pkg = first_package(&root);
+    let state_def = match &package_body_elements(pkg)[0].value {
+        PackageBodyElement::StateDef(sd) => &sd.value,
+        _ => panic!("expected state def"),
+    };
+    let transition = match &state_def.body {
+        StateDefBody::Brace { elements } => elements
+            .iter()
+            .find_map(|e| match &e.value {
+                StateDefBodyElement::Transition(t) => Some(&t.value),
+                _ => None,
+            })
+            .expect("transition"),
+        _ => panic!("expected brace body"),
+    };
+    assert!(
+        !transition.is_initial,
+        "named transition first source must not be classified as initial"
+    );
     assert!(transition.source.is_some());
 }
 
