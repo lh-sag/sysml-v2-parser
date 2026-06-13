@@ -47,7 +47,10 @@ fn transition_accept_retained_with_spans() {
         _ => panic!("expected brace state body"),
     };
     assert_eq!(transitions.len(), 2);
-    assert!(transitions[0].is_initial);
+    assert!(
+        !transitions[0].is_initial,
+        "named transition to_running must not be classified as initial"
+    );
     let accept = transitions[0]
         .accept
         .as_ref()
