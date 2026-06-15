@@ -104,6 +104,8 @@ pub struct ExhibitState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttributeDef {
     pub name: String,
+    /// Short name from `< ... >` when present (e.g. unit symbol `m`, `EUR`).
+    pub short_name: Option<String>,
     /// Type after `:>`, e.g. Some("ISQ::mass").
     pub typing: Option<String>,
     /// Default or binding after `=` / `:=` / `default =` before the body terminator.

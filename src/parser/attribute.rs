@@ -185,12 +185,14 @@ pub(crate) fn attribute_def(
         .name
         .as_ref()
         .map(|_| crate::parser::span_from_to(ident_start, input));
-    let Some(name_str) = ident.name.clone() else {
-        return Err(nom::Err::Error(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Tag,
-        )));
-    };
+    let name_str = ident
+        .name
+        .clone()
+        .or_else(|| ident.short_name.clone())
+        .ok_or_else(|| {
+            nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
+        })?;
+    let short_name = ident.short_name.clone();
     if disambiguate_from_usage {
         let (peek_input, _) = ws_and_comments(input)?;
         let peek = peek_input.fragment();
@@ -239,6 +241,7 @@ pub(crate) fn attribute_def(
             input,
             AttributeDef {
                 name: name_str,
+                short_name,
                 typing,
                 value,
                 body,

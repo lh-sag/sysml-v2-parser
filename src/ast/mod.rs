@@ -261,6 +261,7 @@ fn normalize_package_body_element_node(el: &Node<PackageBodyElement>) -> Node<Pa
 fn normalize_attribute_def(a: &AttributeDef) -> AttributeDef {
     AttributeDef {
         name: a.name.clone(),
+        short_name: a.short_name.clone(),
         typing: a.typing.clone(),
         value: a.value.clone(),
         body: a.body.clone(),
