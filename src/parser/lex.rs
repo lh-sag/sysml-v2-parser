@@ -453,20 +453,21 @@ fn basic_name(input: Input<'_>) -> IResult<Input<'_>, String> {
 fn quoted_name(input: Input<'_>) -> IResult<Input<'_>, String> {
     let (input, _) = tag(&b"'"[..]).parse(input)?;
     let frag = input.fragment();
-    let mut s = String::new();
     let mut count = 0usize;
+    let mut bytes = Vec::new();
     while count < frag.len() {
         if frag[count] == b'\\' && count + 1 < frag.len() && frag[count + 1] == b'\'' {
-            s.push('\'');
+            bytes.push(b'\'');
             count += 2;
         } else if frag[count] == b'\'' {
             count += 1;
             break;
         } else {
-            s.push(frag[count] as char);
+            bytes.push(frag[count]);
             count += 1;
         }
     }
+    let s = String::from_utf8_lossy(&bytes).into_owned();
     let (input, _) = nom::bytes::complete::take(count).parse(input)?;
     Ok((input, s))
 }
@@ -827,6 +828,12 @@ mod lexical_bnf_tests {
     fn name_parses_unrestricted_name() {
         let (_, n) = name(span_input("'a name'")).expect("UNRESTRICTED_NAME");
         assert_eq!(n, "a name");
+    }
+
+    #[test]
+    fn name_parses_unrestricted_name_with_degree_symbol() {
+        let (_, n) = name(span_input("'\u{00b0}F'")).expect("UNRESTRICTED_NAME");
+        assert_eq!(n, "\u{00b0}F");
     }
 
     #[test]
